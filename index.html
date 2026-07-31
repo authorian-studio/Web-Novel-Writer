@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>Novelist Web</title>
+<link rel="stylesheet" href="style.css" />
+<!-- Manifest supaya bisa "Add to Home Screen" di Android/desktop -->
+<link rel="manifest" href="manifest.json" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- TOP BAR -->
+    <div id="topbar">
+      <button id="btnMenuMobile" class="mobile-only" title="Menu">☰</button>
+      <div class="topbar-left">
+        <button id="btnNew" title="Project Baru">＋ Baru</button>
+        <button id="btnOpenLocal" title="Buka file .novj dari perangkat">📂 Buka File</button>
+        <button id="btnSaveLocal" title="Unduh file .novj">💾 Unduh</button>
+      </div>
+      <div class="topbar-center">
+        <input id="projectTitle" value="Novel Tanpa Judul" />
+      </div>
+      <div class="topbar-right">
+        <span id="saveStatus" class="save-status">Belum disimpan</span>
+        <button id="btnDrive" title="Google Drive">☁ Drive</button>
+        <button id="btnFocus" title="Mode Fokus">🖋</button>
+        <button id="btnTheme" title="Ganti Tema">🌙</button>
+      </div>
+    </div>
+
+    <div id="main">
+      <!-- BINDER / SIDEBAR -->
+      <div id="binder">
+        <div class="binder-section" data-key="manuscript">
+          <div class="binder-header">📖 Manuskrip</div>
+          <div class="binder-list" id="list-manuscript"></div>
+          <button class="add-item" data-parent="manuscript">+ Scene</button>
+        </div>
+        <div class="binder-section" data-key="characters">
+          <div class="binder-header">🧑 Karakter</div>
+          <div class="binder-list" id="list-characters"></div>
+          <button class="add-item" data-parent="characters">+ Karakter</button>
+        </div>
+        <div class="binder-section" data-key="locations">
+          <div class="binder-header">📍 Lokasi</div>
+          <div class="binder-list" id="list-locations"></div>
+          <button class="add-item" data-parent="locations">+ Lokasi</button>
+        </div>
+        <div class="binder-section" data-key="notes">
+          <div class="binder-header">🗒 Catatan</div>
+          <div class="binder-list" id="list-notes"></div>
+          <button class="add-item" data-parent="notes">+ Catatan</button>
+        </div>
+      </div>
+
+      <!-- EDITOR -->
+      <div id="editorWrap">
+        <div id="editorToolbar">
+          <input id="itemTitle" placeholder="Judul scene / item..." />
+          <div class="toolbar-buttons">
+            <button data-cmd="bold"><b>B</b></button>
+            <button data-cmd="italic"><i>I</i></button>
+            <button data-cmd="underline"><u>U</u></button>
+            <button data-cmd="formatBlock" data-value="h2">H2</button>
+          </div>
+          <div id="wordCount">0 kata</div>
+        </div>
+        <div id="editor" contenteditable="true" spellcheck="false"></div>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="fileInputHidden" accept=".novj" style="display:none" />
+
+  <!-- MODAL DRIVE -->
+  <div id="driveModal" class="modal hidden">
+    <div class="modal-box">
+      <h3>☁ Google Drive</h3>
+      <div id="driveNotSignedIn">
+        <p>Login untuk menyimpan project ke cloud dan membukanya di perangkat lain.</p>
+        <button id="btnDriveSignIn">Login dengan Google</button>
+      </div>
+      <div id="driveSignedIn" class="hidden">
+        <p id="driveUserInfo">Login berhasil ✅</p>
+        <button id="btnDriveSaveNow">Simpan project ini ke Drive</button>
+        <button id="btnDriveSignOut">Logout</button>
+        <h4>Project di Drive:</h4>
+        <div id="driveProjectList"></div>
+      </div>
+      <button id="btnCloseDrive" class="close-btn">Tutup</button>
+    </div>
+  </div>
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
