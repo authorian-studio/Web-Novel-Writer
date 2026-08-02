@@ -3,98 +3,242 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-<title>Novelist Web</title>
+<title>Novelist</title>
 <link rel="stylesheet" href="style.css" />
-<!-- Manifest supaya bisa "Add to Home Screen" di Android/desktop -->
 <link rel="manifest" href="manifest.json" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div id="app">
+<div id="app">
 
-    <!-- TOP BAR -->
-    <div id="topbar">
-      <button id="btnMenuMobile" class="mobile-only" title="Menu">☰</button>
-      <div class="topbar-left">
-        <button id="btnNew" title="Project Baru">＋ Baru</button>
-        <button id="btnOpenLocal" title="Buka file .novj dari perangkat">📂 Buka File</button>
-        <button id="btnSaveLocal" title="Unduh file .novj">💾 Unduh</button>
-      </div>
-      <div class="topbar-center">
-        <input id="projectTitle" value="Novel Tanpa Judul" />
-      </div>
-      <div class="topbar-right">
-        <span id="saveStatus" class="save-status">Belum disimpan</span>
-        <button id="btnDrive" title="Google Drive">☁ Drive</button>
-        <button id="btnFocus" title="Mode Fokus">🖋</button>
-        <button id="btnTheme" title="Ganti Tema">🌙</button>
+  <!-- ============ LOGIN GATE ============ -->
+  <section id="loginView" class="view">
+    <div class="login-box">
+      <div class="logo login-logo">Novelist</div>
+      <p class="login-tagline">Tulis novelmu, tersimpan otomatis ke Google Drive-mu sendiri.</p>
+      <button id="btnLoginGoogle" class="btn-google">
+        <span class="g-icon">G</span> Login dengan Google
+      </button>
+      <p class="login-note">Login diperlukan supaya project kamu aman tersimpan &amp; ter-backup otomatis di Google Drive-mu. Tidak ada data yang disimpan di server kami.</p>
+      <p id="loginError" class="login-error hidden"></p>
+    </div>
+  </section>
+
+  <!-- ============ DASHBOARD VIEW ============ -->
+  <section id="dashboardView" class="view hidden">
+    <div id="dashTopbar">
+      <div class="logo">Novelist</div>
+      <div class="dash-actions">
+        <span id="syncIndicator" class="sync-indicator">☁ Tersinkron</span>
+        <button id="btnSettings" class="icon-btn" title="Pengaturan">⋮</button>
       </div>
     </div>
 
-    <div id="main">
-      <!-- BINDER / SIDEBAR -->
-      <div id="binder">
-        <div class="binder-section" data-key="manuscript">
-          <div class="binder-header">📖 Manuskrip</div>
-          <div class="binder-list" id="list-manuscript"></div>
-          <button class="add-item" data-parent="manuscript">+ Scene</button>
-        </div>
-        <div class="binder-section" data-key="characters">
-          <div class="binder-header">🧑 Karakter</div>
-          <div class="binder-list" id="list-characters"></div>
-          <button class="add-item" data-parent="characters">+ Karakter</button>
-        </div>
-        <div class="binder-section" data-key="locations">
-          <div class="binder-header">📍 Lokasi</div>
-          <div class="binder-list" id="list-locations"></div>
-          <button class="add-item" data-parent="locations">+ Lokasi</button>
-        </div>
-        <div class="binder-section" data-key="notes">
-          <div class="binder-header">🗒 Catatan</div>
-          <div class="binder-list" id="list-notes"></div>
-          <button class="add-item" data-parent="notes">+ Catatan</button>
-        </div>
+    <div id="dashBody">
+      <div id="loadingState" class="empty-state hidden">
+        <div class="spinner"></div>
+        <p>Memuat project dari Google Drive...</p>
       </div>
+      <div id="emptyState" class="empty-state hidden">
+        <div class="empty-icon">📚</div>
+        <p>Belum ada project. Klik tombol <b>+</b> di kanan bawah untuk mulai menulis.</p>
+      </div>
+      <div id="projectGrid"></div>
+    </div>
 
-      <!-- EDITOR -->
-      <div id="editorWrap">
-        <div id="editorToolbar">
-          <input id="itemTitle" placeholder="Judul scene / item..." />
-          <div class="toolbar-buttons">
-            <button data-cmd="bold"><b>B</b></button>
-            <button data-cmd="italic"><i>I</i></button>
-            <button data-cmd="underline"><u>U</u></button>
-            <button data-cmd="formatBlock" data-value="h2">H2</button>
+    <button id="btnAddProject" class="fab">
+      <span class="fab-icon">+</span>
+      <span class="fab-label">Add Project</span>
+    </button>
+  </section>
+
+  <!-- ============ PROJECT VIEW ============ -->
+  <section id="editorView" class="view hidden">
+    <div id="projectTopbar">
+      <button id="btnBack" class="icon-btn" title="Kembali ke Perpustakaan">←</button>
+      <div class="project-title-wrap"><input id="projectTitle" value="Novel Tanpa Judul" /></div>
+      <div class="project-top-actions">
+        <span id="saveStatus" class="save-status">Tersimpan</span>
+        <button id="btnPreview" class="icon-btn" title="Preview Manuskrip">👁</button>
+        <button id="btnProjectMenu" class="icon-btn" title="Menu">⋮</button>
+      </div>
+    </div>
+
+    <div id="editorBody">
+      <nav id="railNav">
+        <button data-tab="plot" class="rail-btn"><span class="rail-icon">🧩</span><span class="rail-label">Plot</span></button>
+        <button data-tab="write" class="rail-btn active"><span class="rail-icon">⌨️</span><span class="rail-label">Write</span></button>
+        <button data-tab="organize" class="rail-btn"><span class="rail-icon">🗂️</span><span class="rail-label">Organize</span></button>
+        <button data-tab="schedule" class="rail-btn"><span class="rail-icon">⏱️</span><span class="rail-label">Schedule</span></button>
+        <button data-tab="tools" class="rail-btn"><span class="rail-icon">🛠️</span><span class="rail-label">Tools</span></button>
+      </nav>
+
+      <div id="tabContent">
+        <!-- ============ WRITE TAB ============ -->
+        <div id="tabWrite" class="tab-panel">
+          <div class="scenes-col">
+            <div class="scenes-header">
+              <span>SCENES</span>
+              <div class="scenes-header-actions">
+                <button id="btnAddScene" class="mini-icon-btn" title="Tambah scene">+</button>
+              </div>
+            </div>
+            <div id="sceneList" class="scenes-list"></div>
           </div>
-          <div id="wordCount">0 kata</div>
+
+          <div class="scene-detail-col" id="sceneDetailCol">
+            <div class="scene-empty-hint">Pilih atau buat scene untuk mulai menulis.</div>
+          </div>
         </div>
-        <div id="editor" contenteditable="true" spellcheck="false"></div>
+
+        <!-- ============ ORGANIZE TAB ============ -->
+        <div id="tabOrganize" class="tab-panel hidden">
+          <div class="scenes-col">
+            <div class="organize-subtabs">
+              <button class="org-subtab active" data-cat="characters">🧑 Karakter</button>
+              <button class="org-subtab" data-cat="locations">📍 Lokasi</button>
+              <button class="org-subtab" data-cat="notes">🗒 Catatan</button>
+            </div>
+            <div class="scenes-header">
+              <span id="organizeCatLabel">KARAKTER</span>
+              <div class="scenes-header-actions">
+                <button id="btnAddOrganizeItem" class="mini-icon-btn" title="Tambah">+</button>
+              </div>
+            </div>
+            <div id="organizeList" class="scenes-list"></div>
+          </div>
+          <div class="scene-detail-col" id="organizeDetailCol">
+            <div class="scene-empty-hint">Pilih atau buat item untuk mulai isi.</div>
+          </div>
+        </div>
+
+        <div id="tabPlot" class="tab-panel hidden placeholder-panel">🧩 Fitur Plot akan segera hadir.</div>
+        <div id="tabSchedule" class="tab-panel hidden placeholder-panel">⏱️ Fitur Schedule akan segera hadir.</div>
+        <div id="tabTools" class="tab-panel hidden placeholder-panel">🛠️ Fitur Tools akan segera hadir.</div>
       </div>
     </div>
+  </section>
+</div>
+
+<!-- ============ FOCUS / FULL WRITER OVERLAY ============ -->
+<div id="focusOverlay" class="focus-overlay hidden">
+  <div class="focus-topbar">
+    <input id="focusTitle" class="focus-title" />
+    <button id="btnExitFocus" class="icon-btn" title="Keluar dari mode fokus">✕</button>
   </div>
+  <div id="focusEditor" class="focus-editor" contenteditable="true" spellcheck="false"></div>
+</div>
 
-  <input type="file" id="fileInputHidden" accept=".novj" style="display:none" />
+<!-- ============ DROPDOWNS ============ -->
+<div id="settingsMenu" class="dropdown hidden">
+  <button id="menuThemeToggle">🌙 Ganti Tema</button>
+  <button id="menuDriveLoad">☁ Muat Ulang dari Drive</button>
+  <button id="menuDriveLogout">🚪 Logout Google</button>
+</div>
 
-  <!-- MODAL DRIVE -->
-  <div id="driveModal" class="modal hidden">
-    <div class="modal-box">
-      <h3>☁ Google Drive</h3>
-      <div id="driveNotSignedIn">
-        <p>Login untuk menyimpan project ke cloud dan membukanya di perangkat lain.</p>
-        <button id="btnDriveSignIn">Login dengan Google</button>
-      </div>
-      <div id="driveSignedIn" class="hidden">
-        <p id="driveUserInfo">Login berhasil ✅</p>
-        <button id="btnDriveSaveNow">Simpan project ini ke Drive</button>
-        <button id="btnDriveSignOut">Logout</button>
-        <h4>Project di Drive:</h4>
-        <div id="driveProjectList"></div>
-      </div>
-      <button id="btnCloseDrive" class="close-btn">Tutup</button>
+<div id="cardMenu" class="dropdown hidden">
+  <button data-action="edit">✏️ Edit Info</button>
+  <button data-action="setCover">🖼️ Pasang Cover</button>
+  <button data-action="clearCover">🧹 Hapus Cover</button>
+  <button data-action="backupWord">📄 Backup ke Word</button>
+  <button data-action="sendCloud">☁️ Send to Cloud</button>
+  <button data-action="delete" class="danger">🗑️ Delete</button>
+</div>
+
+<div id="projectMenu" class="dropdown hidden">
+  <button data-action="sendCloud">☁ Simpan ke Drive Sekarang</button>
+  <button data-action="backupNow">🗄 Backup Sekarang</button>
+  <button data-action="history">🕘 Riwayat Backup</button>
+  <button data-action="exportWord">📄 Export ke Word</button>
+</div>
+
+<div id="sceneMenu" class="dropdown hidden">
+  <button data-action="duplicate">📄 Duplikat Scene</button>
+  <button data-action="delete" class="danger">🗑️ Hapus Scene</button>
+</div>
+
+<!-- ============ ADD PROJECT MODAL ============ -->
+<div id="projectModal" class="modal hidden">
+  <div class="modal-box">
+    <h3 id="projectModalTitle">Add project</h3>
+    <label class="field-label">Title</label>
+    <input id="fieldTitle" class="field-input" placeholder="Judul novel..." />
+    <label class="field-label">Description</label>
+    <input id="fieldDesc" class="field-input" placeholder="Deskripsi singkat (opsional)" />
+    <div id="templateBlock">
+      <label class="field-label">Template</label>
+      <label class="template-option">
+        <input type="radio" name="template" value="standard" checked />
+        <div><strong>Novel standard</strong><p>Kategori &amp; metadata untuk karakter, lokasi, catatan</p></div>
+      </label>
+      <label class="template-option">
+        <input type="radio" name="template" value="empty" />
+        <div><strong>Empty</strong><p>Fully customizable</p></div>
+      </label>
+    </div>
+    <div class="modal-buttons">
+      <button id="btnCancelProject" class="btn-secondary">Cancel</button>
+      <button id="btnSaveProject" class="btn-primary">Save</button>
     </div>
   </div>
+</div>
 
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+<!-- ============ ADD SCENE MODAL ============ -->
+<div id="sceneModal" class="modal hidden">
+  <div class="modal-box">
+    <h3>Add scene</h3>
+    <label class="field-label">Title</label>
+    <input id="sceneFieldTitle" class="field-input" autofocus />
+    <label class="field-label">Synopsis</label>
+    <textarea id="sceneFieldSynopsis" class="field-input textarea" placeholder="Synopsis"></textarea>
+    <div class="modal-buttons">
+      <button id="btnCancelScene" class="btn-secondary">Cancel</button>
+      <button id="btnSaveScene" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ADD ORGANIZE ITEM MODAL ============ -->
+<div id="organizeModal" class="modal hidden">
+  <div class="modal-box">
+    <h3>Add item</h3>
+    <label class="field-label">Title</label>
+    <input id="organizeFieldTitle" class="field-input" autofocus />
+    <div class="modal-buttons">
+      <button id="btnCancelOrganize" class="btn-secondary">Cancel</button>
+      <button id="btnSaveOrganize" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ BACKUP HISTORY MODAL ============ -->
+<div id="backupModal" class="modal hidden">
+  <div class="modal-box">
+    <h3>🕘 Riwayat Backup</h3>
+    <p class="field-hint">Backup otomatis tersimpan terpisah di folder Drive "Novelist Web Backups". Klik salah satu untuk memulihkan.</p>
+    <div id="backupList" class="backup-list"></div>
+    <div class="modal-buttons">
+      <button id="btnCloseBackup" class="btn-secondary">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PREVIEW MODAL ============ -->
+<div id="previewModal" class="modal hidden">
+  <div class="modal-box preview-box">
+    <h3 id="previewTitle">Preview</h3>
+    <div id="previewContent" class="preview-content"></div>
+    <div class="modal-buttons">
+      <button id="btnClosePreview" class="btn-secondary">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="coverInputHidden" accept="image/*" style="display:none" />
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

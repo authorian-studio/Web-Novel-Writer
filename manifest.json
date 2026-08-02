@@ -1,9 +1,9 @@
 {
-  "name": "Novelist Web",
+  "name": "Novelist",
   "short_name": "Novelist",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#1b1b1f",
-  "theme_color": "#1b1b1f",
+  "background_color": "#0a0a0c",
+  "theme_color": "#0a0a0c",
   "icons": []
 }
