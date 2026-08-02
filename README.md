@@ -1,5 +1,86 @@
-# Novelist Web — v0.1
+# Novelist Web — v0.3
 
-Aplikasi menulis novel minimalis (mirip Scrivener) yang jalan di **browser**,
-di Windows maupun Android — tidak perlu install apa pun selain browser.
-Bisa disimpan/dibuka lewat Google Drive, atau diunduh sebagai file `.novj` biasa.
+Web app menulis novel: **login Google wajib** → dashboard project →
+editor ala Novelist (tab **Write** dengan Scenes + panel profil, tab
+**Organize** untuk Karakter/Lokasi/Catatan). Semua project **auto-save**
+ke Google Drive-mu sendiri, plus backup bertimestamp otomatis di folder
+terpisah supaya data tidak pernah hilang walau tab/PC tiba-tiba mati.
+
+## Setup Google Drive (WAJIB sebelum dipakai)
+
+1. https://console.cloud.google.com/ → buat project baru
+2. "APIs & Services" > "Library" → aktifkan **Google Drive API**
+3. "APIs & Services" > "OAuth consent screen" → External → isi info dasar →
+   tambahkan emailmu di "Test users"
+4. "APIs & Services" > "Credentials" > "Create Credentials" > "OAuth client ID"
+   - Application type: **Web application**
+   - "Authorized JavaScript origins" → isi URL hosting kamu, misal
+     `https://namakamu.github.io`
+5. Salin **Client ID**, tempel ke `config.js` (ganti `GOOGLE_CLIENT_ID`)
+6. Host filenya (GitHub Pages dll — lihat bagian fix 404 di bawah kalau perlu)
+
+## Cara Kerja Auto-Save & Backup (menjawab kekhawatiran data hilang)
+
+- Begitu login, kamu **wajib** masuk dengan akun Google — tidak ada mode "tanpa login".
+- Setiap kali kamu mengetik (judul, synopsis, isi tulisan, dsb), setelah
+  **4 detik berhenti mengetik**, project otomatis disimpan ke folder Drive
+  **"Novelist Web Projects"** (file `.novj`, update di file yang sama — tidak
+  membuat file baru terus-menerus).
+- Setiap **3 menit sekali** (kalau ada perubahan), dibuat juga **salinan
+  backup bertimestamp** di folder terpisah **"Novelist Web Backups"**.
+  Hanya 6 backup terakhir per project yang disimpan (yang lama otomatis
+  dihapus supaya Drive tidak penuh).
+- Kalau kamu menutup tab sebelum sempat autosave jalan, browser akan
+  menampilkan peringatan konfirmasi ("perubahan belum tersimpan").
+- Kalau ada apa-apa (misal salah edit parah, atau file utama korup), buka
+  menu **⋮ di halaman project > "Riwayat Backup"** untuk memulihkan dari
+  salinan backup manapun.
+- Ctrl+S juga bisa dipakai untuk memaksa simpan langsung.
+
+**Catatan jujur:** ini tetap web browser biasa, bukan aplikasi native — jadi
+kalau PC mati/hang tanpa sempat browser memproses request terakhir, ada
+kemungkinan sangat kecil detik-detik terakhir belum sempat ter-upload. Tapi
+dengan kombinasi autosave 4 detik + backup berkala + peringatan sebelum
+menutup tab, risiko kehilangan tulisan ditekan seminim mungkin.
+
+## Fitur v0.3
+
+**Dashboard:** sama seperti sebelumnya (card project, cover custom, gear
+menu: edit info/cover/backup Word/send to cloud/delete).
+
+**Halaman Project (baru, mengikuti desain Novelist.app):**
+- Rail navigasi kiri: Plot, **Write**, **Organize**, Schedule, Tools
+  (Plot/Schedule/Tools masih placeholder, siap dikembangkan lagi nanti)
+- **Write:**
+  - Kolom kiri "SCENES" + tombol **+** untuk tambah scene (judul & synopsis)
+  - Tiap scene punya 2 ikon: 🖋 **mode fokus** (layar penuh tanpa gangguan)
+    dan 📄 **duplikat scene**
+  - Klik scene → panel kanan "MAIN INFORMATION" (synopsis + status
+    Todo/Draft/Done), dan di bawahnya area menulis penuh
+- **Organize:** sub-tab Karakter / Lokasi / Catatan, tiap kategori bisa
+  tambah item dan diisi kontennya sendiri
+- Tombol 👁 preview → lihat seluruh manuskrip tergabung
+- Menu ⋮ di halaman project → simpan manual, backup manual, riwayat
+  backup, export ke Word
+
+## ⚠️ Fix error 404 / index.html merah di GitHub Pages
+
+Penyebab paling umum: file ke-upload di dalam subfolder, bukan langsung
+di root repo. Struktur yang benar (semua file sejajar di root):
+```
+nama-repo/
+├── index.html
+├── style.css
+├── app.js
+├── config.js
+├── manifest.json
+```
+**Cara upload yang benar:** extract zip → buka isi foldernya → select
+SEMUA file di dalamnya (bukan folder itu sendiri) → upload/drag ke GitHub.
+Lalu cek **Settings > Pages**: Source "Deploy from a branch", Branch
+`main`, folder **`/ (root)`**.
+
+## Rencana Selanjutnya
+- Drag & drop reorder scene
+- Fitur Plot (papan beat/plot point) dan Schedule (target kata harian)
+- Export EPUB
