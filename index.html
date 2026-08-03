@@ -53,6 +53,23 @@
     </button>
   </section>
 
+  <!-- ============ CLOUD LIBRARY VIEW ============ -->
+  <section id="cloudLibraryView" class="view hidden">
+    <div id="cloudTopbar">
+      <button id="btnCloudBack" class="icon-btn" title="Kembali">←</button>
+      <div class="cloud-title">Cloud library</div>
+      <button id="btnCloudMenu" class="icon-btn" title="Menu">⋮</button>
+    </div>
+    <div class="cloud-tabs">
+      <button id="tabSendToCloud" class="cloud-tab active">SEND TO CLOUD</button>
+      <button id="tabReceiveFromCloud" class="cloud-tab">RECEIVE FROM CLOUD</button>
+    </div>
+    <div id="cloudTabContent">
+      <div id="sendToCloudPanel" class="cloud-panel"></div>
+      <div id="receiveFromCloudPanel" class="cloud-panel hidden"></div>
+    </div>
+  </section>
+
   <!-- ============ PROJECT VIEW ============ -->
   <section id="editorView" class="view hidden">
     <div id="projectTopbar">
@@ -133,8 +150,12 @@
 <!-- ============ DROPDOWNS ============ -->
 <div id="settingsMenu" class="dropdown hidden">
   <button id="menuThemeToggle">🌙 Ganti Tema</button>
-  <button id="menuDriveLoad">☁ Muat Ulang dari Drive</button>
+  <button id="menuCloudLibrary">☁ Cloud Library</button>
   <button id="menuDriveLogout">🚪 Logout Google</button>
+</div>
+
+<div id="cloudMenu" class="dropdown hidden">
+  <button id="menuCloudRefresh">🔄 Refresh</button>
 </div>
 
 <div id="cardMenu" class="dropdown hidden">

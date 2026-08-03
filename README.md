@@ -43,6 +43,22 @@ kemungkinan sangat kecil detik-detik terakhir belum sempat ter-upload. Tapi
 dengan kombinasi autosave 4 detik + backup berkala + peringatan sebelum
 menutup tab, risiko kehilangan tulisan ditekan seminim mungkin.
 
+## Cloud Library (kirim/ambil manual — beda dengan autosave)
+
+Selain autosave otomatis di atas, ada juga layar terpisah **Cloud Library**
+(buka lewat menu ⋮ di dashboard) untuk kontrol manual:
+
+- **SEND TO CLOUD** — daftar semua project yang ada di perangkat ini,
+  tinggal pencet ikon ⬆ di project yang mau dikirim manual ke Drive.
+- **RECEIVE FROM CLOUD** — daftar semua file project yang ada di Drive
+  (folder "Novelist Web Projects") lengkap dengan **waktu terakhir
+  disimpan**, tinggal pencet salah satu untuk mengambil/membukanya di
+  perangkat ini.
+
+Ini cocok dipakai kalau kamu ganti perangkat (nanti termasuk dari HP)
+dan mau pilih sendiri project mana yang diambil, terpisah dari mekanisme
+autosave otomatis yang jalan diam-diam di belakang layar.
+
 ## Fitur v0.3
 
 **Dashboard:** sama seperti sebelumnya (card project, cover custom, gear

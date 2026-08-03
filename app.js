@@ -572,7 +572,8 @@ async function saveProjectToDriveMain(p) {
   if (!p || !accessToken) return;
   try {
     const folderId = await getOrCreateFolder(DRIVE_FOLDER_NAME, "main");
-    const json = JSON.stringify(p.data);
+    const payload = { ...p.data, cover: p.cover || null };
+    const json = JSON.stringify(payload);
     const result = await driveUpload(p.title + ".novj", json, p.driveFileId, folderId);
     p.driveFileId = result.id;
     p.updatedAt = new Date().toISOString();
@@ -593,7 +594,8 @@ async function backupProjectNow(p, silent = false) {
     const folderId = await getOrCreateFolder(DRIVE_BACKUP_FOLDER_NAME, "backup");
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const fileName = `${p.title}__${stamp}.novj`;
-    await driveUpload(fileName, JSON.stringify(p.data), null, folderId);
+    const payload = { ...p.data, cover: p.cover || null };
+    await driveUpload(fileName, JSON.stringify(payload), null, folderId);
     await pruneOldBackups(p, folderId);
     if (!silent) toast("Backup tersimpan 🗄");
     dirtySinceLastBackup = false;
@@ -633,7 +635,9 @@ async function openBackupHistory() {
       row.querySelector("button").onclick = async () => {
         if (!confirm("Pulihkan dari backup ini? Perubahan yang belum disimpan di project aktif akan tertimpa.")) return;
         const content = await driveGetContent(f.id);
-        p.data = migrateOldData(JSON.parse(content));
+        const restored = migrateOldData(JSON.parse(content));
+        p.data = restored;
+        p.cover = restored.cover || null;
         el("backupModal").classList.add("hidden");
         openProject(p.id);
         toast("Project dipulihkan dari backup ✅");
@@ -671,6 +675,99 @@ async function loadProjectsFromDrive(isInitialLogin = false) {
   }
   renderDashboard();
 }
+// ================= CLOUD LIBRARY (manual send/receive, terpisah dari autosave) =================
+function formatDateTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) + " " + d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+}
+function openCloudLibrary() {
+  el("dashboardView").classList.add("hidden");
+  el("editorView").classList.add("hidden");
+  el("cloudLibraryView").classList.remove("hidden");
+  switchCloudTab("send");
+}
+function closeCloudLibrary() {
+  el("cloudLibraryView").classList.add("hidden");
+  el("dashboardView").classList.remove("hidden");
+  renderDashboard();
+}
+function switchCloudTab(tab) {
+  el("tabSendToCloud").classList.toggle("active", tab === "send");
+  el("tabReceiveFromCloud").classList.toggle("active", tab === "receive");
+  el("sendToCloudPanel").classList.toggle("hidden", tab !== "send");
+  el("receiveFromCloudPanel").classList.toggle("hidden", tab !== "receive");
+  if (tab === "send") renderSendToCloudList(); else renderReceiveFromCloudList();
+}
+function cloudAvatarHtml(title, cover, colorA, colorB) {
+  if (cover) return `<img class="cloud-avatar" src="${cover}" alt="" />`;
+  const bg = colorA ? `background:linear-gradient(135deg, ${colorA}, ${colorB || colorA})` : "";
+  return `<div class="cloud-avatar cloud-avatar-letter" style="${bg}">${escapeHtml((title || "?").charAt(0).toUpperCase())}</div>`;
+}
+function renderSendToCloudList() {
+  const panel = el("sendToCloudPanel");
+  panel.innerHTML = "";
+  if (projects.length === 0) { panel.innerHTML = '<p class="cloud-empty">Belum ada project lokal untuk dikirim.</p>'; return; }
+  projects.forEach((p) => {
+    const row = document.createElement("div");
+    row.className = "cloud-row";
+    row.innerHTML = `
+      ${cloudAvatarHtml(p.title, p.cover, p.colorA, p.colorB)}
+      <div class="cloud-row-title">${escapeHtml(p.title)}</div>
+      <div class="cloud-row-meta">${p.driveFileId ? "Terkirim " + timeAgo(p.updatedAt) : "Belum pernah dikirim"}</div>
+      <button class="cloud-action-btn" title="Kirim ke Cloud">⬆</button>`;
+    row.querySelector(".cloud-action-btn").onclick = async (e) => {
+      e.stopPropagation();
+      const btn = e.currentTarget;
+      btn.textContent = "…";
+      if (currentProjectId === p.id) flushCurrentEdits();
+      await saveProjectToDriveMain(p);
+      btn.textContent = "✓";
+      setTimeout(() => renderSendToCloudList(), 900);
+    };
+    panel.appendChild(row);
+  });
+}
+async function renderReceiveFromCloudList() {
+  const panel = el("receiveFromCloudPanel");
+  panel.innerHTML = '<p class="cloud-empty">Memuat daftar dari Drive...</p>';
+  try {
+    const folderId = await getOrCreateFolder(DRIVE_FOLDER_NAME, "main");
+    const files = await driveListInFolder(folderId);
+    if (files.length === 0) { panel.innerHTML = '<p class="cloud-empty">Belum ada file tersimpan di Drive.</p>'; return; }
+    panel.innerHTML = "";
+    files.forEach((f) => {
+      const localMatch = projects.find((p) => p.driveFileId === f.id);
+      const row = document.createElement("div");
+      row.className = "cloud-row";
+      row.innerHTML = `
+        ${cloudAvatarHtml(f.name, localMatch?.cover, localMatch?.colorA, localMatch?.colorB)}
+        <div class="cloud-row-title">${escapeHtml(f.name.replace(/\.novj$/, ""))}</div>
+        <div class="cloud-row-meta">${formatDateTime(f.modifiedTime)}</div>
+        <button class="cloud-action-btn" title="Ambil dari Cloud">⬇</button>`;
+      row.onclick = () => pullFromCloud(f);
+      panel.appendChild(row);
+    });
+  } catch (e) { panel.innerHTML = '<p class="cloud-empty">Gagal memuat daftar: ' + e.message + "</p>"; }
+}
+async function pullFromCloud(f) {
+  try {
+    const content = await driveGetContent(f.id);
+    const rawData = JSON.parse(content);
+    const data = migrateOldData(rawData);
+    let p = projects.find((x) => x.driveFileId === f.id);
+    if (p) {
+      p.data = data; p.title = data.title || p.title; p.cover = data.cover || null; p.updatedAt = f.modifiedTime;
+    } else {
+      const colorPair = COLOR_PAIRS[Math.floor(Math.random() * COLOR_PAIRS.length)];
+      p = { id: "proj-" + f.id, title: data.title || f.name.replace(/\.novj$/, ""), description: "", template: "standard", cover: data.cover || null, colorA: colorPair[0], colorB: colorPair[1], driveFileId: f.id, updatedAt: f.modifiedTime, data };
+      projects.unshift(p);
+    }
+    toast('Project "' + p.title + '" diambil dari Cloud ✅');
+    el("cloudLibraryView").classList.add("hidden");
+    openProject(p.id);
+  } catch (e) { alert("Gagal mengambil dari Drive: " + e.message); }
+}
+
 function updateSyncIndicator(ok) {
   const ind = el("syncIndicator");
   ind.textContent = ok ? "☁ Tersinkron" : "☁ Gagal sinkron";
@@ -696,8 +793,25 @@ window.addEventListener("DOMContentLoaded", () => {
   };
   document.addEventListener("click", closeAllDropdowns);
   el("menuThemeToggle").onclick = () => document.body.classList.toggle("light");
-  el("menuDriveLoad").onclick = () => loadProjectsFromDrive(false);
+  el("menuCloudLibrary").onclick = openCloudLibrary;
   el("menuDriveLogout").onclick = driveSignOut;
+
+  // ---- Cloud Library (manual send/receive, terpisah dari autosave) ----
+  el("btnCloudBack").onclick = closeCloudLibrary;
+  el("btnCloudMenu").onclick = (e) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menu = el("cloudMenu");
+    menu.style.top = rect.bottom + 6 + "px"; menu.style.right = (window.innerWidth - rect.right) + "px"; menu.style.left = "auto";
+    menu.classList.remove("hidden");
+  };
+  el("menuCloudRefresh").onclick = () => {
+    closeAllDropdowns();
+    const activeTab = el("tabSendToCloud").classList.contains("active") ? "send" : "receive";
+    switchCloudTab(activeTab);
+  };
+  el("tabSendToCloud").onclick = () => switchCloudTab("send");
+  el("tabReceiveFromCloud").onclick = () => switchCloudTab("receive");
 
   // ---- project view ----
   el("btnBack").onclick = backToLibrary;
