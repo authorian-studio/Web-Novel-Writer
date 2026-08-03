@@ -9,6 +9,7 @@ let tokenClient = null;
 let activeCardMenuProjectId = null;
 let editingProjectId = null;
 let saveDebounceTimer = null;
+let firstDirtyAt = null;
 let backupIntervalHandle = null;
 let dirtySinceLastBackup = false;
 let hasUnsyncedChanges = false;
@@ -141,7 +142,6 @@ function renderDashboard() {
       ? `<img class="cover-img" src="${p.cover}" alt="" draggable="false" />`
       : `<span class="cover-letter">${escapeHtml((p.title || "?").charAt(0).toUpperCase())}</span>`;
     card.innerHTML = `
-      <div class="accent-bar" style="background:${p.colorA}"></div>
       <div class="cover" style="background-image:linear-gradient(135deg, ${p.colorA}, ${p.colorB})">
         <button class="card-gear" title="Opsi">⚙️</button>
         ${coverInner}
@@ -302,6 +302,7 @@ function switchTab(tab) {
 function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 // ---- WRITE TAB : scenes ----
+let draggedSceneId = null;
 function renderSceneList() {
   const p = getProject(currentProjectId);
   const container = el("sceneList");
@@ -309,12 +310,15 @@ function renderSceneList() {
   p.data.scenes.forEach((s) => {
     const card = document.createElement("div");
     card.className = "scene-card" + (s.id === currentSceneId ? " active" : "");
+    card.draggable = true;
     card.innerHTML = `
       <div class="scene-card-top">
+        <span class="drag-handle" title="Seret untuk pindahkan urutan">⠿</span>
         <div class="scene-card-title">${escapeHtml(s.title || "(tanpa judul)")}</div>
         <div class="scene-card-icons">
           <button class="scene-icon-btn" data-action="focus" title="Mode fokus (tanpa gangguan)">🖋</button>
           <button class="scene-icon-btn" data-action="duplicate" title="Duplikat scene">📄</button>
+          <button class="scene-icon-btn scene-icon-danger" data-action="delete" title="Hapus scene">🗑</button>
         </div>
       </div>
       <div class="scene-card-bottom">
@@ -325,10 +329,32 @@ function renderSceneList() {
       const action = e.target.closest(".scene-icon-btn")?.dataset.action;
       if (action === "focus") { openFocusMode(s.id); return; }
       if (action === "duplicate") { duplicateScene(s.id); return; }
+      if (action === "delete") { deleteScene(s.id); return; }
       selectScene(s.id);
+    });
+    card.addEventListener("dragstart", (e) => { draggedSceneId = s.id; card.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; });
+    card.addEventListener("dragend", () => { card.classList.remove("dragging"); });
+    card.addEventListener("dragover", (e) => { e.preventDefault(); card.classList.add("drag-over"); });
+    card.addEventListener("dragleave", () => card.classList.remove("drag-over"));
+    card.addEventListener("drop", (e) => {
+      e.preventDefault();
+      card.classList.remove("drag-over");
+      if (!draggedSceneId || draggedSceneId === s.id) return;
+      reorderScenes(draggedSceneId, s.id);
     });
     container.appendChild(card);
   });
+}
+function reorderScenes(draggedId, targetId) {
+  const p = getProject(currentProjectId);
+  const arr = p.data.scenes;
+  const fromIdx = arr.findIndex((x) => x.id === draggedId);
+  const toIdx = arr.findIndex((x) => x.id === targetId);
+  if (fromIdx < 0 || toIdx < 0) return;
+  const [item] = arr.splice(fromIdx, 1);
+  arr.splice(toIdx, 0, item);
+  renderSceneList();
+  markDirtyAndSchedule();
 }
 function selectScene(id) {
   syncSceneFromDetail();
@@ -456,6 +482,7 @@ function switchOrganizeCat(cat) {
   el("organizeCatLabel").textContent = labels[cat];
   renderOrganizeList(); renderOrganizeDetail();
 }
+let draggedOrgItemId = null;
 function renderOrganizeList() {
   const p = getProject(currentProjectId);
   const list = p.data.organize[currentOrgCat] || [];
@@ -464,10 +491,49 @@ function renderOrganizeList() {
   list.forEach((item) => {
     const card = document.createElement("div");
     card.className = "scene-card" + (item.id === currentOrgItemId ? " active" : "");
-    card.innerHTML = `<div class="scene-card-top"><div class="scene-card-title">${escapeHtml(item.title)}</div></div>`;
-    card.onclick = () => { syncOrganizeFromDetail(); currentOrgItemId = item.id; renderOrganizeList(); renderOrganizeDetail(); };
+    card.draggable = true;
+    card.innerHTML = `
+      <div class="scene-card-top">
+        <span class="drag-handle" title="Seret untuk pindahkan urutan">⠿</span>
+        <div class="scene-card-title">${escapeHtml(item.title)}</div>
+        <div class="scene-card-icons">
+          <button class="scene-icon-btn scene-icon-danger" data-action="delete" title="Hapus">🗑</button>
+        </div>
+      </div>`;
+    card.addEventListener("click", (e) => {
+      if (e.target.closest(".scene-icon-btn")?.dataset.action === "delete") { deleteOrganizeItem(item.id); return; }
+      syncOrganizeFromDetail(); currentOrgItemId = item.id; renderOrganizeList(); renderOrganizeDetail();
+    });
+    card.addEventListener("dragstart", (e) => { draggedOrgItemId = item.id; card.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; });
+    card.addEventListener("dragend", () => card.classList.remove("dragging"));
+    card.addEventListener("dragover", (e) => { e.preventDefault(); card.classList.add("drag-over"); });
+    card.addEventListener("dragleave", () => card.classList.remove("drag-over"));
+    card.addEventListener("drop", (e) => {
+      e.preventDefault(); card.classList.remove("drag-over");
+      if (!draggedOrgItemId || draggedOrgItemId === item.id) return;
+      reorderOrganizeItems(draggedOrgItemId, item.id);
+    });
     container.appendChild(card);
   });
+}
+function reorderOrganizeItems(draggedId, targetId) {
+  const p = getProject(currentProjectId);
+  const arr = p.data.organize[currentOrgCat];
+  const fromIdx = arr.findIndex((x) => x.id === draggedId);
+  const toIdx = arr.findIndex((x) => x.id === targetId);
+  if (fromIdx < 0 || toIdx < 0) return;
+  const [it] = arr.splice(fromIdx, 1);
+  arr.splice(toIdx, 0, it);
+  renderOrganizeList();
+  markDirtyAndSchedule();
+}
+function deleteOrganizeItem(id) {
+  if (!confirm("Hapus item ini?")) return;
+  const p = getProject(currentProjectId);
+  p.data.organize[currentOrgCat] = p.data.organize[currentOrgCat].filter((x) => x.id !== id);
+  if (currentOrgItemId === id) currentOrgItemId = null;
+  renderOrganizeList(); renderOrganizeDetail();
+  markDirtyAndSchedule();
 }
 function syncOrganizeFromDetail() {
   if (!currentProjectId || !currentOrgItemId) return;
@@ -512,16 +578,23 @@ function openPreview() {
 }
 
 // ================= SAVE STATUS =================
-function markDirty() { hasUnsyncedChanges = true; dirtySinceLastBackup = true; el("saveStatus").textContent = "Menyimpan..."; }
-function markSaved(label) { hasUnsyncedChanges = false; el("saveStatus").textContent = label || "Tersimpan"; }
+function markDirty() { hasUnsyncedChanges = true; dirtySinceLastBackup = true; if (!firstDirtyAt) firstDirtyAt = Date.now(); el("saveStatus").textContent = "Menyimpan..."; }
+function markSaved(label) { hasUnsyncedChanges = false; firstDirtyAt = null; el("saveStatus").textContent = label || "Tersimpan"; }
+async function doAutosaveFlush() {
+  clearTimeout(saveDebounceTimer);
+  firstDirtyAt = null;
+  flushCurrentEdits();
+  const p = getProject(currentProjectId);
+  if (p) { p.title = el("projectTitle").value; p.data.title = p.title; await saveProjectToDriveMain(p); }
+}
 function markDirtyAndSchedule() {
   markDirty();
   clearTimeout(saveDebounceTimer);
-  saveDebounceTimer = setTimeout(async () => {
-    flushCurrentEdits();
-    const p = getProject(currentProjectId);
-    if (p) { p.title = el("projectTitle").value; p.data.title = p.title; await saveProjectToDriveMain(p); }
-  }, AUTOSAVE_DEBOUNCE_MS);
+  // Kalau sudah mengetik terus-menerus lebih dari MAX_WAIT, tetap paksa simpan
+  // supaya tidak menunggu selamanya sampai orang berhenti mengetik.
+  const elapsed = Date.now() - firstDirtyAt;
+  const wait = elapsed >= AUTOSAVE_MAX_WAIT_MS ? 0 : AUTOSAVE_DEBOUNCE_MS;
+  saveDebounceTimer = setTimeout(doAutosaveFlush, wait);
 }
 
 // ================= GOOGLE DRIVE (REST API) =================
@@ -863,6 +936,9 @@ window.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("beforeunload", (e) => {
     if (hasUnsyncedChanges) { e.preventDefault(); e.returnValue = ""; }
   });
+  // Simpan langsung (tanpa menunggu debounce) begitu tab disembunyikan / app kehilangan fokus
+  document.addEventListener("visibilitychange", () => { if (document.hidden && hasUnsyncedChanges) doAutosaveFlush(); });
+  window.addEventListener("pagehide", () => { if (hasUnsyncedChanges) doAutosaveFlush(); });
 
   window.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "s") {

@@ -1,4 +1,14 @@
-# Novelist Web — v0.3
+# Novelist Web — v0.3.1
+
+**Pembaruan terbaru:**
+- Autosave dipercepat (1.5 detik setelah berhenti mengetik, dan dipaksa
+  tersimpan tiap maksimal 8 detik walau kamu terus mengetik tanpa jeda).
+  Juga otomatis flush begitu kamu pindah tab/aplikasi lain.
+- Garis warna di tepi cover project sudah dihapus.
+- Scene & item Organize sekarang punya tombol 🗑 hapus langsung di card-nya.
+- Scene & item Organize bisa **diseret (drag & drop)** untuk diatur ulang
+  urutannya — pegang ikon ⠿ di kiri card lalu geser ke posisi yang diinginkan.
+
 
 Web app menulis novel: **login Google wajib** → dashboard project →
 editor ala Novelist (tab **Write** dengan Scenes + panel profil, tab
@@ -60,7 +70,6 @@ dan mau pilih sendiri project mana yang diambil, terpisah dari mekanisme
 autosave otomatis yang jalan diam-diam di belakang layar.
 
 ## Fitur v0.3
-
 **Dashboard:** sama seperti sebelumnya (card project, cover custom, gear
 menu: edit info/cover/backup Word/send to cloud/delete).
 
