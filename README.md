@@ -1,4 +1,11 @@
-# Novelist Web — v0.4 (menuju tampilan ala Scrivener)
+# Novelist Web — v0.4.1
+
+**Pembaruan terbaru:** panel statistik teks real-time (jumlah kata,
+karakter, kalimat, paragraf) — muncul di pojok kanan atas Mode Fokus, dan
+juga di status bar bawah editor Write biasa. Update otomatis tiap kamu
+mengetik.
+
+
 
 **Langkah pertama menuju tampilan Scrivener di bagian dalam project:**
 - **Binder bertingkat** — sekarang bisa bikin **Chapter (folder)** yang berisi

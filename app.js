@@ -558,8 +558,8 @@ function renderSceneDetail() {
     </div>`;
 
   const updateSceneWordCount = () => {
-    const text = el("sceneEditor").innerText.trim();
-    el("sceneWordCount").textContent = (text.length ? text.split(/\s+/).length : 0) + " kata";
+    const stats = computeTextStats(el("sceneEditor").innerText);
+    el("sceneWordCount").textContent = statsLabel(stats);
   };
   updateSceneWordCount();
 
@@ -655,6 +655,21 @@ function deleteScene(id) { deleteSceneNode(id); }
 
 
 
+// ---- STATISTIK TEKS (kata, karakter, kalimat, paragraf) ----
+function computeTextStats(text) {
+  const trimmed = (text || "").trim();
+  const words = trimmed ? trimmed.split(/\s+/).length : 0;
+  const chars = (text || "").replace(/\n/g, "").length;
+  const sentences = trimmed ? (trimmed.match(/[^.!?]*[.!?]+|[^.!?]+$/g) || []).filter((s) => s.trim().length > 0).length : 0;
+  const paragraphs = trimmed ? trimmed.split(/\n+/).filter((p) => p.trim().length > 0).length : 0;
+  return { words, chars, sentences, paragraphs };
+}
+function statsLabel(stats) { return `${stats.words} kata · ${stats.chars} karakter · ${stats.sentences} kalimat · ${stats.paragraphs} paragraf`; }
+function updateFocusStats() {
+  const stats = computeTextStats(el("focusEditor").innerText);
+  el("focusStats").textContent = statsLabel(stats);
+}
+
 // ---- FOCUS MODE (full writer tanpa gangguan) ----
 let focusSceneId = null;
 function openFocusMode(id) {
@@ -665,6 +680,7 @@ function openFocusMode(id) {
   el("focusEditor").innerHTML = s.content || "";
   el("focusOverlay").classList.remove("hidden");
   el("focusEditor").focus();
+  updateFocusStats();
 }
 function closeFocusMode() {
   const s = findScene(focusSceneId);
@@ -1138,6 +1154,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (btn.dataset.action === "delete") deleteSceneNode(id);
   });
   el("btnExitFocus").onclick = closeFocusMode;
+  el("focusEditor").addEventListener("input", updateFocusStats);
 
   // Organize tab
   document.querySelectorAll(".org-subtab").forEach((btn) => btn.onclick = () => switchOrganizeCat(btn.dataset.cat));
