@@ -208,10 +208,14 @@
 <!-- ============ ADD SCENE MODAL ============ -->
 <div id="sceneModal" class="modal hidden">
   <div class="modal-box">
-    <h3>Add scene</h3>
+    <h3 id="sceneModalTitle">Add item</h3>
+    <div class="type-toggle">
+      <button type="button" class="type-toggle-btn active" data-type="scene">📄 Scene</button>
+      <button type="button" class="type-toggle-btn" data-type="folder">📁 Chapter (folder)</button>
+    </div>
     <label class="field-label">Title</label>
     <input id="sceneFieldTitle" class="field-input" autofocus />
-    <label class="field-label">Synopsis</label>
+    <label class="field-label" id="sceneSynopsisLabel">Synopsis</label>
     <textarea id="sceneFieldSynopsis" class="field-input textarea" placeholder="Synopsis"></textarea>
     <div class="modal-buttons">
       <button id="btnCancelScene" class="btn-secondary">Cancel</button>

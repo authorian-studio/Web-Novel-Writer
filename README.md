@@ -1,13 +1,26 @@
-# Novelist Web — v0.3.1
+# Novelist Web — v0.4 (menuju tampilan ala Scrivener)
 
-**Pembaruan terbaru:**
-- Autosave dipercepat (1.5 detik setelah berhenti mengetik, dan dipaksa
-  tersimpan tiap maksimal 8 detik walau kamu terus mengetik tanpa jeda).
-  Juga otomatis flush begitu kamu pindah tab/aplikasi lain.
-- Garis warna di tepi cover project sudah dihapus.
-- Scene & item Organize sekarang punya tombol 🗑 hapus langsung di card-nya.
-- Scene & item Organize bisa **diseret (drag & drop)** untuk diatur ulang
-  urutannya — pegang ikon ⠿ di kiri card lalu geser ke posisi yang diinginkan.
+**Langkah pertama menuju tampilan Scrivener di bagian dalam project:**
+- **Binder bertingkat** — sekarang bisa bikin **Chapter (folder)** yang berisi
+  banyak Scene di dalamnya, mirip struktur Manuscript > Chapter > Scene di
+  Scrivener. Klik tombol **+** di header SCENES, pilih "📄 Scene" atau
+  "📁 Chapter (folder)". Folder bisa expand/collapse (klik ikon ▸/▾), dan
+  punya tombol **+** sendiri untuk menambah scene langsung di dalamnya.
+- **Drag & drop lintas folder** — seret scene/folder pakai ikon ⠿, bisa
+  diurutkan ulang di level yang sama, atau dijatuhkan tepat ke atas sebuah
+  folder untuk memindahkannya ke dalam folder itu.
+- **Toolbar format lengkap** — font, ukuran, gaya paragraf/heading, bold/
+  italic/underline, rata kiri-tengah-kanan, bullet & numbered list, warna teks.
+- **Breadcrumb + navigasi back/forward** (◀ ▶) seperti Scrivener, buat
+  lompat antar scene yang baru dibuka.
+- **Status bar** di bawah area tulisan: jumlah kata real-time + slider zoom
+  ukuran teks.
+
+**Catatan:** ini baru sebagian fitur ala Scrivener. Struktur binder penuh
+Scrivener (Front Matter/Back Matter/Research/Trash sebagai kategori khusus,
+mode Corkboard/Outliner) belum diimplementasikan — bisa jadi langkah
+berikutnya kalau dibutuhkan.
+
 
 
 Web app menulis novel: **login Google wajib** → dashboard project →

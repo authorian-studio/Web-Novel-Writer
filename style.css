@@ -212,6 +212,33 @@ body.light .cloud-row:hover { background: rgba(0,0,0,0.02); }
 #sceneEditor, .organize-editor { min-height: 260px; background: var(--bg-editor); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; font-family: Georgia, "Times New Roman", serif; font-size: 16px; line-height: 1.8; outline: none; }
 #sceneEditor:focus, .organize-editor:focus { border-color: var(--accent); }
 
+/* ============ BINDER BERTINGKAT (folder/chapter) ============ */
+.folder-card { background: var(--bg-panel); }
+.folder-caret { background: none; border: none; color: var(--text-dim); font-size: 11px; width: 16px; cursor: pointer; padding: 0; flex-shrink: 0; }
+.node-icon { font-size: 13px; flex-shrink: 0; }
+
+/* ============ BREADCRUMB BAR ============ */
+.breadcrumb-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; }
+.breadcrumb-path { font-size: 15px; font-weight: 600; color: var(--text); }
+
+/* ============ RICH TOOLBAR ============ */
+.rich-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; max-width: 640px; margin-bottom: 16px; }
+.rich-toolbar select { background: var(--bg-editor); border: 1px solid var(--border); color: var(--text); font-size: 12.5px; padding: 4px 6px; border-radius: 6px; }
+.rich-toolbar button { background: none; border: 1px solid var(--border); color: var(--text); width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.rich-toolbar button:hover { border-color: var(--accent); color: var(--accent); }
+.toolbar-sep { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
+#fmtColor { width: 28px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; }
+
+/* ============ STATUS BAR (bawah editor tulisan) ============ */
+.status-bar { display: flex; align-items: center; justify-content: space-between; max-width: 640px; margin-top: 10px; padding: 6px 2px; font-size: 12px; color: var(--text-dim); }
+.zoom-control { display: flex; align-items: center; gap: 6px; }
+.zoom-control input[type="range"] { width: 90px; accent-color: var(--accent); }
+
+/* ============ TYPE TOGGLE (modal add scene/chapter) ============ */
+.type-toggle { display: flex; gap: 8px; margin-top: 4px; }
+.type-toggle-btn { flex: 1; background: var(--bg-editor); border: 1px solid var(--border); color: var(--text-dim); padding: 9px 6px; border-radius: 8px; cursor: pointer; font-size: 12.5px; }
+.type-toggle-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(215,168,110,0.08); }
+
 /* ============ FOCUS OVERLAY (full writer tanpa gangguan) ============ */
 .focus-overlay { position: fixed; inset: 0; background: var(--bg-editor); z-index: 400; display: flex; flex-direction: column; animation: fadeIn .2s ease; }
 .focus-topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 5%; }

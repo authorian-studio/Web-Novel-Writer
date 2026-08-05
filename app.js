@@ -25,7 +25,7 @@ const STATUS_LABELS = { todo: "Todo", draft: "Draft", done: "Done" };
 function blankBinderData(title, template) {
   const data = {
     title,
-    scenes: [{ id: "scene-" + Date.now(), title: "Scene 1", synopsis: "", status: "todo", content: "" }],
+    scenes: [{ id: "scene-" + Date.now(), type: "scene", title: "Scene 1", synopsis: "", status: "todo", content: "" }],
     organize: { characters: [], locations: [], notes: [] }
   };
   if (template === "standard") {
@@ -35,14 +35,24 @@ function blankBinderData(title, template) {
   return data;
 }
 
+// Pastikan tiap node scene punya field "type" (scene/folder) - buat kompatibel dengan
+// project lama (v0.3) yang scene-nya masih flat tanpa field type.
+function ensureSceneTypes(list) {
+  return (list || []).map((n) => {
+    if (!n.type) n.type = "scene";
+    if (n.type === "folder") n.children = ensureSceneTypes(n.children || []);
+    return n;
+  });
+}
+
 // Migrasi format lama (.novj versi sebelumnya yang pakai "items")
 function migrateOldData(data) {
-  if (!data.items) return data;
+  if (!data.items) { if (data.scenes) data.scenes = ensureSceneTypes(data.scenes); return data; }
   const migrated = { title: data.title || "Tanpa Judul", scenes: [], organize: { characters: [], locations: [], notes: [] } };
   data.items.forEach((folder) => {
     (folder.children || []).forEach((child) => {
       if (folder.id === "manuscript") {
-        migrated.scenes.push({ id: child.id, title: child.title, synopsis: "", status: "todo", content: child.content || "" });
+        migrated.scenes.push({ id: child.id, type: "scene", title: child.title, synopsis: "", status: "todo", content: child.content || "" });
       } else if (folder.id === "characters") {
         migrated.organize.characters.push({ id: child.id, title: child.title, content: child.content || "" });
       } else if (folder.id === "locations") {
@@ -52,9 +62,42 @@ function migrateOldData(data) {
       }
     });
   });
-  if (migrated.scenes.length === 0) migrated.scenes.push({ id: "scene-" + Date.now(), title: "Scene 1", synopsis: "", status: "todo", content: "" });
+  if (migrated.scenes.length === 0) migrated.scenes.push({ id: "scene-" + Date.now(), type: "scene", title: "Scene 1", synopsis: "", status: "todo", content: "" });
   return migrated;
 }
+
+// ---- Helper untuk pohon binder bertingkat (folder/chapter berisi scene) ----
+function findSceneNode(id, list, parent = null) {
+  list = list || getProject(currentProjectId).data.scenes;
+  for (let i = 0; i < list.length; i++) {
+    if (list[i].id === id) return { node: list[i], array: list, index: i, parent };
+    if (list[i].children) {
+      const found = findSceneNode(id, list[i].children, list[i]);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+function findScene(id) { const info = findSceneNode(id); return info ? info.node : null; }
+function findFirstScene(list) {
+  for (const n of list) {
+    if (n.type === "scene") return n;
+    if (n.children) { const f = findFirstScene(n.children); if (f) return f; }
+  }
+  return null;
+}
+function isDescendantOf(folderNode, id) {
+  if (!folderNode.children) return false;
+  return folderNode.children.some((c) => c.id === id || (c.children && isDescendantOf(c, id)));
+}
+function deepCloneNode(node) {
+  const clone = JSON.parse(JSON.stringify(node));
+  const reassign = (n) => { n.id = (n.type === "folder" ? "folder-" : "scene-") + Date.now() + Math.floor(Math.random() * 10000); if (n.children) n.children.forEach(reassign); };
+  reassign(clone);
+  return clone;
+}
+
+
 
 function createProject(title, description, template) {
   const colorPair = COLOR_PAIRS[Math.floor(Math.random() * COLOR_PAIRS.length)];
@@ -231,14 +274,25 @@ async function handleCardMenuAction(action) {
 }
 
 // ================= EXPORT KE WORD (.doc) =================
+function sceneNodesToHtml(list, depth) {
+  let html = "";
+  (list || []).forEach((n) => {
+    if (n.type === "folder") {
+      const tag = depth === 0 ? "h2" : "h3";
+      html += `<${tag} style="font-family:Georgia,serif;">${escapeHtml(n.title)}</${tag}>`;
+      html += sceneNodesToHtml(n.children, depth + 1);
+    } else {
+      html += `<h3 style="font-family:Georgia,serif;">${escapeHtml(n.title)}</h3>`;
+      if (n.synopsis) html += `<p style="font-style:italic;color:#555;">${escapeHtml(n.synopsis)}</p>`;
+      html += `<div style="font-family:Georgia,serif;font-size:14px;">${n.content || ""}</div>`;
+    }
+  });
+  return html;
+}
 function binderToHtml(data) {
   let html = `<h1 style="font-family:Georgia,serif;">${escapeHtml(data.title)}</h1>`;
   html += `<h2 style="font-family:Georgia,serif;border-bottom:1px solid #ccc;">Manuskrip</h2>`;
-  (data.scenes || []).forEach((s) => {
-    html += `<h3 style="font-family:Georgia,serif;">${escapeHtml(s.title)}</h3>`;
-    if (s.synopsis) html += `<p style="font-style:italic;color:#555;">${escapeHtml(s.synopsis)}</p>`;
-    html += `<div style="font-family:Georgia,serif;font-size:14px;">${s.content || ""}</div>`;
-  });
+  html += sceneNodesToHtml(data.scenes, 0);
   const catLabels = { characters: "Karakter", locations: "Lokasi", notes: "Catatan" };
   Object.keys(catLabels).forEach((cat) => {
     const list = data.organize?.[cat] || [];
@@ -268,8 +322,12 @@ function openProject(id) {
   const p = getProject(id);
   el("projectTitle").value = p.title;
   switchTab("write");
+  expandedFolders = new Set(p.data.scenes.filter((n) => n.type === "folder").map((n) => n.id));
+  sceneHistory = []; sceneHistoryIndex = -1;
   renderSceneList();
-  currentSceneId = p.data.scenes[0]?.id || null;
+  const first = findFirstScene(p.data.scenes);
+  currentSceneId = first ? first.id : null;
+  if (currentSceneId) { sceneHistory = [currentSceneId]; sceneHistoryIndex = 0; }
   renderSceneDetail();
   currentOrgCat = "characters";
   document.querySelectorAll(".org-subtab").forEach((b) => b.classList.toggle("active", b.dataset.cat === "characters"));
@@ -301,88 +359,182 @@ function switchTab(tab) {
 }
 function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
-// ---- WRITE TAB : scenes ----
-let draggedSceneId = null;
+// ---- WRITE TAB : binder bertingkat (folder/chapter berisi scene) ----
+let draggedNodeId = null;
+let expandedFolders = new Set();
+let sceneHistory = [];
+let sceneHistoryIndex = -1;
+let pendingSceneParentId = null;
+let pendingSceneType = "scene";
+let currentZoom = 100;
+
+function toggleFolder(id) {
+  if (expandedFolders.has(id)) expandedFolders.delete(id); else expandedFolders.add(id);
+  renderSceneList();
+}
+
 function renderSceneList() {
   const p = getProject(currentProjectId);
   const container = el("sceneList");
   container.innerHTML = "";
-  p.data.scenes.forEach((s) => {
+  renderBinderLevel(p.data.scenes, container, 0);
+}
+
+function renderBinderLevel(list, container, depth) {
+  list.forEach((node) => {
     const card = document.createElement("div");
-    card.className = "scene-card" + (s.id === currentSceneId ? " active" : "");
+    const isFolder = node.type === "folder";
+    card.className = "scene-card" + (node.id === currentSceneId ? " active" : "") + (isFolder ? " folder-card" : "");
+    card.style.marginLeft = (depth * 14) + "px";
     card.draggable = true;
-    card.innerHTML = `
-      <div class="scene-card-top">
-        <span class="drag-handle" title="Seret untuk pindahkan urutan">⠿</span>
-        <div class="scene-card-title">${escapeHtml(s.title || "(tanpa judul)")}</div>
-        <div class="scene-card-icons">
-          <button class="scene-icon-btn" data-action="focus" title="Mode fokus (tanpa gangguan)">🖋</button>
-          <button class="scene-icon-btn" data-action="duplicate" title="Duplikat scene">📄</button>
-          <button class="scene-icon-btn scene-icon-danger" data-action="delete" title="Hapus scene">🗑</button>
+
+    if (isFolder) {
+      const expanded = expandedFolders.has(node.id);
+      card.innerHTML = `
+        <div class="scene-card-top">
+          <span class="drag-handle" title="Seret untuk pindahkan">⠿</span>
+          <button class="folder-caret" title="Buka/tutup">${expanded ? "▾" : "▸"}</button>
+          <span class="node-icon">📁</span>
+          <div class="scene-card-title">${escapeHtml(node.title || "(tanpa judul)")}</div>
+          <div class="scene-card-icons">
+            <button class="scene-icon-btn" data-action="addChild" title="Tambah scene di dalam folder ini">+</button>
+            <button class="scene-icon-btn scene-icon-danger" data-action="delete" title="Hapus folder & seluruh isinya">🗑</button>
+          </div>
+        </div>`;
+      card.addEventListener("click", (e) => {
+        const action = e.target.closest(".scene-icon-btn")?.dataset.action;
+        if (action === "addChild") { openAddSceneModal(node.id); return; }
+        if (action === "delete") { deleteSceneNode(node.id); return; }
+        toggleFolder(node.id);
+      });
+    } else {
+      card.innerHTML = `
+        <div class="scene-card-top">
+          <span class="drag-handle" title="Seret untuk pindahkan">⠿</span>
+          <span class="node-icon">📄</span>
+          <div class="scene-card-title">${escapeHtml(node.title || "(tanpa judul)")}</div>
+          <div class="scene-card-icons">
+            <button class="scene-icon-btn" data-action="focus" title="Mode fokus (tanpa gangguan)">🖋</button>
+            <button class="scene-icon-btn" data-action="duplicate" title="Duplikat scene">📄</button>
+            <button class="scene-icon-btn scene-icon-danger" data-action="delete" title="Hapus scene">🗑</button>
+          </div>
         </div>
-      </div>
-      <div class="scene-card-bottom">
-        <span class="status-dot ${s.status}"></span>
-        <span class="scene-card-synopsis">${escapeHtml(s.synopsis || "Belum ada synopsis")}</span>
-      </div>`;
-    card.addEventListener("click", (e) => {
-      const action = e.target.closest(".scene-icon-btn")?.dataset.action;
-      if (action === "focus") { openFocusMode(s.id); return; }
-      if (action === "duplicate") { duplicateScene(s.id); return; }
-      if (action === "delete") { deleteScene(s.id); return; }
-      selectScene(s.id);
-    });
-    card.addEventListener("dragstart", (e) => { draggedSceneId = s.id; card.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; });
-    card.addEventListener("dragend", () => { card.classList.remove("dragging"); });
-    card.addEventListener("dragover", (e) => { e.preventDefault(); card.classList.add("drag-over"); });
+        <div class="scene-card-bottom">
+          <span class="status-dot ${node.status}"></span>
+          <span class="scene-card-synopsis">${escapeHtml(node.synopsis || "Belum ada synopsis")}</span>
+        </div>`;
+      card.addEventListener("click", (e) => {
+        const action = e.target.closest(".scene-icon-btn")?.dataset.action;
+        if (action === "focus") { openFocusMode(node.id); return; }
+        if (action === "duplicate") { duplicateScene(node.id); return; }
+        if (action === "delete") { deleteSceneNode(node.id); return; }
+        selectScene(node.id);
+      });
+    }
+
+    card.addEventListener("dragstart", (e) => { draggedNodeId = node.id; card.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.stopPropagation(); });
+    card.addEventListener("dragend", () => card.classList.remove("dragging"));
+    card.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); card.classList.add("drag-over"); });
     card.addEventListener("dragleave", () => card.classList.remove("drag-over"));
     card.addEventListener("drop", (e) => {
-      e.preventDefault();
+      e.preventDefault(); e.stopPropagation();
       card.classList.remove("drag-over");
-      if (!draggedSceneId || draggedSceneId === s.id) return;
-      reorderScenes(draggedSceneId, s.id);
+      if (!draggedNodeId || draggedNodeId === node.id) return;
+      dropNodeOnto(draggedNodeId, node);
     });
+
     container.appendChild(card);
+    if (isFolder && expandedFolders.has(node.id)) renderBinderLevel(node.children || [], container, depth + 1);
   });
 }
-function reorderScenes(draggedId, targetId) {
+
+function dropNodeOnto(draggedId, targetNode) {
   const p = getProject(currentProjectId);
-  const arr = p.data.scenes;
-  const fromIdx = arr.findIndex((x) => x.id === draggedId);
-  const toIdx = arr.findIndex((x) => x.id === targetId);
-  if (fromIdx < 0 || toIdx < 0) return;
-  const [item] = arr.splice(fromIdx, 1);
-  arr.splice(toIdx, 0, item);
+  const draggedInfo = findSceneNode(draggedId, p.data.scenes);
+  if (!draggedInfo) return;
+  if (draggedInfo.node.type === "folder" && isDescendantOf(draggedInfo.node, targetNode.id)) return; // cegah folder dipindah ke dalam anaknya sendiri
+  draggedInfo.array.splice(draggedInfo.index, 1);
+  if (targetNode.type === "folder") {
+    targetNode.children = targetNode.children || [];
+    targetNode.children.push(draggedInfo.node);
+    expandedFolders.add(targetNode.id);
+  } else {
+    const targetInfo = findSceneNode(targetNode.id, p.data.scenes);
+    if (targetInfo) targetInfo.array.splice(targetInfo.index, 0, draggedInfo.node);
+    else p.data.scenes.push(draggedInfo.node); // fallback aman
+  }
   renderSceneList();
   markDirtyAndSchedule();
 }
-function selectScene(id) {
+
+function selectScene(id, addToHistory = true) {
   syncSceneFromDetail();
   currentSceneId = id;
+  if (addToHistory) {
+    sceneHistory = sceneHistory.slice(0, sceneHistoryIndex + 1);
+    sceneHistory.push(id);
+    sceneHistoryIndex = sceneHistory.length - 1;
+  }
   renderSceneList();
   renderSceneDetail();
 }
+function goSceneBack() { if (sceneHistoryIndex > 0) { sceneHistoryIndex--; selectScene(sceneHistory[sceneHistoryIndex], false); } }
+function goSceneForward() { if (sceneHistoryIndex < sceneHistory.length - 1) { sceneHistoryIndex++; selectScene(sceneHistory[sceneHistoryIndex], false); } }
+
 function syncSceneFromDetail() {
   if (!currentProjectId || !currentSceneId) return;
-  const p = getProject(currentProjectId);
-  const s = p.data.scenes.find((x) => x.id === currentSceneId);
+  const s = findScene(currentSceneId);
   if (!s || !el("sceneTitleField")) return;
   s.title = el("sceneTitleField").value;
   s.synopsis = el("sceneSynopsis").value;
   s.content = el("sceneEditor").innerHTML;
 }
+
 function renderSceneDetail() {
-  const p = getProject(currentProjectId);
   const col = el("sceneDetailCol");
-  const s = p.data.scenes.find((x) => x.id === currentSceneId);
+  const s = currentSceneId ? findScene(currentSceneId) : null;
   if (!s) { col.innerHTML = '<div class="scene-empty-hint">Pilih atau buat scene untuk mulai menulis.</div>'; return; }
   col.innerHTML = `
-    <div class="scene-detail-header">
-      <input id="sceneTitleField" class="scene-title-input" value="${escapeHtml(s.title)}" />
-      <button id="sceneMenuBtn" class="icon-btn" title="Menu">⋮</button>
+    <div class="breadcrumb-bar">
+      <button id="sceneNavBack" class="mini-icon-btn" title="Kembali" ${sceneHistoryIndex <= 0 ? "disabled" : ""}>◀</button>
+      <button id="sceneNavForward" class="mini-icon-btn" title="Maju" ${sceneHistoryIndex >= sceneHistory.length - 1 ? "disabled" : ""}>▶</button>
+      <span class="breadcrumb-path">📄 ${escapeHtml(s.title || "(tanpa judul)")}</span>
+      <button id="sceneMenuBtn" class="icon-btn" title="Menu" style="margin-left:auto;">⋮</button>
     </div>
+
+    <div class="rich-toolbar">
+      <select id="fmtFont" title="Font">
+        <option value="Georgia">Georgia</option>
+        <option value="'Segoe UI',sans-serif">Segoe UI</option>
+        <option value="'Times New Roman',serif">Times New Roman</option>
+        <option value="'Courier New',monospace">Courier New</option>
+      </select>
+      <select id="fmtSize" title="Ukuran">
+        <option value="2">12</option><option value="3" selected>14</option><option value="4">16</option>
+        <option value="5">18</option><option value="6">24</option><option value="7">32</option>
+      </select>
+      <select id="fmtStyle" title="Gaya">
+        <option value="p">Paragraf</option><option value="h1">Heading 1</option>
+        <option value="h2">Heading 2</option><option value="h3">Heading 3</option>
+      </select>
+      <span class="toolbar-sep"></span>
+      <button data-cmd="bold" title="Bold"><b>B</b></button>
+      <button data-cmd="italic" title="Italic"><i>I</i></button>
+      <button data-cmd="underline" title="Underline"><u>U</u></button>
+      <span class="toolbar-sep"></span>
+      <button data-cmd="justifyLeft" title="Rata kiri">⯇</button>
+      <button data-cmd="justifyCenter" title="Rata tengah">☰</button>
+      <button data-cmd="justifyRight" title="Rata kanan">⯈</button>
+      <span class="toolbar-sep"></span>
+      <button data-cmd="insertUnorderedList" title="Bullet list">• ≡</button>
+      <button data-cmd="insertOrderedList" title="Numbered list">1. ≡</button>
+      <input type="color" id="fmtColor" title="Warna teks" value="#e7e5e0" />
+    </div>
+
     <div class="main-info-card">
       <div class="main-info-header">👤 MAIN INFORMATION</div>
+      <label class="field-label">Title</label>
+      <input id="sceneTitleField" class="field-input" value="${escapeHtml(s.title)}" />
       <label class="field-label">Synopsis</label>
       <textarea id="sceneSynopsis" class="field-input textarea" placeholder="Synopsis singkat scene ini...">${escapeHtml(s.synopsis || "")}</textarea>
       <div class="status-row">
@@ -393,79 +545,129 @@ function renderSceneDetail() {
     </div>
     <div class="scene-writer-half">
       <div class="writer-half-label">✍️ TULISAN</div>
-      <div id="sceneEditor" contenteditable="true" spellcheck="false">${s.content || ""}</div>
+      <div id="sceneEditor" contenteditable="true" spellcheck="false" style="font-size:${16 * currentZoom / 100}px">${s.content || ""}</div>
+    </div>
+
+    <div class="status-bar">
+      <span id="sceneWordCount">0 kata</span>
+      <div class="zoom-control">
+        <span>🔍</span>
+        <input type="range" id="zoomSlider" min="70" max="160" value="${currentZoom}" />
+        <span id="zoomLabel">${currentZoom}%</span>
+      </div>
     </div>`;
 
-  el("sceneTitleField").addEventListener("input", () => { s.title = el("sceneTitleField").value; renderSceneListSoft(); markDirtyAndSchedule(); });
-  el("sceneSynopsis").addEventListener("input", () => { s.synopsis = el("sceneSynopsis").value; renderSceneListSoft(); markDirtyAndSchedule(); });
-  el("sceneEditor").addEventListener("input", () => { s.content = el("sceneEditor").innerHTML; markDirtyAndSchedule(); });
-  col.querySelectorAll(".status-chip").forEach((btn) => {
-    btn.onclick = () => { s.status = btn.dataset.status; renderSceneDetail(); renderSceneList(); markDirtyAndSchedule(); };
-  });
+  const updateSceneWordCount = () => {
+    const text = el("sceneEditor").innerText.trim();
+    el("sceneWordCount").textContent = (text.length ? text.split(/\s+/).length : 0) + " kata";
+  };
+  updateSceneWordCount();
+
+  el("sceneTitleField").addEventListener("input", () => { s.title = el("sceneTitleField").value; document.querySelector(".breadcrumb-path").textContent = "📄 " + s.title; renderSceneList(); markDirtyAndSchedule(); });
+  el("sceneSynopsis").addEventListener("input", () => { s.synopsis = el("sceneSynopsis").value; renderSceneList(); markDirtyAndSchedule(); });
+  el("sceneEditor").addEventListener("input", () => { s.content = el("sceneEditor").innerHTML; updateSceneWordCount(); markDirtyAndSchedule(); });
+
+  col.querySelectorAll(".status-chip").forEach((btn) => { btn.onclick = () => { s.status = btn.dataset.status; renderSceneDetail(); renderSceneList(); markDirtyAndSchedule(); }; });
+
+  el("sceneNavBack").onclick = goSceneBack;
+  el("sceneNavForward").onclick = goSceneForward;
   el("sceneMenuBtn").onclick = (e) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const menu = el("sceneMenu");
-    menu.style.top = rect.bottom + 6 + "px";
-    menu.style.right = (window.innerWidth - rect.right) + "px"; menu.style.left = "auto";
+    menu.style.top = rect.bottom + 6 + "px"; menu.style.right = (window.innerWidth - rect.right) + "px"; menu.style.left = "auto";
     menu.classList.remove("hidden");
     menu.dataset.sceneId = s.id;
   };
-}
-// render ulang list tanpa reset scroll/detail (dipakai saat mengetik supaya list judul ikut update)
-function renderSceneListSoft() { renderSceneList(); }
 
-function openAddSceneModal() {
+  // ---- toolbar format ----
+  col.querySelectorAll(".rich-toolbar button[data-cmd]").forEach((btn) => {
+    btn.onclick = () => { document.execCommand(btn.dataset.cmd, false, null); el("sceneEditor").focus(); };
+  });
+  el("fmtFont").onchange = () => { document.execCommand("fontName", false, el("fmtFont").value); el("sceneEditor").focus(); };
+  el("fmtSize").onchange = () => { document.execCommand("fontSize", false, el("fmtSize").value); el("sceneEditor").focus(); };
+  el("fmtStyle").onchange = () => { document.execCommand("formatBlock", false, el("fmtStyle").value); el("sceneEditor").focus(); };
+  el("fmtColor").oninput = () => { document.execCommand("foreColor", false, el("fmtColor").value); el("sceneEditor").focus(); };
+  el("zoomSlider").oninput = () => {
+    currentZoom = parseInt(el("zoomSlider").value, 10);
+    el("zoomLabel").textContent = currentZoom + "%";
+    el("sceneEditor").style.fontSize = (16 * currentZoom / 100) + "px";
+  };
+}
+
+function openAddSceneModal(parentId = null) {
+  pendingSceneParentId = parentId;
+  pendingSceneType = "scene";
   el("sceneFieldTitle").value = ""; el("sceneFieldSynopsis").value = "";
+  el("sceneModalTitle").textContent = parentId ? "Add scene ke chapter ini" : "Add item";
+  document.querySelectorAll(".type-toggle-btn").forEach((b) => b.classList.toggle("active", b.dataset.type === "scene"));
+  el("sceneSynopsisLabel").classList.remove("hidden");
+  el("sceneFieldSynopsis").classList.remove("hidden");
   el("sceneModal").classList.remove("hidden");
   el("sceneFieldTitle").focus();
 }
 function saveNewScene() {
   const p = getProject(currentProjectId);
-  const title = el("sceneFieldTitle").value.trim() || "Scene Baru";
+  const title = el("sceneFieldTitle").value.trim() || (pendingSceneType === "folder" ? "Chapter Baru" : "Scene Baru");
   const synopsis = el("sceneFieldSynopsis").value.trim();
-  const s = { id: "scene-" + Date.now(), title, synopsis, status: "todo", content: "" };
-  p.data.scenes.push(s);
+  const node = pendingSceneType === "folder"
+    ? { id: "folder-" + Date.now(), type: "folder", title, children: [] }
+    : { id: "scene-" + Date.now(), type: "scene", title, synopsis, status: "todo", content: "" };
+
+  let targetArray = p.data.scenes;
+  if (pendingSceneParentId) {
+    const parentInfo = findSceneNode(pendingSceneParentId, p.data.scenes);
+    if (parentInfo && parentInfo.node.type === "folder") {
+      parentInfo.node.children = parentInfo.node.children || [];
+      targetArray = parentInfo.node.children;
+      expandedFolders.add(pendingSceneParentId);
+    }
+  }
+  targetArray.push(node);
   el("sceneModal").classList.add("hidden");
-  currentSceneId = s.id;
-  renderSceneList(); renderSceneDetail();
+  if (node.type === "scene") selectScene(node.id);
+  else renderSceneList();
   markDirtyAndSchedule();
 }
 function duplicateScene(id) {
-  const p = getProject(currentProjectId);
-  const s = p.data.scenes.find((x) => x.id === id);
-  if (!s) return;
-  const copy = { ...s, id: "scene-" + Date.now(), title: s.title + " (copy)" };
-  const idx = p.data.scenes.findIndex((x) => x.id === id);
-  p.data.scenes.splice(idx + 1, 0, copy);
+  const info = findSceneNode(id);
+  if (!info) return;
+  const copy = deepCloneNode(info.node);
+  copy.title = info.node.title + " (copy)";
+  info.array.splice(info.index + 1, 0, copy);
   renderSceneList();
-  toast("Scene diduplikat 📄");
+  toast((copy.type === "folder" ? "Chapter" : "Scene") + " diduplikat 📄");
   markDirtyAndSchedule();
 }
-function deleteScene(id) {
-  const p = getProject(currentProjectId);
-  if (!confirm("Hapus scene ini?")) return;
-  p.data.scenes = p.data.scenes.filter((x) => x.id !== id);
-  if (currentSceneId === id) currentSceneId = p.data.scenes[0]?.id || null;
+function deleteSceneNode(id) {
+  const info = findSceneNode(id);
+  if (!info) return;
+  const msg = info.node.type === "folder" ? "Hapus chapter ini beserta seluruh scene di dalamnya?" : "Hapus scene ini?";
+  if (!confirm(msg)) return;
+  info.array.splice(info.index, 1);
+  if (!findSceneNode(currentSceneId)) { const first = findFirstScene(getProject(currentProjectId).data.scenes); currentSceneId = first ? first.id : null; }
   renderSceneList(); renderSceneDetail();
   markDirtyAndSchedule();
 }
+// alias lama, tetap dipakai di beberapa tempat
+function renderSceneListSoft() { renderSceneList(); }
+function deleteScene(id) { deleteSceneNode(id); }
+
+
 
 // ---- FOCUS MODE (full writer tanpa gangguan) ----
 let focusSceneId = null;
 function openFocusMode(id) {
   syncSceneFromDetail();
   focusSceneId = id;
-  const p = getProject(currentProjectId);
-  const s = p.data.scenes.find((x) => x.id === id);
+  const s = findScene(id);
   el("focusTitle").value = s.title;
   el("focusEditor").innerHTML = s.content || "";
   el("focusOverlay").classList.remove("hidden");
   el("focusEditor").focus();
 }
 function closeFocusMode() {
-  const p = getProject(currentProjectId);
-  const s = p.data.scenes.find((x) => x.id === focusSceneId);
+  const s = findScene(focusSceneId);
   if (s) { s.title = el("focusTitle").value; s.content = el("focusEditor").innerHTML; }
   el("focusOverlay").classList.add("hidden");
   renderSceneList(); renderSceneDetail();
@@ -567,12 +769,19 @@ function saveNewOrganizeItem() {
 }
 
 // ---- PREVIEW ----
+function previewNodesToHtml(list) {
+  let html = "";
+  (list || []).forEach((n) => {
+    if (n.type === "folder") { html += `<h2>📁 ${escapeHtml(n.title)}</h2>`; html += previewNodesToHtml(n.children); }
+    else html += `<h3>${escapeHtml(n.title)}</h3>${n.content || "<p><i>(kosong)</i></p>"}`;
+  });
+  return html;
+}
 function openPreview() {
   flushCurrentEdits();
   const p = getProject(currentProjectId);
   el("previewTitle").textContent = p.title;
-  let html = "";
-  p.data.scenes.forEach((s) => { html += `<h2>${escapeHtml(s.title)}</h2>${s.content || "<p><i>(kosong)</i></p>"}`; });
+  const html = previewNodesToHtml(p.data.scenes);
   el("previewContent").innerHTML = html || "<p>Belum ada tulisan.</p>";
   el("previewModal").classList.remove("hidden");
 }
@@ -912,14 +1121,21 @@ window.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".rail-btn").forEach((btn) => btn.onclick = () => switchTab(btn.dataset.tab));
 
   // Write tab
-  el("btnAddScene").onclick = openAddSceneModal;
+  el("btnAddScene").onclick = () => openAddSceneModal(null);
   el("btnCancelScene").onclick = () => el("sceneModal").classList.add("hidden");
   el("btnSaveScene").onclick = saveNewScene;
+  document.querySelectorAll(".type-toggle-btn").forEach((btn) => btn.onclick = () => {
+    pendingSceneType = btn.dataset.type;
+    document.querySelectorAll(".type-toggle-btn").forEach((b) => b.classList.toggle("active", b === btn));
+    const isFolder = pendingSceneType === "folder";
+    el("sceneSynopsisLabel").classList.toggle("hidden", isFolder);
+    el("sceneFieldSynopsis").classList.toggle("hidden", isFolder);
+  });
   document.querySelectorAll("#sceneMenu button").forEach((btn) => btn.onclick = () => {
     const id = el("sceneMenu").dataset.sceneId;
     closeAllDropdowns();
     if (btn.dataset.action === "duplicate") duplicateScene(id);
-    if (btn.dataset.action === "delete") deleteScene(id);
+    if (btn.dataset.action === "delete") deleteSceneNode(id);
   });
   el("btnExitFocus").onclick = closeFocusMode;
 
