@@ -1,9 +1,14 @@
-# Novelist Web — v0.4.1
+# Novelist Web — v0.4.2
 
-**Pembaruan terbaru:** panel statistik teks real-time (jumlah kata,
-karakter, kalimat, paragraf) — muncul di pojok kanan atas Mode Fokus, dan
-juga di status bar bawah editor Write biasa. Update otomatis tiap kamu
-mengetik.
+**Pembaruan terbaru:**
+- Area tulisan di Mode Fokus digeser makin mepet ke tepi kiri & kanan
+  (padding dipersempit jadi 2.5%).
+- Ditambahkan toolbar kompak di Mode Fokus: Bold/Italic/Underline, rata
+  kiri-tengah-kanan, dan pemilih warna teks — tombolnya menyala (highlight)
+  otomatis kalau kursor sedang berada di teks dengan gaya itu.
+- Panel statistik kata/karakter/kalimat/paragraf sekarang berbentuk pill
+  (kotak highlight ujung bulat) supaya lebih kelihatan, baik di Mode Fokus
+  maupun status bar editor Write biasa.
 
 
 

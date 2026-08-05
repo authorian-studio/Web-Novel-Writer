@@ -549,7 +549,7 @@ function renderSceneDetail() {
     </div>
 
     <div class="status-bar">
-      <span id="sceneWordCount">0 kata</span>
+      <span id="sceneWordCount" class="stats-pill">0 kata</span>
       <div class="zoom-control">
         <span>🔍</span>
         <input type="range" id="zoomSlider" min="70" max="160" value="${currentZoom}" />
@@ -668,6 +668,11 @@ function statsLabel(stats) { return `${stats.words} kata · ${stats.chars} karak
 function updateFocusStats() {
   const stats = computeTextStats(el("focusEditor").innerText);
   el("focusStats").textContent = statsLabel(stats);
+}
+function updateFocusToolbarState() {
+  document.querySelectorAll(".focus-toolbar button[data-cmd]").forEach((btn) => {
+    try { btn.classList.toggle("active", document.queryCommandState(btn.dataset.cmd)); } catch (e) {}
+  });
 }
 
 // ---- FOCUS MODE (full writer tanpa gangguan) ----
@@ -1155,6 +1160,11 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   el("btnExitFocus").onclick = closeFocusMode;
   el("focusEditor").addEventListener("input", updateFocusStats);
+  document.querySelectorAll(".focus-toolbar button[data-cmd]").forEach((btn) => {
+    btn.onclick = () => { document.execCommand(btn.dataset.cmd, false, null); el("focusEditor").focus(); updateFocusToolbarState(); };
+  });
+  el("focusColor").oninput = () => { document.execCommand("foreColor", false, el("focusColor").value); el("focusEditor").focus(); };
+  document.addEventListener("selectionchange", () => { if (!el("focusOverlay").classList.contains("hidden")) updateFocusToolbarState(); });
 
   // Organize tab
   document.querySelectorAll(".org-subtab").forEach((btn) => btn.onclick = () => switchOrganizeCat(btn.dataset.cat));
