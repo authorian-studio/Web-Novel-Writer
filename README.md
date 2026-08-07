@@ -1,4 +1,14 @@
-# Novelist Web — v0.4.2
+# Novelist Web — v0.4.3
+
+**Pembaruan terbaru:** halaman login diberi animasi baru terinspirasi
+komponen "MinimalAuthPage" dari 21st.dev — partikel titik-titik halus yang
+melayang pelan di background (canvas, ikut bereaksi lembut saat mouse
+didekatkan), plus lapisan blob gradient abu-abu lembut di pojok kiri atas.
+Semua dibangun ulang pakai vanilla JS/CSS (bukan React) supaya konsisten
+dengan struktur project ini. Logo tetap teks "Novelist" biasa (belum pakai
+logo custom), dan posisi kartu login tetap di tengah layar.
+
+
 
 **Pembaruan terbaru:**
 - Area tulisan di Mode Fokus digeser makin mepet ke tepi kiri & kanan

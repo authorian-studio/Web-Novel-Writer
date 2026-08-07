@@ -1077,8 +1077,90 @@ function updateSyncIndicator(ok) {
   ind.style.color = ok ? "var(--success)" : "var(--danger)";
 }
 
+// ================= PARTICLES BACKGROUND (halaman login) =================
+function initLoginParticles() {
+  const canvas = document.getElementById("particlesCanvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const QUANTITY = 110;
+  const EASE = 20; // makin besar makin "lembut" gerakan menjauh dari mouse
+  let particles = [];
+  let mouse = { x: -9999, y: -9999 };
+  let raf = null;
+  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resize() {
+    canvas.width = canvas.clientWidth * dpr;
+    canvas.height = canvas.clientHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function makeParticle() {
+    return {
+      x: Math.random() * canvas.clientWidth,
+      y: Math.random() * canvas.clientHeight,
+      baseX: 0, baseY: 0,
+      vx: (Math.random() - 0.5) * 0.15,
+      vy: (Math.random() - 0.5) * 0.15,
+      r: Math.random() * 1.4 + 0.4,
+      alpha: Math.random() * 0.5 + 0.2
+    };
+  }
+
+  function initParticles() {
+    particles = Array.from({ length: QUANTITY }, makeParticle);
+  }
+
+  function step() {
+    ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    particles.forEach((p) => {
+      // drift lambat
+      p.x += p.vx;
+      p.y += p.vy;
+      // wrap di tepi layar
+      if (p.x < -5) p.x = canvas.clientWidth + 5;
+      if (p.x > canvas.clientWidth + 5) p.x = -5;
+      if (p.y < -5) p.y = canvas.clientHeight + 5;
+      if (p.y > canvas.clientHeight + 5) p.y = -5;
+
+      // dorongan halus menjauh dari mouse, lalu "ease" kembali
+      const dx = p.x - mouse.x, dy = p.y - mouse.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 110) {
+        const force = (110 - dist) / 110;
+        p.x += (dx / (dist || 1)) * force * (EASE / 10);
+        p.y += (dy / (dist || 1)) * force * (EASE / 10);
+      }
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(180,180,190,${p.alpha})`;
+      ctx.fill();
+    });
+    raf = requestAnimationFrame(step);
+  }
+
+  resize();
+  initParticles();
+  step();
+
+  window.addEventListener("resize", () => { resize(); });
+  window.addEventListener("load", () => { resize(); });
+  canvas.addEventListener("mousemove", (e) => { const r = canvas.getBoundingClientRect(); mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; });
+  canvas.addEventListener("mouseleave", () => { mouse.x = -9999; mouse.y = -9999; });
+
+  // hentikan animasi begitu halaman login sudah tidak terlihat (hemat CPU)
+  const loginViewEl = document.getElementById("loginView");
+  const observer = new MutationObserver(() => {
+    if (loginViewEl.classList.contains("hidden") && raf) { cancelAnimationFrame(raf); raf = null; }
+    else if (!loginViewEl.classList.contains("hidden") && !raf) { step(); }
+  });
+  observer.observe(loginViewEl, { attributes: true, attributeFilter: ["class"] });
+}
+
 // ================= EVENT BINDING =================
 window.addEventListener("DOMContentLoaded", () => {
+  initLoginParticles();
   el("btnLoginGoogle").onclick = handleLogin;
 
   el("btnAddProject").onclick = openAddProjectModal;

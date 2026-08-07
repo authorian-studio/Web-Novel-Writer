@@ -14,9 +14,18 @@
 
   <!-- ============ LOGIN GATE ============ -->
   <section id="loginView" class="view">
+    <canvas id="particlesCanvas" class="particles-canvas"></canvas>
+    <div class="blob-layer" aria-hidden="true">
+      <div class="blob blob1"></div>
+      <div class="blob blob2"></div>
+      <div class="blob blob3"></div>
+    </div>
     <div class="login-box">
       <div class="logo login-logo">Novelist</div>
-      <p class="login-tagline">Tulis novelmu, tersimpan otomatis ke Google Drive-mu sendiri.</p>
+      <div class="login-heading">
+        <h1>Sign In atau Mulai Menulis</h1>
+        <p class="login-tagline">Tulis novelmu, tersimpan otomatis ke Google Drive-mu sendiri.</p>
+      </div>
       <button id="btnLoginGoogle" class="btn-google">
         <span class="g-icon">G</span> Login dengan Google
       </button>
