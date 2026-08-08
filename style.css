@@ -58,6 +58,84 @@ button, input, textarea { font-family: inherit; }
 .icon-btn:hover { background: rgba(255,255,255,0.06); color: var(--text); }
 body.light .icon-btn:hover { background: rgba(0,0,0,0.06); }
 
+/* ============ FLOW BUTTON "Exit" (adapted from 21st.dev FlowButton) ============ */
+.flow-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 4px;
+  overflow: hidden;
+  border-radius: 100px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  padding: 9px 20px;
+  font-size: 13.5px;
+  font-family: inherit;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color .6s cubic-bezier(.23,1,.32,1), border-color .6s cubic-bezier(.23,1,.32,1), border-radius .6s cubic-bezier(.23,1,.32,1);
+}
+.flow-btn:hover,
+.flow-btn:focus-visible {
+  border-color: transparent;
+  border-radius: 12px;
+  color: var(--bg);
+}
+.flow-btn:active { transform: scale(.95); }
+
+.flow-arrow {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  stroke: var(--text-dim);
+  fill: none;
+  z-index: 9;
+  transition: left .8s cubic-bezier(.34,1.56,.64,1), right .8s cubic-bezier(.34,1.56,.64,1), stroke .5s ease;
+}
+.flow-arrow-left { left: -25%; }
+.flow-btn:hover .flow-arrow-left,
+.flow-btn:focus-visible .flow-arrow-left { left: 14px; stroke: var(--bg); }
+.flow-arrow-right { right: 14px; }
+.flow-btn:hover .flow-arrow-right,
+.flow-btn:focus-visible .flow-arrow-right { right: -25%; stroke: var(--bg); }
+
+.flow-text {
+  position: relative;
+  z-index: 1;
+  transform: translateX(-10px);
+  transition: transform .8s cubic-bezier(.19,1,.22,1);
+  white-space: nowrap;
+}
+.flow-btn:hover .flow-text,
+.flow-btn:focus-visible .flow-text { transform: translateX(10px); }
+
+.flow-circle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  background: var(--text);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: width .8s cubic-bezier(.19,1,.22,1), height .8s cubic-bezier(.19,1,.22,1), opacity .3s ease;
+  z-index: 0;
+}
+.flow-btn:hover .flow-circle,
+.flow-btn:focus-visible .flow-circle { width: 220px; height: 220px; opacity: 1; }
+
+@media (hover: none) {
+  /* touch devices: no hover, so mirror the effect on tap */
+  .flow-btn:active { border-color: transparent; border-radius: 12px; color: var(--bg); }
+  .flow-btn:active .flow-arrow-left { left: 14px; stroke: var(--bg); transition: none; }
+  .flow-btn:active .flow-arrow-right { right: -25%; stroke: var(--bg); transition: none; }
+  .flow-btn:active .flow-text { transform: translateX(10px); transition: none; }
+  .flow-btn:active .flow-circle { width: 220px; height: 220px; opacity: 1; transition: none; }
+}
+
 #dashBody { flex: 1; overflow-y: auto; padding: 10px 36px 100px; }
 #projectGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 24px; max-width: 1400px; margin: 0 auto; }
 
@@ -81,12 +159,40 @@ body.light .project-card:hover { box-shadow: 0 16px 32px rgba(0,0,0,0.12); }
 .project-card .card-meta { font-size: 10.5px; color: var(--text-dim); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
 .card-meta .drive-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
 
-.empty-state { text-align: center; margin-top: 100px; color: var(--text-dim); opacity: 0; animation: fadeSlideDown .5s .1s ease forwards; }
+.empty-state { text-align: center; margin-top: 90px; color: var(--text-dim); opacity: 0; animation: fadeSlideDown .5s .1s ease forwards; display: flex; flex-direction: column; align-items: center; max-width: 340px; margin-left: auto; margin-right: auto; }
 .empty-icon { font-size: 46px; margin-bottom: 10px; }
 .spinner { width: 34px; height: 34px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; margin: 0 auto 14px; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.fab { position: fixed; right: 34px; bottom: 34px; z-index: 30; background: var(--accent); color: #171716; border: none; border-radius: 30px; padding: 14px 22px; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 10px 26px rgba(0,0,0,0.4); transition: transform .15s ease, box-shadow .15s ease; }
+/* ============ EMPTY STATE (reui-style) ============ */
+.empty-media {
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  margin-bottom: 16px;
+}
+.empty-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.empty-desc { font-size: 13.5px; line-height: 1.55; color: var(--text-dim); margin-bottom: 18px; }
+.empty-desc a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+.empty-desc a:hover { color: var(--accent); }
+.empty-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg-panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 9px 18px; font-size: 13.5px; font-weight: 600;
+  font-family: inherit; cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+.empty-btn:hover { background: rgba(255,255,255,0.06); border-color: var(--text-dim); }
+body.light .empty-btn:hover { background: rgba(0,0,0,0.05); }
+.empty-btn:active { transform: scale(.96); }
+.empty-btn span { font-size: 15px; line-height: 1; }
+
+.fab { position: fixed; right: 34px; bottom: 34px; z-index: 30; background: var(--accent); color: #171716; border: none; border-radius: 30px; padding: 14px 22px; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 10px 26px rgba(0,0,0,0.4); transition: transform .15s ease, box-shadow .15s ease, opacity .2s ease; }
+.fab.hidden { display: none; }
 .fab:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 14px 30px rgba(0,0,0,0.5); }
 .fab-icon { font-size: 18px; line-height: 1; }
 

@@ -175,7 +175,11 @@ function renderDashboard() {
   const grid = el("projectGrid");
   grid.innerHTML = "";
   el("loadingState").classList.add("hidden");
-  el("emptyState").classList.toggle("hidden", projects.length > 0);
+  const hasProjects = projects.length > 0;
+  el("emptyState").classList.toggle("hidden", hasProjects);
+  // FAB "Add Project" is hidden while the empty state is showing (first-time / no projects),
+  // and reappears once a project/template exists.
+  el("btnAddProject").classList.toggle("hidden", !hasProjects);
 
   projects.forEach((p, idx) => {
     const card = document.createElement("div");
@@ -267,9 +271,19 @@ async function handleCardMenuAction(action) {
   if (action === "backupWord") exportProjectToWord(p);
   if (action === "sendCloud") { await saveProjectToDriveMain(p); toast("Tersimpan ke Google Drive ✅"); }
   if (action === "delete") {
-    if (!confirm(`Hapus project "${p.title}"? File di Drive tidak ikut terhapus otomatis.`)) return;
+    if (!confirm(`Hapus project "${p.title}"? File ini juga akan dihapus permanen dari Google Drive.`)) return;
+    if (p.driveFileId) {
+      try {
+        await driveDelete(p.driveFileId);
+      } catch (e) {
+        console.error(e);
+        toast("Gagal menghapus file di Google Drive: " + e.message);
+        return; // don't remove locally if the Drive delete failed — avoids it "reappearing" after re-login
+      }
+    }
     projects = projects.filter((x) => x.id !== p.id);
     renderDashboard();
+    toast("Project dihapus ✅");
   }
 }
 
@@ -953,6 +967,7 @@ async function openBackupHistory() {
 async function loadProjectsFromDrive(isInitialLogin = false) {
   el("loadingState").classList.remove("hidden");
   el("emptyState").classList.add("hidden");
+  el("btnAddProject").classList.add("hidden");
   try {
     const folderId = await getOrCreateFolder(DRIVE_FOLDER_NAME, "main");
     const files = await driveListInFolder(folderId);
@@ -1164,6 +1179,8 @@ window.addEventListener("DOMContentLoaded", () => {
   el("btnLoginGoogle").onclick = handleLogin;
 
   el("btnAddProject").onclick = openAddProjectModal;
+  el("emptyStateBtn").onclick = openAddProjectModal;
+  el("emptyStateLink").onclick = (e) => { e.preventDefault(); openAddProjectModal(); };
   el("btnCancelProject").onclick = () => el("projectModal").classList.add("hidden");
   el("btnSaveProject").onclick = saveProjectModal;
 

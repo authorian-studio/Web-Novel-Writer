@@ -50,13 +50,17 @@
         <p>Memuat project dari Google Drive...</p>
       </div>
       <div id="emptyState" class="empty-state hidden">
-        <div class="empty-icon">📚</div>
-        <p>Belum ada project. Klik tombol <b>+</b> di kanan bawah untuk mulai menulis.</p>
+        <div class="empty-media">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>
+        </div>
+        <div class="empty-title">Belum ada apa-apa di sini</div>
+        <div class="empty-desc">Belum ada project yang dibuat. Mulai dengan <a href="#" id="emptyStateLink">membuat project pertamamu</a>.</div>
+        <button id="emptyStateBtn" class="empty-btn"><span>+</span> Project Baru</button>
       </div>
       <div id="projectGrid"></div>
     </div>
 
-    <button id="btnAddProject" class="fab">
+    <button id="btnAddProject" class="fab hidden">
       <span class="fab-icon">+</span>
       <span class="fab-label">Add Project</span>
     </button>
@@ -82,7 +86,12 @@
   <!-- ============ PROJECT VIEW ============ -->
   <section id="editorView" class="view hidden">
     <div id="projectTopbar">
-      <button id="btnBack" class="icon-btn" title="Kembali ke Perpustakaan">←</button>
+      <button id="btnBack" class="flow-btn" title="Kembali ke Perpustakaan">
+        <svg class="flow-arrow flow-arrow-left" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        <span class="flow-text">Exit</span>
+        <span class="flow-circle"></span>
+        <svg class="flow-arrow flow-arrow-right" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </button>
       <div class="project-title-wrap"><input id="projectTitle" value="Novel Tanpa Judul" /></div>
       <div class="project-top-actions">
         <span id="saveStatus" class="save-status">Tersimpan</span>
