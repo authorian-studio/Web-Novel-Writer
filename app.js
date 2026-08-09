@@ -582,8 +582,6 @@ function renderSceneDetail() {
   col.innerHTML = `
     <div class="obsidian-pane">
       <div class="breadcrumb-bar">
-        <button id="sceneNavBack" class="mini-icon-btn" title="Kembali" ${sceneHistoryIndex <= 0 ? "disabled" : ""}>◀</button>
-        <button id="sceneNavForward" class="mini-icon-btn" title="Maju" ${sceneHistoryIndex >= sceneHistory.length - 1 ? "disabled" : ""}>▶</button>
         <span class="breadcrumb-path">📄 ${escapeHtml(s.title || "(tanpa judul)")}</span>
       </div>
       <div id="sceneEditor" class="obsidian-editor" contenteditable="true" spellcheck="false" style="font-size:${16 * currentZoom / 100}px">${s.content || ""}</div>
@@ -605,9 +603,6 @@ function renderSceneDetail() {
   updateSceneWordCount();
 
   el("sceneEditor").addEventListener("input", () => { s.content = el("sceneEditor").innerHTML; updateSceneWordCount(); markDirtyAndSchedule(); });
-
-  el("sceneNavBack").onclick = goSceneBack;
-  el("sceneNavForward").onclick = goSceneForward;
 
   el("zoomSlider").oninput = () => {
     currentZoom = parseInt(el("zoomSlider").value, 10);

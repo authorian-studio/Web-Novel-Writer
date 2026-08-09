@@ -432,21 +432,21 @@ body.light .tree-group { border-left-color: rgba(0,0,0,0.14); }
 /* ============ BINDER BERTINGKAT (folder/chapter) ============ */
 
 /* ============ OBSIDIAN-STYLE WRITING PANE ============ */
-.obsidian-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: 760px; margin: 0 auto; padding: 20px 32px 0; }
+.obsidian-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: 960px; margin: 0 auto; padding: 20px 32px 0; }
 .obsidian-pane .breadcrumb-bar { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; opacity: .8; }
-.obsidian-pane .breadcrumb-path { font-size: 12.5px; font-weight: 500; color: var(--text-dim); margin-left: 4px; }
+.obsidian-pane .breadcrumb-path { font-size: 12.5px; font-weight: 500; color: var(--text-dim); }
 .obsidian-pane .mini-icon-btn:disabled { opacity: .3; cursor: default; }
 
 #sceneEditor.obsidian-editor {
   flex: 1; min-height: 50vh; background: transparent; border: none; border-radius: 0;
-  padding: 20px 0 140px; font-family: Georgia, "Times New Roman", serif;
+  padding: 20px 0 49px; font-family: Georgia, "Times New Roman", serif;
   line-height: 1.9; outline: none; color: var(--text); caret-color: var(--accent);
 }
 #sceneEditor.obsidian-editor:empty::before { content: "Mulai menulis di sini..."; color: var(--text-dim); opacity: .6; }
 
 .obsidian-statusbar {
   position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 18px;
-  width: 100%; max-width: 760px; margin: 0 auto; padding: 12px 32px 16px;
+  width: 100%; max-width: 960px; margin: 0 auto; padding: 12px 32px 16px;
   background: linear-gradient(to top, var(--bg-panel) 45%, transparent); font-size: 12px; color: var(--text-dim);
 }
 
