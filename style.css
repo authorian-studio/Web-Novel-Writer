@@ -386,9 +386,10 @@ body.light .tree-row:hover { background: rgba(0,0,0,0.035); }
   grid-template-rows: 0fr;
   transition: grid-template-rows .28s cubic-bezier(.23,1,.32,1);
   margin-left: 14px;
-  border-left: 1px solid var(--border);
+  border-left: 1px solid rgba(255,255,255,0.14);
   padding-left: 7px;
 }
+body.light .tree-group { border-left-color: rgba(0,0,0,0.14); }
 .tree-group.open { grid-template-rows: 1fr; }
 .tree-group-inner { overflow: hidden; min-height: 0; }
 
