@@ -1271,7 +1271,14 @@ window.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("click", closeAllDropdowns);
   el("menuThemeToggle").onclick = () => document.body.classList.toggle("light");
   el("menuCloudLibrary").onclick = openCloudLibrary;
-  el("menuDriveLogout").onclick = driveSignOut;
+  el("menuDriveLogout").onclick = () => { if (confirm("Logout dari Google?")) driveSignOut(); };
+
+  // ---- Quick action icons (top-right expandable tabs bar) ----
+  el("btnQuickTheme").onclick = () => document.body.classList.toggle("light");
+  el("btnQuickCloud").onclick = openCloudLibrary;
+  el("btnQuickLogout").onclick = () => { if (confirm("Logout dari Google?")) driveSignOut(); };
+  el("btnSupport").onclick = () => el("supportModal").classList.remove("hidden");
+  el("btnCloseSupport").onclick = () => el("supportModal").classList.add("hidden");
 
   // ---- Cloud Library (manual send/receive, terpisah dari autosave) ----
   el("btnCloudBack").onclick = closeCloudLibrary;
