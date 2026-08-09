@@ -370,6 +370,10 @@ body.light .tree-row:hover { background: rgba(0,0,0,0.035); }
 .tree-status-dot.draft { background: #d7a86e; }
 .tree-status-dot.done { background: var(--success); }
 .tree-label { flex: 1; min-width: 0; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tree-rename-input {
+  width: 100%; background: var(--bg-editor); color: var(--text); border: 1px solid var(--accent);
+  border-radius: 4px; font-size: 12.5px; font-family: inherit; padding: 1px 5px; outline: none;
+}
 .tree-row.active .tree-label { font-weight: 600; color: var(--text); }
 .tree-meta { flex-shrink: 0; font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--text-dim); font-family: "SFMono-Regular", Menlo, Consolas, monospace; }
 .tree-actions { display: flex; gap: 1px; flex-shrink: 0; opacity: 0; transition: opacity .15s; }

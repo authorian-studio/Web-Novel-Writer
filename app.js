@@ -453,6 +453,10 @@ function buildTreeNode(node) {
     if (isFolder) toggleFolder(node.id); else selectScene(node.id);
   });
 
+  const labelEl = row.querySelector(".tree-label");
+  labelEl.addEventListener("dblclick", (e) => { e.stopPropagation(); e.preventDefault(); startRenameNode(node, labelEl); });
+  labelEl.title = "Klik dua kali untuk ganti nama";
+
   row.addEventListener("dragstart", (e) => { draggedNodeId = node.id; row.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.stopPropagation(); });
   row.addEventListener("dragend", () => row.classList.remove("dragging"));
   row.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); row.classList.add("drag-over"); });
@@ -477,6 +481,50 @@ function buildTreeNode(node) {
   }
 
   return wrap;
+}
+
+function startRenameNode(node, labelEl) {
+  if (labelEl.querySelector(".tree-rename-input")) return; // sudah dalam mode edit
+  const rowEl = labelEl.closest(".tree-row");
+  if (rowEl) rowEl.draggable = false; // supaya drag-select teks di input tidak bentrok dengan drag-drop tree
+  const originalTitle = node.title || "";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "tree-rename-input";
+  input.value = originalTitle;
+  labelEl.textContent = "";
+  labelEl.appendChild(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+  const commit = () => {
+    if (done) return;
+    done = true;
+    const newTitle = input.value.trim() || originalTitle || "Tanpa Judul";
+    node.title = newTitle;
+    if (node.id === currentSceneId) {
+      const bp = document.querySelector(".breadcrumb-path");
+      if (bp) bp.textContent = "📄 " + newTitle;
+      const tf = el("sceneTitleField");
+      if (tf) tf.value = newTitle;
+    }
+    renderSceneList();
+    markDirtyAndSchedule();
+  };
+  const cancel = () => {
+    if (done) return;
+    done = true;
+    renderSceneList();
+  };
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+    else if (e.key === "Escape") { e.preventDefault(); cancel(); }
+  });
+  input.addEventListener("blur", commit);
+  input.addEventListener("click", (e) => e.stopPropagation());
+  input.addEventListener("dblclick", (e) => e.stopPropagation());
 }
 
 function dropNodeOnto(draggedId, targetNode) {
