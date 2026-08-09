@@ -13,13 +13,14 @@
 //    - Create, lalu salin "Client ID" ke bawah ini.
 // =============================================================
 
-const GOOGLE_CLIENT_ID = "994669345414-5kulq7vvh2rogij9536asf80qdcrvaun.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "628822091691-57k6ru434qnrrfmgcp676l4kco4k61ep.apps.googleusercontent.com";
 const GOOGLE_SCOPES = "https://www.googleapis.com/auth/drive.file";
 
-// Dua folder terpisah di Drive: satu untuk file project aktif,
-// satu lagi khusus backup otomatis (supaya aman kalau file utama korup/kehapus).
+// Tiga folder terpisah di Drive: file project aktif, backup otomatis berkala,
+// dan trash — tempat project yang dihapus disimpan sementara supaya bisa dipulihkan.
 const DRIVE_FOLDER_NAME = "Novelist Web Projects";
 const DRIVE_BACKUP_FOLDER_NAME = "Novelist Web Backups";
+const DRIVE_TRASH_FOLDER_NAME = "Novelist Web Trash";
 
 // Interval autosave & backup (ms)
 const AUTOSAVE_DEBOUNCE_MS = 1500;     // simpan ke Drive 1.5 detik setelah berhenti mengetik (lebih instan)

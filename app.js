@@ -271,19 +271,23 @@ async function handleCardMenuAction(action) {
   if (action === "backupWord") exportProjectToWord(p);
   if (action === "sendCloud") { await saveProjectToDriveMain(p); toast("Tersimpan ke Google Drive ✅"); }
   if (action === "delete") {
-    if (!confirm(`Hapus project "${p.title}"? File ini juga akan dihapus permanen dari Google Drive.`)) return;
+    if (!confirm(`Pindahkan project "${p.title}" ke Trash? Kamu masih bisa memulihkannya nanti dari Cloud Library.`)) return;
+    p._deleted = true; // guard: kalau ada autosave lain yang masih berjalan untuk project ini, dia tidak akan menghidupkannya lagi
     if (p.driveFileId) {
       try {
-        await driveDelete(p.driveFileId);
+        const mainFolderId = await getOrCreateFolder(DRIVE_FOLDER_NAME, "main");
+        const trashFolderId = await getOrCreateFolder(DRIVE_TRASH_FOLDER_NAME, "trash");
+        await driveMoveFile(p.driveFileId, mainFolderId, trashFolderId);
       } catch (e) {
         console.error(e);
-        toast("Gagal menghapus file di Google Drive: " + e.message);
-        return; // don't remove locally if the Drive delete failed — avoids it "reappearing" after re-login
+        p._deleted = false;
+        toast("Gagal memindahkan ke Trash: " + e.message);
+        return; // jangan hapus dari daftar lokal kalau gagal — supaya tidak dikira sudah terhapus padahal masih ada di Drive
       }
     }
     projects = projects.filter((x) => x.id !== p.id);
     renderDashboard();
-    toast("Project dihapus ✅");
+    toast("Project dipindahkan ke Trash 🗑");
   }
 }
 
@@ -846,6 +850,7 @@ const DRIVE_API = "https://www.googleapis.com/drive/v3";
 const DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3";
 let mainFolderIdCache = null;
 let backupFolderIdCache = null;
+let trashFolderIdCache = null;
 
 async function driveFetch(url, options = {}) {
   const res = await fetch(url, { ...options, headers: { ...(options.headers || {}), Authorization: `Bearer ${accessToken}` } });
@@ -856,6 +861,7 @@ async function driveFetch(url, options = {}) {
 async function getOrCreateFolder(name, cacheKey) {
   if (cacheKey === "main" && mainFolderIdCache) return mainFolderIdCache;
   if (cacheKey === "backup" && backupFolderIdCache) return backupFolderIdCache;
+  if (cacheKey === "trash" && trashFolderIdCache) return trashFolderIdCache;
   const q = encodeURIComponent(`mimeType='application/vnd.google-apps.folder' and name='${name}' and trashed=false`);
   const res = await driveFetch(`${DRIVE_API}/files?q=${q}&fields=files(id,name)`);
   const data = await res.json();
@@ -865,7 +871,9 @@ async function getOrCreateFolder(name, cacheKey) {
     const createRes = await driveFetch(`${DRIVE_API}/files`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, mimeType: "application/vnd.google-apps.folder" }) });
     id = (await createRes.json()).id;
   }
-  if (cacheKey === "main") mainFolderIdCache = id; else backupFolderIdCache = id;
+  if (cacheKey === "main") mainFolderIdCache = id;
+  else if (cacheKey === "backup") backupFolderIdCache = id;
+  else if (cacheKey === "trash") trashFolderIdCache = id;
   return id;
 }
 async function driveListInFolder(folderId, extraQuery = "") {
@@ -883,15 +891,28 @@ async function driveUpload(fileName, jsonContent, fileId, folderId) {
 }
 async function driveGetContent(fileId) { return (await driveFetch(`${DRIVE_API}/files/${fileId}?alt=media`)).text(); }
 async function driveDelete(fileId) { await driveFetch(`${DRIVE_API}/files/${fileId}`, { method: "DELETE" }); }
+// Pindahkan file antar folder tanpa upload ulang isinya (dipakai untuk Trash: pindah ke/keluar folder trash)
+async function driveMoveFile(fileId, fromFolderId, toFolderId) {
+  await driveFetch(`${DRIVE_API}/files/${fileId}?addParents=${toFolderId}&removeParents=${fromFolderId}&fields=id,parents`, { method: "PATCH" });
+}
 
 // ---- simpan file utama project ----
 async function saveProjectToDriveMain(p) {
-  if (!p || !accessToken) return;
+  if (!p || !accessToken || p._deleted) return;
   try {
     const folderId = await getOrCreateFolder(DRIVE_FOLDER_NAME, "main");
     const payload = { ...p.data, cover: p.cover || null };
     const json = JSON.stringify(payload);
     const result = await driveUpload(p.title + ".novj", json, p.driveFileId, folderId);
+    if (p._deleted) {
+      // Project dihapus SAAT save ini masih berjalan (race condition) — jangan biarkan
+      // file yang baru saja dibuat/diupdate nongkrong di folder utama, langsung pindah ke Trash.
+      try {
+        const trashFolderId = await getOrCreateFolder(DRIVE_TRASH_FOLDER_NAME, "trash");
+        await driveMoveFile(result.id, folderId, trashFolderId);
+      } catch (e) { console.error(e); }
+      return;
+    }
     p.driveFileId = result.id;
     p.updatedAt = new Date().toISOString();
     markSaved("Tersimpan " + new Date().toLocaleTimeString());
@@ -1012,9 +1033,13 @@ function closeCloudLibrary() {
 function switchCloudTab(tab) {
   el("tabSendToCloud").classList.toggle("active", tab === "send");
   el("tabReceiveFromCloud").classList.toggle("active", tab === "receive");
+  el("tabTrash").classList.toggle("active", tab === "trash");
   el("sendToCloudPanel").classList.toggle("hidden", tab !== "send");
   el("receiveFromCloudPanel").classList.toggle("hidden", tab !== "receive");
-  if (tab === "send") renderSendToCloudList(); else renderReceiveFromCloudList();
+  el("trashPanel").classList.toggle("hidden", tab !== "trash");
+  if (tab === "send") renderSendToCloudList();
+  else if (tab === "receive") renderReceiveFromCloudList();
+  else renderTrashList();
 }
 function cloudAvatarHtml(title, cover, colorA, colorB) {
   if (cover) return `<img class="cloud-avatar" src="${cover}" alt="" />`;
@@ -1084,6 +1109,56 @@ async function pullFromCloud(f) {
     el("cloudLibraryView").classList.add("hidden");
     openProject(p.id);
   } catch (e) { alert("Gagal mengambil dari Drive: " + e.message); }
+}
+
+// ---- TRASH: project yang dihapus dipindah ke sini dulu, bukan langsung hilang permanen ----
+async function renderTrashList() {
+  const panel = el("trashPanel");
+  panel.innerHTML = '<p class="cloud-empty">Memuat Trash dari Drive...</p>';
+  try {
+    const trashFolderId = await getOrCreateFolder(DRIVE_TRASH_FOLDER_NAME, "trash");
+    const files = await driveListInFolder(trashFolderId);
+    if (files.length === 0) { panel.innerHTML = '<p class="cloud-empty">Trash kosong. Project yang dihapus akan muncul di sini.</p>'; return; }
+    panel.innerHTML = "";
+    files.forEach((f) => {
+      const row = document.createElement("div");
+      row.className = "cloud-row";
+      row.innerHTML = `
+        ${cloudAvatarHtml(f.name, null, null, null)}
+        <div class="cloud-row-title">${escapeHtml(f.name.replace(/\.novj$/, ""))}</div>
+        <div class="cloud-row-meta">Dihapus ${timeAgo(f.modifiedTime)}</div>
+        <div class="cloud-row-actions">
+          <button class="cloud-action-btn" data-act="restore" title="Pulihkan project">⟲</button>
+          <button class="cloud-action-btn cloud-action-danger" data-act="wipe" title="Hapus permanen">🗑</button>
+        </div>`;
+      row.querySelector('[data-act="restore"]').onclick = (e) => { e.stopPropagation(); restoreFromTrash(f); };
+      row.querySelector('[data-act="wipe"]').onclick = (e) => { e.stopPropagation(); permanentlyDeleteFromTrash(f); };
+      panel.appendChild(row);
+    });
+  } catch (e) { panel.innerHTML = '<p class="cloud-empty">Gagal memuat Trash: ' + e.message + "</p>"; }
+}
+async function restoreFromTrash(f) {
+  try {
+    const mainFolderId = await getOrCreateFolder(DRIVE_FOLDER_NAME, "main");
+    const trashFolderId = await getOrCreateFolder(DRIVE_TRASH_FOLDER_NAME, "trash");
+    await driveMoveFile(f.id, trashFolderId, mainFolderId);
+    const content = await driveGetContent(f.id);
+    const rawData = JSON.parse(content);
+    const data = migrateOldData(rawData);
+    const colorPair = COLOR_PAIRS[Math.floor(Math.random() * COLOR_PAIRS.length)];
+    const p = { id: "proj-" + f.id, title: data.title || f.name.replace(/\.novj$/, ""), description: "", template: "standard", cover: data.cover || null, colorA: colorPair[0], colorB: colorPair[1], driveFileId: f.id, updatedAt: new Date().toISOString(), data };
+    if (!projects.some((x) => x.driveFileId === f.id)) projects.unshift(p);
+    toast('Project "' + p.title + '" dipulihkan ✅');
+    renderTrashList();
+  } catch (e) { toast("Gagal memulihkan: " + e.message); }
+}
+async function permanentlyDeleteFromTrash(f) {
+  if (!confirm(`Hapus permanen "${f.name.replace(/\.novj$/, "")}"? Tindakan ini tidak bisa dibatalkan.`)) return;
+  try {
+    await driveDelete(f.id);
+    toast("Dihapus permanen dari Trash ✅");
+    renderTrashList();
+  } catch (e) { toast("Gagal menghapus permanen: " + e.message); }
 }
 
 function updateSyncIndicator(ok) {
@@ -1209,11 +1284,14 @@ window.addEventListener("DOMContentLoaded", () => {
   };
   el("menuCloudRefresh").onclick = () => {
     closeAllDropdowns();
-    const activeTab = el("tabSendToCloud").classList.contains("active") ? "send" : "receive";
+    let activeTab = "send";
+    if (el("tabReceiveFromCloud").classList.contains("active")) activeTab = "receive";
+    else if (el("tabTrash").classList.contains("active")) activeTab = "trash";
     switchCloudTab(activeTab);
   };
   el("tabSendToCloud").onclick = () => switchCloudTab("send");
   el("tabReceiveFromCloud").onclick = () => switchCloudTab("receive");
+  el("tabTrash").onclick = () => switchCloudTab("trash");
 
   // ---- project view ----
   el("btnBack").onclick = backToLibrary;
