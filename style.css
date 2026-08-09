@@ -310,12 +310,23 @@ body.light .cloud-row:hover { background: rgba(0,0,0,0.02); }
 .save-status { font-size: 11.5px; color: var(--text-dim); margin-right: 4px; white-space: nowrap; }
 
 #editorBody { flex: 1; display: flex; overflow: hidden; }
-#railNav { width: 76px; flex-shrink: 0; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding-top: 14px; gap: 4px; }
-.rail-btn { width: 60px; background: none; border: none; color: var(--text-dim); border-radius: 10px; padding: 10px 0 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; transition: background .15s, color .15s; }
-.rail-btn .rail-icon { font-size: 19px; }
-.rail-btn .rail-label { font-size: 10.5px; }
-.rail-btn:hover { background: rgba(255,255,255,0.05); color: var(--text); }
-.rail-btn.active { color: var(--accent); background: rgba(215,168,110,0.1); }
+#railNav { width: 64px; flex-shrink: 0; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding-top: 14px; gap: 8px; }
+.rail-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .5s cubic-bezier(.25,1.1,.4,1), color .35s ease;
+}
+.rail-btn:hover { background: var(--bg-elevated); color: var(--text); }
+.rail-btn.active { background: var(--bg-elevated); color: var(--accent); }
 
 #tabContent { flex: 1; overflow: hidden; position: relative; }
 .tab-panel { position: absolute; inset: 0; display: flex; }
@@ -422,7 +433,7 @@ body.light .cloud-row:hover { background: rgba(0,0,0,0.02); }
 @media (max-width: 700px) {
   #editorBody { position: relative; }
   #railNav { position: fixed; bottom: 0; left: 0; right: 0; flex-direction: row; width: 100%; height: 58px; padding: 0; justify-content: space-around; z-index: 20; border-right: none; border-top: 1px solid var(--border); }
-  .rail-btn { width: auto; padding: 6px 0; }
+  .rail-btn { width: 42px; height: 42px; }
   .tab-panel { flex-direction: column; padding-bottom: 58px; }
   .scenes-col { width: 100%; height: 42%; border-right: none; border-bottom: 1px solid var(--border); }
   .scene-detail-col { padding: 16px; }

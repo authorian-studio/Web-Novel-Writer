@@ -1,6 +1,17 @@
-# Novelist Web — v0.5.0
+# Novelist Web — v0.5.1
 
-**Pembaruan terbaru (v0.5.0):**
+**Pembaruan terbaru (v0.5.1):**
+- **Rail navigasi kiri di halaman project (Plot/Write/Organize/Schedule/
+  Tools) didesain ulang** terinspirasi komponen `IconNavigation` dari
+  "Interfaces" (icon nav rail 2-level sidebar) — sekarang jadi rail
+  ramping (64px) berisi tombol ikon persegi rounded, **icon-only** (label
+  teks diganti tooltip `title`), dengan highlight background halus saat
+  hover/aktif dan transisi "soft spring" (`cubic-bezier(0.25, 1.1, 0.4, 1)`)
+  yang lembut. Ikon emoji lama (🧩⌨️🗂️⏱️🛠️) diganti SVG stroke-based
+  minimalis (branch/pen/folder/clock/wrench) supaya konsisten dengan
+  gaya ikon di bar aksi dashboard. Berlaku juga di versi bottom-bar mobile.
+
+**Pembaruan v0.5.0:**
 - **Bar aksi baru di pojok kanan atas dashboard** — menggantikan tombol
   "⋮ Pengaturan" lama, sekarang berupa pill berisi 5 ikon interaktif
   terinspirasi komponen `ExpandableTabs` (21st.dev): ikon diam sebagai
