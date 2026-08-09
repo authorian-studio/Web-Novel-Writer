@@ -159,6 +159,26 @@
           <div class="scene-detail-col" id="sceneDetailCol">
             <div class="scene-empty-hint">Pilih atau buat scene untuk mulai menulis.</div>
           </div>
+
+          <!-- ============ SCENE OPTIONS DRAWER TOGGLE ============ -->
+          <button id="sceneDrawerToggle" class="scene-drawer-toggle hidden" title="Edit info scene" aria-label="Buka panel edit scene" aria-expanded="false">
+            <svg class="drawer-toggle-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+          </button>
+
+          <div id="sceneDrawerScrim" class="scene-drawer-scrim hidden"></div>
+
+          <aside id="sceneOptionsDrawer" class="scene-options-drawer" aria-hidden="true">
+            <header class="drawer-header" id="sceneDrawerGrip">
+              <div class="drawer-header-text">
+                <h2 class="drawer-title">Scene Settings</h2>
+                <p class="drawer-desc">Info &amp; format tulisan scene ini</p>
+              </div>
+              <button id="sceneDrawerClose" class="drawer-close-btn" aria-label="Tutup panel" title="Tutup">
+                <svg width="13" height="13" viewBox="0 0 256 256" fill="none" aria-hidden="true"><line x1="200" y1="56" x2="56" y2="200" stroke="currentColor" stroke-width="16" stroke-linecap="round"/><line x1="200" y1="200" x2="56" y2="56" stroke="currentColor" stroke-width="16" stroke-linecap="round"/></svg>
+              </button>
+            </header>
+            <div class="drawer-body" id="sceneDrawerBody"></div>
+          </aside>
         </div>
 
         <!-- ============ ORGANIZE TAB ============ -->

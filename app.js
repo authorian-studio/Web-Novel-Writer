@@ -362,6 +362,7 @@ function backToLibrary() {
   const p = getProject(currentProjectId);
   if (p) { p.title = el("projectTitle").value; p.data.title = p.title; p.updatedAt = new Date().toISOString(); }
   saveProjectToDriveMain(p);
+  closeSceneDrawer();
   el("editorView").classList.add("hidden");
   el("dashboardView").classList.remove("hidden");
   renderDashboard();
@@ -374,6 +375,7 @@ function flushCurrentEdits() {
 function switchTab(tab) {
   document.querySelectorAll(".rail-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   ["write", "organize", "plot", "schedule", "tools"].forEach((t) => el("tab" + capitalize(t)).classList.toggle("hidden", t !== tab));
+  updateSceneDrawerVisibility();
 }
 function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
@@ -572,62 +574,22 @@ function syncSceneFromDetail() {
 function renderSceneDetail() {
   const col = el("sceneDetailCol");
   const s = currentSceneId ? findScene(currentSceneId) : null;
-  if (!s) { col.innerHTML = '<div class="scene-empty-hint">Pilih atau buat scene untuk mulai menulis.</div>'; return; }
+  if (!s) {
+    col.innerHTML = '<div class="scene-empty-hint">Pilih atau buat scene untuk mulai menulis.</div>';
+    updateSceneDrawerVisibility();
+    return;
+  }
   col.innerHTML = `
-    <div class="breadcrumb-bar">
-      <button id="sceneNavBack" class="mini-icon-btn" title="Kembali" ${sceneHistoryIndex <= 0 ? "disabled" : ""}>◀</button>
-      <button id="sceneNavForward" class="mini-icon-btn" title="Maju" ${sceneHistoryIndex >= sceneHistory.length - 1 ? "disabled" : ""}>▶</button>
-      <span class="breadcrumb-path">📄 ${escapeHtml(s.title || "(tanpa judul)")}</span>
-      <button id="sceneMenuBtn" class="icon-btn" title="Menu" style="margin-left:auto;">⋮</button>
-    </div>
-
-    <div class="rich-toolbar">
-      <select id="fmtFont" title="Font">
-        <option value="Georgia">Georgia</option>
-        <option value="'Segoe UI',sans-serif">Segoe UI</option>
-        <option value="'Times New Roman',serif">Times New Roman</option>
-        <option value="'Courier New',monospace">Courier New</option>
-      </select>
-      <select id="fmtSize" title="Ukuran">
-        <option value="2">12</option><option value="3" selected>14</option><option value="4">16</option>
-        <option value="5">18</option><option value="6">24</option><option value="7">32</option>
-      </select>
-      <select id="fmtStyle" title="Gaya">
-        <option value="p">Paragraf</option><option value="h1">Heading 1</option>
-        <option value="h2">Heading 2</option><option value="h3">Heading 3</option>
-      </select>
-      <span class="toolbar-sep"></span>
-      <button data-cmd="bold" title="Bold"><b>B</b></button>
-      <button data-cmd="italic" title="Italic"><i>I</i></button>
-      <button data-cmd="underline" title="Underline"><u>U</u></button>
-      <span class="toolbar-sep"></span>
-      <button data-cmd="justifyLeft" title="Rata kiri">⯇</button>
-      <button data-cmd="justifyCenter" title="Rata tengah">☰</button>
-      <button data-cmd="justifyRight" title="Rata kanan">⯈</button>
-      <span class="toolbar-sep"></span>
-      <button data-cmd="insertUnorderedList" title="Bullet list">• ≡</button>
-      <button data-cmd="insertOrderedList" title="Numbered list">1. ≡</button>
-      <input type="color" id="fmtColor" title="Warna teks" value="#e7e5e0" />
-    </div>
-
-    <div class="main-info-card">
-      <div class="main-info-header">👤 MAIN INFORMATION</div>
-      <label class="field-label">Title</label>
-      <input id="sceneTitleField" class="field-input" value="${escapeHtml(s.title)}" />
-      <label class="field-label">Synopsis</label>
-      <textarea id="sceneSynopsis" class="field-input textarea" placeholder="Synopsis singkat scene ini...">${escapeHtml(s.synopsis || "")}</textarea>
-      <div class="status-row">
-        <button class="status-chip chip-todo ${s.status === "todo" ? "selected" : ""}" data-status="todo">Todo</button>
-        <button class="status-chip chip-draft ${s.status === "draft" ? "selected" : ""}" data-status="draft">Draft</button>
-        <button class="status-chip chip-done ${s.status === "done" ? "selected" : ""}" data-status="done">Done</button>
+    <div class="obsidian-pane">
+      <div class="breadcrumb-bar">
+        <button id="sceneNavBack" class="mini-icon-btn" title="Kembali" ${sceneHistoryIndex <= 0 ? "disabled" : ""}>◀</button>
+        <button id="sceneNavForward" class="mini-icon-btn" title="Maju" ${sceneHistoryIndex >= sceneHistory.length - 1 ? "disabled" : ""}>▶</button>
+        <span class="breadcrumb-path">📄 ${escapeHtml(s.title || "(tanpa judul)")}</span>
       </div>
-    </div>
-    <div class="scene-writer-half">
-      <div class="writer-half-label">✍️ TULISAN</div>
-      <div id="sceneEditor" contenteditable="true" spellcheck="false" style="font-size:${16 * currentZoom / 100}px">${s.content || ""}</div>
+      <div id="sceneEditor" class="obsidian-editor" contenteditable="true" spellcheck="false" style="font-size:${16 * currentZoom / 100}px">${s.content || ""}</div>
     </div>
 
-    <div class="status-bar">
+    <div class="obsidian-statusbar">
       <span id="sceneWordCount" class="stats-pill">0 kata</span>
       <div class="zoom-control">
         <span>🔍</span>
@@ -642,36 +604,175 @@ function renderSceneDetail() {
   };
   updateSceneWordCount();
 
-  el("sceneTitleField").addEventListener("input", () => { s.title = el("sceneTitleField").value; document.querySelector(".breadcrumb-path").textContent = "📄 " + s.title; renderSceneList(); markDirtyAndSchedule(); });
-  el("sceneSynopsis").addEventListener("input", () => { s.synopsis = el("sceneSynopsis").value; renderSceneList(); markDirtyAndSchedule(); });
   el("sceneEditor").addEventListener("input", () => { s.content = el("sceneEditor").innerHTML; updateSceneWordCount(); markDirtyAndSchedule(); });
-
-  col.querySelectorAll(".status-chip").forEach((btn) => { btn.onclick = () => { s.status = btn.dataset.status; renderSceneDetail(); renderSceneList(); markDirtyAndSchedule(); }; });
 
   el("sceneNavBack").onclick = goSceneBack;
   el("sceneNavForward").onclick = goSceneForward;
-  el("sceneMenuBtn").onclick = (e) => {
-    e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const menu = el("sceneMenu");
-    menu.style.top = rect.bottom + 6 + "px"; menu.style.right = (window.innerWidth - rect.right) + "px"; menu.style.left = "auto";
-    menu.classList.remove("hidden");
-    menu.dataset.sceneId = s.id;
+
+  el("zoomSlider").oninput = () => {
+    currentZoom = parseInt(el("zoomSlider").value, 10);
+    el("zoomLabel").textContent = currentZoom + "%";
+    el("sceneEditor").style.fontSize = (16 * currentZoom / 100) + "px";
   };
 
-  // ---- toolbar format ----
-  col.querySelectorAll(".rich-toolbar button[data-cmd]").forEach((btn) => {
+  renderSceneDrawerBody(s);
+  updateSceneDrawerVisibility();
+}
+
+// ============ SCENE OPTIONS DRAWER (nama, synopsis, status, format tulisan) ============
+function renderSceneDrawerBody(s) {
+  const body = el("sceneDrawerBody");
+  if (!body) return;
+  body.innerHTML = `
+    <div class="drawer-section">
+      <div class="drawer-section-label">👤 Main Information</div>
+      <label class="field-label">Title</label>
+      <input id="sceneTitleField" class="field-input" value="${escapeHtml(s.title)}" />
+      <label class="field-label">Synopsis</label>
+      <textarea id="sceneSynopsis" class="field-input textarea" placeholder="Synopsis singkat scene ini...">${escapeHtml(s.synopsis || "")}</textarea>
+      <div class="status-row">
+        <button class="status-chip chip-todo ${s.status === "todo" ? "selected" : ""}" data-status="todo">Todo</button>
+        <button class="status-chip chip-draft ${s.status === "draft" ? "selected" : ""}" data-status="draft">Draft</button>
+        <button class="status-chip chip-done ${s.status === "done" ? "selected" : ""}" data-status="done">Done</button>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <div class="drawer-section-label">🪶 Formatting</div>
+      <div class="drawer-toolbar-selects">
+        <select id="fmtFont" title="Font">
+          <option value="Georgia">Georgia</option>
+          <option value="'Segoe UI',sans-serif">Segoe UI</option>
+          <option value="'Times New Roman',serif">Times New Roman</option>
+          <option value="'Courier New',monospace">Courier New</option>
+        </select>
+        <select id="fmtSize" title="Ukuran">
+          <option value="2">12</option><option value="3" selected>14</option><option value="4">16</option>
+          <option value="5">18</option><option value="6">24</option><option value="7">32</option>
+        </select>
+        <select id="fmtStyle" title="Gaya">
+          <option value="p">Paragraf</option><option value="h1">Heading 1</option>
+          <option value="h2">Heading 2</option><option value="h3">Heading 3</option>
+        </select>
+      </div>
+      <div class="drawer-toolbar-row">
+        <button data-cmd="bold" title="Bold"><b>B</b></button>
+        <button data-cmd="italic" title="Italic"><i>I</i></button>
+        <button data-cmd="underline" title="Underline"><u>U</u></button>
+        <span class="toolbar-sep"></span>
+        <button data-cmd="justifyLeft" title="Rata kiri">⯇</button>
+        <button data-cmd="justifyCenter" title="Rata tengah">☰</button>
+        <button data-cmd="justifyRight" title="Rata kanan">⯈</button>
+        <span class="toolbar-sep"></span>
+        <button data-cmd="insertUnorderedList" title="Bullet list">• ≡</button>
+        <button data-cmd="insertOrderedList" title="Numbered list">1. ≡</button>
+        <input type="color" id="fmtColor" title="Warna teks" value="#e7e5e0" />
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <div class="drawer-section-label">⚙️ Scene Actions</div>
+      <div class="drawer-action-row">
+        <button id="sceneDuplicateBtn" class="drawer-action-btn">📄 Duplikat Scene</button>
+        <button id="sceneDeleteBtn" class="drawer-action-btn drawer-action-danger">🗑️ Hapus Scene</button>
+      </div>
+    </div>`;
+
+  el("sceneTitleField").addEventListener("input", () => {
+    s.title = el("sceneTitleField").value;
+    const bp = document.querySelector(".breadcrumb-path");
+    if (bp) bp.textContent = "📄 " + (s.title || "(tanpa judul)");
+    renderSceneList();
+    markDirtyAndSchedule();
+  });
+  el("sceneSynopsis").addEventListener("input", () => { s.synopsis = el("sceneSynopsis").value; renderSceneList(); markDirtyAndSchedule(); });
+
+  body.querySelectorAll(".status-chip").forEach((btn) => {
+    btn.onclick = () => {
+      s.status = btn.dataset.status;
+      body.querySelectorAll(".status-chip").forEach((b) => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      renderSceneList();
+      markDirtyAndSchedule();
+    };
+  });
+
+  // ---- toolbar format (bekerja pada seleksi terakhir di #sceneEditor) ----
+  body.querySelectorAll(".drawer-toolbar-row button[data-cmd]").forEach((btn) => {
     btn.onclick = () => { document.execCommand(btn.dataset.cmd, false, null); el("sceneEditor").focus(); };
   });
   el("fmtFont").onchange = () => { document.execCommand("fontName", false, el("fmtFont").value); el("sceneEditor").focus(); };
   el("fmtSize").onchange = () => { document.execCommand("fontSize", false, el("fmtSize").value); el("sceneEditor").focus(); };
   el("fmtStyle").onchange = () => { document.execCommand("formatBlock", false, el("fmtStyle").value); el("sceneEditor").focus(); };
   el("fmtColor").oninput = () => { document.execCommand("foreColor", false, el("fmtColor").value); el("sceneEditor").focus(); };
-  el("zoomSlider").oninput = () => {
-    currentZoom = parseInt(el("zoomSlider").value, 10);
-    el("zoomLabel").textContent = currentZoom + "%";
-    el("sceneEditor").style.fontSize = (16 * currentZoom / 100) + "px";
+
+  el("sceneDuplicateBtn").onclick = () => duplicateScene(s.id);
+  el("sceneDeleteBtn").onclick = () => deleteSceneNode(s.id);
+}
+
+function updateSceneDrawerVisibility() {
+  const tabWrite = el("tabWrite");
+  const writeActive = tabWrite && !tabWrite.classList.contains("hidden");
+  const show = !!(writeActive && currentSceneId && findScene(currentSceneId));
+  el("sceneDrawerToggle").classList.toggle("hidden", !show);
+  if (!show) closeSceneDrawer();
+}
+
+function openSceneDrawer() {
+  el("sceneOptionsDrawer").classList.add("open");
+  el("sceneOptionsDrawer").setAttribute("aria-hidden", "false");
+  el("sceneDrawerScrim").classList.remove("hidden");
+  requestAnimationFrame(() => el("sceneDrawerScrim").classList.add("visible"));
+  el("sceneDrawerToggle").classList.add("is-open");
+  el("sceneDrawerToggle").setAttribute("aria-expanded", "true");
+  document.addEventListener("keydown", sceneDrawerKeyHandler);
+}
+function closeSceneDrawer() {
+  const drawer = el("sceneOptionsDrawer");
+  if (!drawer || !drawer.classList.contains("open")) return;
+  drawer.classList.remove("open");
+  drawer.setAttribute("aria-hidden", "true");
+  el("sceneDrawerScrim").classList.remove("visible");
+  el("sceneDrawerToggle").classList.remove("is-open");
+  el("sceneDrawerToggle").setAttribute("aria-expanded", "false");
+  document.removeEventListener("keydown", sceneDrawerKeyHandler);
+  setTimeout(() => { if (!drawer.classList.contains("open")) el("sceneDrawerScrim").classList.add("hidden"); }, 340);
+}
+function toggleSceneDrawer() {
+  const drawer = el("sceneOptionsDrawer");
+  if (drawer.classList.contains("open")) closeSceneDrawer(); else openSceneDrawer();
+}
+function sceneDrawerKeyHandler(e) { if (e.key === "Escape") closeSceneDrawer(); }
+
+function setupSceneDrawerDrag() {
+  const panel = el("sceneOptionsDrawer");
+  const grip = el("sceneDrawerGrip");
+  if (!panel || !grip) return;
+  let dragging = false, startX = 0, startTime = 0, currentX = 0, pointerId = null;
+
+  grip.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("#sceneDrawerClose")) return;
+    dragging = true; startX = e.clientX; startTime = Date.now(); currentX = 0; pointerId = e.pointerId;
+    panel.classList.add("dragging");
+    grip.setPointerCapture(pointerId);
+  });
+  grip.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    currentX = Math.max(0, e.clientX - startX);
+    panel.style.transform = `translateX(${currentX}px)`;
+  });
+  const endDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    panel.classList.remove("dragging");
+    panel.style.transform = "";
+    const dt = Math.max(1, Date.now() - startTime);
+    const velocity = (currentX / dt) * 1000;
+    const width = panel.getBoundingClientRect().width || 360;
+    if (currentX > width * 0.35 || velocity > 650) closeSceneDrawer();
   };
+  grip.addEventListener("pointerup", endDrag);
+  grip.addEventListener("pointercancel", endDrag);
 }
 
 function openAddSceneModal(parentId = null) {
@@ -1414,6 +1515,12 @@ window.addEventListener("DOMContentLoaded", () => {
     if (btn.dataset.action === "duplicate") duplicateScene(id);
     if (btn.dataset.action === "delete") deleteSceneNode(id);
   });
+
+  // Scene options drawer (obsidian-style writer: nama, synopsis, status & format dipindah ke sini)
+  el("sceneDrawerToggle").onclick = toggleSceneDrawer;
+  el("sceneDrawerClose").onclick = closeSceneDrawer;
+  el("sceneDrawerScrim").onclick = closeSceneDrawer;
+  setupSceneDrawerDrag();
   el("btnExitFocus").onclick = closeFocusMode;
   el("focusEditor").addEventListener("input", updateFocusStats);
   document.querySelectorAll(".focus-toolbar button[data-cmd]").forEach((btn) => {

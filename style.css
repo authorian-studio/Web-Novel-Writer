@@ -413,45 +413,114 @@ body.light .tree-group { border-left-color: rgba(0,0,0,0.14); }
 .scene-card-bottom { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .scene-card-synopsis { font-size: 11.5px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.scene-detail-col { flex: 1; overflow-y: auto; padding: 22px 28px 60px; }
+.scene-detail-col { flex: 1; overflow-y: auto; padding: 0; position: relative; display: flex; flex-direction: column; }
 .scene-empty-hint { color: var(--text-dim); text-align: center; margin-top: 60px; font-size: 14px; }
 
 .scene-detail-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
 .scene-title-input { flex: 1; background: none; border: none; color: var(--text); font-size: 22px; font-weight: 700; }
 .scene-title-input:focus { outline: none; }
 
-.main-info-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; max-width: 640px; margin-bottom: 20px; }
-.main-info-header { display: flex; align-items: center; gap: 8px; font-size: 11.5px; letter-spacing: .08em; color: var(--text-dim); font-weight: 700; margin-bottom: 12px; }
 .status-row { display: flex; gap: 8px; margin-top: 12px; }
 .status-chip { border: 1px solid var(--border); background: none; color: var(--text-dim); padding: 6px 14px; border-radius: 20px; font-size: 12.5px; cursor: pointer; transition: all .15s; }
 .status-chip.chip-todo.selected { border-color: #8f8f97; color: #cfcfd4; background: rgba(143,143,151,0.15); }
 .status-chip.chip-draft.selected { border-color: var(--accent); color: var(--accent); background: rgba(215,168,110,0.12); }
 .status-chip.chip-done.selected { border-color: var(--success); color: var(--success); background: rgba(76,175,130,0.12); }
 
-.scene-writer-half { max-width: 640px; }
-.writer-half-label { font-size: 11.5px; letter-spacing: .08em; color: var(--text-dim); font-weight: 700; margin-bottom: 8px; }
-#sceneEditor, .organize-editor { min-height: 260px; background: var(--bg-editor); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; font-family: Georgia, "Times New Roman", serif; font-size: 16px; line-height: 1.8; outline: none; }
-#sceneEditor:focus, .organize-editor:focus { border-color: var(--accent); }
+.organize-editor { min-height: 260px; background: var(--bg-editor); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; font-family: Georgia, "Times New Roman", serif; font-size: 16px; line-height: 1.8; outline: none; }
+.organize-editor:focus { border-color: var(--accent); }
 
 /* ============ BINDER BERTINGKAT (folder/chapter) ============ */
+
+/* ============ OBSIDIAN-STYLE WRITING PANE ============ */
+.obsidian-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: 760px; margin: 0 auto; padding: 20px 32px 0; }
+.obsidian-pane .breadcrumb-bar { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; opacity: .8; }
+.obsidian-pane .breadcrumb-path { font-size: 12.5px; font-weight: 500; color: var(--text-dim); margin-left: 4px; }
+.obsidian-pane .mini-icon-btn:disabled { opacity: .3; cursor: default; }
+
+#sceneEditor.obsidian-editor {
+  flex: 1; min-height: 50vh; background: transparent; border: none; border-radius: 0;
+  padding: 20px 0 140px; font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.9; outline: none; color: var(--text); caret-color: var(--accent);
+}
+#sceneEditor.obsidian-editor:empty::before { content: "Mulai menulis di sini..."; color: var(--text-dim); opacity: .6; }
+
+.obsidian-statusbar {
+  position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 18px;
+  width: 100%; max-width: 760px; margin: 0 auto; padding: 12px 32px 16px;
+  background: linear-gradient(to top, var(--bg-panel) 45%, transparent); font-size: 12px; color: var(--text-dim);
+}
 
 /* ============ BREADCRUMB BAR ============ */
 .breadcrumb-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; }
 .breadcrumb-path { font-size: 15px; font-weight: 600; color: var(--text); }
 
-/* ============ RICH TOOLBAR ============ */
-.rich-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; max-width: 640px; margin-bottom: 16px; }
-.rich-toolbar select { background: var(--bg-editor); border: 1px solid var(--border); color: var(--text); font-size: 12.5px; padding: 4px 6px; border-radius: 6px; }
-.rich-toolbar button { background: none; border: 1px solid var(--border); color: var(--text); width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-.rich-toolbar button:hover { border-color: var(--accent); color: var(--accent); }
 .toolbar-sep { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
-#fmtColor { width: 28px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; }
 
 /* ============ STATUS BAR (bawah editor tulisan) ============ */
-.status-bar { display: flex; align-items: center; justify-content: space-between; max-width: 640px; margin-top: 10px; padding: 6px 2px; font-size: 12px; color: var(--text-dim); }
 .stats-pill { background: var(--bg-panel); border: 1px solid var(--border); padding: 7px 16px; border-radius: 999px; }
 .zoom-control { display: flex; align-items: center; gap: 6px; }
 .zoom-control input[type="range"] { width: 90px; accent-color: var(--accent); }
+
+/* ============ SCENE OPTIONS DRAWER (edit nama, synopsis, status, format) ============ */
+.scene-drawer-toggle {
+  position: fixed; top: 50%; right: 0; z-index: 60; transform: translateY(-50%);
+  width: 28px; height: 58px; display: flex; align-items: center; justify-content: center;
+  background: var(--bg-elevated); border: 1px solid var(--border); border-right: none;
+  border-radius: 12px 0 0 12px; color: var(--text-dim); cursor: pointer; padding: 0;
+  box-shadow: -6px 0 16px rgba(0,0,0,0.25);
+  transition: right .42s cubic-bezier(.32,1.25,.4,1), background .15s ease, color .15s ease, border-color .15s ease;
+}
+.scene-drawer-toggle:hover { color: var(--accent); border-color: var(--accent); background: var(--bg-panel); }
+.scene-drawer-toggle.is-open { right: 360px; }
+.scene-drawer-toggle .drawer-toggle-icon { transition: transform .42s cubic-bezier(.32,1.25,.4,1); transform: rotate(180deg); }
+.scene-drawer-toggle.is-open .drawer-toggle-icon { transform: rotate(0deg); }
+
+.scene-drawer-scrim {
+  position: fixed; inset: 0; z-index: 55; background: rgba(8,8,10,0.45);
+  opacity: 0; transition: opacity .32s ease; pointer-events: none;
+}
+body.light .scene-drawer-scrim { background: rgba(40,36,28,0.25); }
+.scene-drawer-scrim.visible { opacity: 1; pointer-events: auto; }
+
+.scene-options-drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 58;
+  width: 360px; max-width: 88vw; display: flex; flex-direction: column;
+  background: var(--bg-panel); border-left: 1px solid var(--border);
+  box-shadow: -28px 0 56px -24px rgba(0,0,0,0.55);
+  transform: translateX(100%);
+  transition: transform .44s cubic-bezier(.32,1.25,.4,1);
+}
+.scene-options-drawer.open { transform: translateX(0); }
+.scene-options-drawer.dragging { transition: none; }
+
+.drawer-header {
+  display: flex; align-items: flex-start; gap: 10px; padding: 18px 16px; flex-shrink: 0;
+  border-bottom: 1px solid var(--border); cursor: grab; user-select: none; touch-action: none;
+}
+.scene-options-drawer.dragging .drawer-header { cursor: grabbing; }
+.drawer-header-text { flex: 1; min-width: 0; }
+.drawer-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--text); }
+.drawer-desc { margin: 3px 0 0; font-size: 12px; color: var(--text-dim); }
+.drawer-close-btn { flex-shrink: 0; width: 26px; height: 26px; border-radius: 7px; background: none; border: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.drawer-close-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+body.light .drawer-close-btn:hover { background: rgba(0,0,0,0.06); }
+
+.drawer-body { flex: 1; overflow-y: auto; padding: 18px 16px 26px; }
+.drawer-section { margin-bottom: 24px; }
+.drawer-section:last-child { margin-bottom: 0; }
+.drawer-section-label { font-size: 11.5px; letter-spacing: .07em; font-weight: 700; color: var(--text-dim); margin-bottom: 10px; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+
+.drawer-toolbar-selects { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.drawer-toolbar-selects select { width: 100%; background: var(--bg-editor); border: 1px solid var(--border); color: var(--text); font-size: 12.5px; padding: 8px 9px; border-radius: 8px; }
+.drawer-toolbar-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.drawer-toolbar-row button { background: var(--bg-editor); border: 1px solid var(--border); color: var(--text); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.drawer-toolbar-row button:hover { border-color: var(--accent); color: var(--accent); }
+.drawer-toolbar-row input[type="color"] { width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: none; cursor: pointer; }
+
+.drawer-action-row { display: flex; flex-direction: column; gap: 8px; }
+.drawer-action-btn { width: 100%; text-align: left; background: var(--bg-editor); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 9px; font-size: 13px; cursor: pointer; transition: border-color .15s, color .15s; }
+.drawer-action-btn:hover { border-color: var(--accent); color: var(--accent); }
+.drawer-action-btn.drawer-action-danger:hover { border-color: var(--danger); color: var(--danger); }
 
 /* ============ TYPE TOGGLE (modal add scene/chapter) ============ */
 .type-toggle { display: flex; gap: 8px; margin-top: 4px; }
@@ -475,7 +544,7 @@ body.light .tree-group { border-left-color: rgba(0,0,0,0.14); }
 /* ============ RESPONSIVE ============ */
 @media (max-width: 860px) {
   .scenes-col { width: 230px; }
-  .main-info-card, .scene-writer-half { max-width: 100%; }
+  .obsidian-pane, .obsidian-statusbar { max-width: 100%; padding-left: 20px; padding-right: 20px; }
 }
 @media (max-width: 700px) {
   #editorBody { position: relative; }
@@ -483,9 +552,12 @@ body.light .tree-group { border-left-color: rgba(0,0,0,0.14); }
   .rail-btn { width: 42px; height: 42px; }
   .tab-panel { flex-direction: column; padding-bottom: 58px; }
   .scenes-col { width: 100%; height: 42%; border-right: none; border-bottom: 1px solid var(--border); }
-  .scene-detail-col { padding: 16px; }
+  .obsidian-pane, .obsidian-statusbar { padding-left: 16px; padding-right: 16px; }
   #dashTopbar { padding: 16px 18px; }
   #dashBody { padding: 6px 18px 100px; }
   .fab-label { display: none; }
   .fab { padding: 14px 16px; }
+  .scene-drawer-toggle { bottom: 58px; top: auto; transform: none; border-radius: 12px 0 0 0; }
+  .scene-drawer-toggle.is-open { right: 88vw; }
+  .scene-options-drawer { bottom: 58px; width: 88vw; }
 }
