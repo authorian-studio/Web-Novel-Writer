@@ -1,4 +1,11 @@
-# Novelist Web — v0.6.1
+# Novelist Web — v0.6.2
+
+**Pembaruan terbaru (v0.6.2):**
+- **Area menulis dilebarkan penuh** — batas max-width dihapus total (sebelumnya
+  1360px), sekarang mengikuti penuh lebar panel dari tepi kiri ke kanan
+  (menyisakan padding 48px di kedua sisi), sesuai contoh yang dikirim.
+
+
 
 **Pembaruan terbaru (v0.6.1):**
 - **Google Client ID diperbarui** ke `994669345414-5kulq7vvh2rogij9536asf80qdcrvaun.apps.googleusercontent.com`
