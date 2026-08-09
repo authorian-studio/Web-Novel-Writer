@@ -13,7 +13,7 @@
 //    - Create, lalu salin "Client ID" ke bawah ini.
 // =============================================================
 
-const GOOGLE_CLIENT_ID = "994669345414-5kulq7vvh2rogij9536asf80qdcrvaun.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "628822091691-57k6ru434qnrrfmgcp676l4kco4k61ep.apps.googleusercontent.com";
 const GOOGLE_SCOPES = "https://www.googleapis.com/auth/drive.file";
 
 // Tiga folder terpisah di Drive: file project aktif, backup otomatis berkala,

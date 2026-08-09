@@ -1,4 +1,36 @@
-# Novelist Web — v0.5.1
+# Novelist Web — v0.6.0
+
+**Pembaruan terbaru (v0.6.0):**
+- **Panel SCENES di tab Write diganti total jadi tree view** ala Scrivener/
+  VS Code, terinspirasi komponen `TreeView` (motion/react) yang dikirim —
+  diadaptasi ke vanilla JS/CSS (tanpa Framer Motion) karena struktur
+  project ini tidak pakai React:
+  - Baris jadi ramping (30px), chevron ▸ yang **berputar 90°** saat
+    folder/chapter dibuka (bukan lagi ganti karakter ▸/▾).
+  - **Garis indentasi vertikal** di kiri anak-anak folder (border-left),
+    persis seperti file tree VS Code / komponen aslinya.
+  - Expand/collapse folder dianimasikan halus pakai trik CSS
+    `grid-template-rows: 0fr → 1fr` (auto-height animation tanpa perlu
+    JS mengukur tinggi konten), dengan easing yang sama seperti
+    komponen aslinya.
+  - Ikon folder/dokumen diganti SVG stroke minimalis (bukan emoji 📁📄).
+  - Kolom "meta" di kanan tiap baris: folder menampilkan **jumlah isi**
+    `(n)`, scene menampilkan **jumlah kata** (`128w`) dihitung otomatis
+    dari isi tulisannya.
+  - Tombol aksi (tambah/fokus/duplikat/hapus) disembunyikan default,
+    baru muncul saat baris di-hover atau sedang aktif — supaya tree-nya
+    tetap bersih dan padat seperti binder Scrivener asli.
+  - **Drag & drop pindah scene/chapter** (ke urutan lain atau ke dalam
+    folder lain) tetap berfungsi persis seperti sebelumnya — cuma
+    tampilannya yang diganti, logika pemindahan datanya tidak disentuh.
+  - Preview synopsis dipindah sepenuhnya ke panel kanan "MAIN
+    INFORMATION" (sudah ada di sana), tidak lagi ditampilkan di baris
+    tree supaya barisnya tetap ringkas satu baris.
+  - Tab **Organize** (Karakter/Lokasi/Catatan) TIDAK terpengaruh —
+    tampilannya tetap seperti biasa (bukan tree, karena strukturnya
+    flat/tidak berjenjang).
+
+**Pembaruan v0.5.1:**
 
 **Pembaruan terbaru (v0.5.1):**
 - **Rail navigasi kiri di halaman project (Plot/Write/Organize/Schedule/

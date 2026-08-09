@@ -377,7 +377,7 @@ function switchTab(tab) {
 }
 function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
-// ---- WRITE TAB : binder bertingkat (folder/chapter berisi scene) ----
+// ---- WRITE TAB : binder bertingkat (folder/chapter berisi scene), tampil sebagai tree view ----
 let draggedNodeId = null;
 let expandedFolders = new Set();
 let sceneHistory = [];
@@ -385,6 +385,24 @@ let sceneHistoryIndex = -1;
 let pendingSceneParentId = null;
 let pendingSceneType = "scene";
 let currentZoom = 100;
+
+const TREE_ICONS = {
+  caret: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>`,
+  folder: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6Z"/></svg>`,
+  file: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+  plus: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>`,
+  pen: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z"/></svg>`,
+  copy: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+  trash: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`,
+};
+function countWordsFromHtml(html) {
+  if (!html) return 0;
+  const text = html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").trim();
+  return text ? text.split(/\s+/).filter(Boolean).length : 0;
+}
+function countAllNodes(list, isFolder) {
+  return (list || []).filter((n) => (n.type === "folder") === isFolder).length;
+}
 
 function toggleFolder(id) {
   if (expandedFolders.has(id)) expandedFolders.delete(id); else expandedFolders.add(id);
@@ -395,75 +413,70 @@ function renderSceneList() {
   const p = getProject(currentProjectId);
   const container = el("sceneList");
   container.innerHTML = "";
-  renderBinderLevel(p.data.scenes, container, 0);
+  (p.data.scenes || []).forEach((node) => container.appendChild(buildTreeNode(node)));
 }
 
-function renderBinderLevel(list, container, depth) {
-  list.forEach((node) => {
-    const card = document.createElement("div");
-    const isFolder = node.type === "folder";
-    card.className = "scene-card" + (node.id === currentSceneId ? " active" : "") + (isFolder ? " folder-card" : "");
-    card.style.marginLeft = (depth * 14) + "px";
-    card.draggable = true;
+function buildTreeNode(node) {
+  const wrap = document.createElement("div");
+  wrap.className = "tree-node";
 
-    if (isFolder) {
-      const expanded = expandedFolders.has(node.id);
-      card.innerHTML = `
-        <div class="scene-card-top">
-          <span class="drag-handle" title="Seret untuk pindahkan">⠿</span>
-          <button class="folder-caret" title="Buka/tutup">${expanded ? "▾" : "▸"}</button>
-          <span class="node-icon">📁</span>
-          <div class="scene-card-title">${escapeHtml(node.title || "(tanpa judul)")}</div>
-          <div class="scene-card-icons">
-            <button class="scene-icon-btn" data-action="addChild" title="Tambah scene di dalam folder ini">+</button>
-            <button class="scene-icon-btn scene-icon-danger" data-action="delete" title="Hapus folder & seluruh isinya">🗑</button>
-          </div>
-        </div>`;
-      card.addEventListener("click", (e) => {
-        const action = e.target.closest(".scene-icon-btn")?.dataset.action;
-        if (action === "addChild") { openAddSceneModal(node.id); return; }
-        if (action === "delete") { deleteSceneNode(node.id); return; }
-        toggleFolder(node.id);
-      });
-    } else {
-      card.innerHTML = `
-        <div class="scene-card-top">
-          <span class="drag-handle" title="Seret untuk pindahkan">⠿</span>
-          <span class="node-icon">📄</span>
-          <div class="scene-card-title">${escapeHtml(node.title || "(tanpa judul)")}</div>
-          <div class="scene-card-icons">
-            <button class="scene-icon-btn" data-action="focus" title="Mode fokus (tanpa gangguan)">🖋</button>
-            <button class="scene-icon-btn" data-action="duplicate" title="Duplikat scene">📄</button>
-            <button class="scene-icon-btn scene-icon-danger" data-action="delete" title="Hapus scene">🗑</button>
-          </div>
-        </div>
-        <div class="scene-card-bottom">
-          <span class="status-dot ${node.status}"></span>
-          <span class="scene-card-synopsis">${escapeHtml(node.synopsis || "Belum ada synopsis")}</span>
-        </div>`;
-      card.addEventListener("click", (e) => {
-        const action = e.target.closest(".scene-icon-btn")?.dataset.action;
-        if (action === "focus") { openFocusMode(node.id); return; }
-        if (action === "duplicate") { duplicateScene(node.id); return; }
-        if (action === "delete") { deleteSceneNode(node.id); return; }
-        selectScene(node.id);
-      });
-    }
+  const isFolder = node.type === "folder";
+  const isOpen = isFolder && expandedFolders.has(node.id);
+  const childCount = isFolder ? (node.children || []).length : 0;
+  const metaText = isFolder ? (childCount ? `${childCount}` : "") : (countWordsFromHtml(node.content) + "w");
 
-    card.addEventListener("dragstart", (e) => { draggedNodeId = node.id; card.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.stopPropagation(); });
-    card.addEventListener("dragend", () => card.classList.remove("dragging"));
-    card.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); card.classList.add("drag-over"); });
-    card.addEventListener("dragleave", () => card.classList.remove("drag-over"));
-    card.addEventListener("drop", (e) => {
-      e.preventDefault(); e.stopPropagation();
-      card.classList.remove("drag-over");
-      if (!draggedNodeId || draggedNodeId === node.id) return;
-      dropNodeOnto(draggedNodeId, node);
-    });
+  const row = document.createElement("div");
+  row.className = "tree-row" + (node.id === currentSceneId ? " active" : "");
+  row.draggable = true;
+  row.innerHTML = `
+    <span class="tree-drag-handle" title="Seret untuk pindahkan">⠿</span>
+    <span class="tree-caret ${isFolder ? (isOpen ? "open" : "") : "leaf"}">${isFolder ? TREE_ICONS.caret : ""}</span>
+    <span class="tree-icon">${isFolder ? TREE_ICONS.folder : TREE_ICONS.file}</span>
+    ${!isFolder ? `<span class="tree-status-dot ${node.status}"></span>` : ""}
+    <span class="tree-label">${escapeHtml(node.title || "(tanpa judul)")}</span>
+    <span class="tree-meta">${metaText}</span>
+    <div class="tree-actions">
+      ${isFolder
+        ? `<button class="tree-action-btn" data-action="addChild" title="Tambah scene di dalam folder ini">${TREE_ICONS.plus}</button>
+           <button class="tree-action-btn tree-action-danger" data-action="delete" title="Hapus folder & seluruh isinya">${TREE_ICONS.trash}</button>`
+        : `<button class="tree-action-btn" data-action="focus" title="Mode fokus (tanpa gangguan)">${TREE_ICONS.pen}</button>
+           <button class="tree-action-btn" data-action="duplicate" title="Duplikat scene">${TREE_ICONS.copy}</button>
+           <button class="tree-action-btn tree-action-danger" data-action="delete" title="Hapus scene">${TREE_ICONS.trash}</button>`}
+    </div>`;
 
-    container.appendChild(card);
-    if (isFolder && expandedFolders.has(node.id)) renderBinderLevel(node.children || [], container, depth + 1);
+  row.addEventListener("click", (e) => {
+    const action = e.target.closest(".tree-action-btn")?.dataset.action;
+    if (action === "addChild") { openAddSceneModal(node.id); return; }
+    if (action === "focus") { openFocusMode(node.id); return; }
+    if (action === "duplicate") { duplicateScene(node.id); return; }
+    if (action === "delete") { deleteSceneNode(node.id); return; }
+    if (isFolder) toggleFolder(node.id); else selectScene(node.id);
   });
+
+  row.addEventListener("dragstart", (e) => { draggedNodeId = node.id; row.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.stopPropagation(); });
+  row.addEventListener("dragend", () => row.classList.remove("dragging"));
+  row.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); row.classList.add("drag-over"); });
+  row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+  row.addEventListener("drop", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    row.classList.remove("drag-over");
+    if (!draggedNodeId || draggedNodeId === node.id) return;
+    dropNodeOnto(draggedNodeId, node);
+  });
+
+  wrap.appendChild(row);
+
+  if (isFolder) {
+    const group = document.createElement("div");
+    group.className = "tree-group" + (isOpen ? " open" : "");
+    const inner = document.createElement("div");
+    inner.className = "tree-group-inner";
+    (node.children || []).forEach((child) => inner.appendChild(buildTreeNode(child)));
+    group.appendChild(inner);
+    wrap.appendChild(group);
+  }
+
+  return wrap;
 }
 
 function dropNodeOnto(draggedId, targetNode) {
