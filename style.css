@@ -432,9 +432,12 @@ body.light .tree-group { border-left-color: rgba(0,0,0,0.14); }
 /* ============ BINDER BERTINGKAT (folder/chapter) ============ */
 
 /* ============ OBSIDIAN-STYLE WRITING PANE ============ */
-.obsidian-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: 960px; margin: 0 auto; padding: 20px 32px 0; }
-.obsidian-pane .breadcrumb-bar { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; opacity: .8; }
-.obsidian-pane .breadcrumb-path { font-size: 12.5px; font-weight: 500; color: var(--text-dim); }
+.obsidian-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: 1360px; margin: 0 auto; padding: 20px 48px 0; }
+.obsidian-pane .breadcrumb-bar {
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: center;
+  gap: 4px; margin-bottom: 4px; padding: 6px 0 10px; background: var(--bg-editor);
+}
+.obsidian-pane .breadcrumb-path { font-size: 14px; font-weight: 600; color: var(--text); text-align: center; }
 .obsidian-pane .mini-icon-btn:disabled { opacity: .3; cursor: default; }
 
 #sceneEditor.obsidian-editor {
@@ -446,7 +449,7 @@ body.light .tree-group { border-left-color: rgba(0,0,0,0.14); }
 
 .obsidian-statusbar {
   position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 18px;
-  width: 100%; max-width: 960px; margin: 0 auto; padding: 12px 32px 16px;
+  width: 100%; max-width: 1360px; margin: 0 auto; padding: 12px 48px 16px;
   background: linear-gradient(to top, var(--bg-panel) 45%, transparent); font-size: 12px; color: var(--text-dim);
 }
 

@@ -1,6 +1,15 @@
-# Novelist Web — v0.6.0
+# Novelist Web — v0.6.1
 
-**Pembaruan terbaru (v0.6.0):**
+**Pembaruan terbaru (v0.6.1):**
+- **Google Client ID diperbarui** ke `994669345414-5kulq7vvh2rogij9536asf80qdcrvaun.apps.googleusercontent.com`
+  (sudah ditempel di `config.js`).
+- **Area menulis (Obsidian-pane) dilebarkan** dari max-width 960px menjadi
+  1360px, supaya lebih lega dipakai di layar lebar.
+- **Judul scene di atas area tulisan sekarang di-pusatkan (center)** dan
+  dibuat **sticky** — tetap menempel di atas walau kamu scroll ke bawah
+  saat tulisannya panjang, jadi selalu jelas scene mana yang sedang dibuka.
+
+
 - **Panel SCENES di tab Write diganti total jadi tree view** ala Scrivener/
   VS Code, terinspirasi komponen `TreeView` (motion/react) yang dikirim —
   diadaptasi ke vanilla JS/CSS (tanpa Framer Motion) karena struktur
