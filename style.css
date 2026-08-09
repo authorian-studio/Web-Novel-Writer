@@ -91,15 +91,9 @@ body.light .icon-btn:hover { background: rgba(0,0,0,0.06); }
   transition: max-width .35s cubic-bezier(.2,.9,.3,1), opacity .25s ease, margin-left .35s cubic-bezier(.2,.9,.3,1);
 }
 .exp-tab:hover .exp-tab-label, .exp-tab:focus-visible .exp-tab-label { max-width: 140px; opacity: 1; margin-left: 7px; }
+.exp-tab.is-active { background: var(--bg-elevated); color: var(--text); padding-left: 14px; padding-right: 14px; }
+.exp-tab.is-active .exp-tab-label { max-width: 140px; opacity: 1; margin-left: 7px; }
 .exp-separator { width: 1.2px; height: 22px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
-.exp-tab-support {
-  background: var(--text);
-  color: var(--bg);
-  padding: 9px 14px;
-}
-.exp-tab-support .exp-tab-label { max-width: 70px; opacity: 1; margin-left: 6px; }
-.exp-tab-support:hover, .exp-tab-support:focus-visible { background: var(--accent); color: #171716; padding-left: 14px; padding-right: 14px; }
-.exp-tab-support:hover .exp-tab-label, .exp-tab-support:focus-visible .exp-tab-label { max-width: 70px; margin-left: 6px; }
 
 /* ============ SUPPORT MODAL ============ */
 .support-box { width: 480px; }

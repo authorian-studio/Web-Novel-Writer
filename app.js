@@ -1274,10 +1274,21 @@ window.addEventListener("DOMContentLoaded", () => {
   el("menuDriveLogout").onclick = () => { if (confirm("Logout dari Google?")) driveSignOut(); };
 
   // ---- Quick action icons (top-right expandable tabs bar) ----
-  el("btnQuickTheme").onclick = () => document.body.classList.toggle("light");
-  el("btnQuickCloud").onclick = openCloudLibrary;
-  el("btnQuickLogout").onclick = () => { if (confirm("Logout dari Google?")) driveSignOut(); };
-  el("btnSupport").onclick = () => el("supportModal").classList.remove("hidden");
+  // Klik langsung memicu animasi "expand" (menampilkan label) tanpa perlu hover dulu —
+  // penting juga untuk perangkat sentuh yang tidak punya state hover sama sekali.
+  function pulseExpTab(btn) {
+    document.querySelectorAll(".exp-tab.is-active").forEach((t) => t.classList.remove("is-active"));
+    btn.classList.add("is-active");
+    clearTimeout(btn._expTimer);
+    btn._expTimer = setTimeout(() => btn.classList.remove("is-active"), 1100);
+  }
+  document.querySelectorAll(".exp-tab").forEach((btn) => {
+    btn.addEventListener("click", () => pulseExpTab(btn));
+  });
+  el("btnQuickTheme").addEventListener("click", () => document.body.classList.toggle("light"));
+  el("btnQuickCloud").addEventListener("click", openCloudLibrary);
+  el("btnQuickLogout").addEventListener("click", () => { if (confirm("Logout dari Google?")) driveSignOut(); });
+  el("btnSupport").addEventListener("click", () => el("supportModal").classList.remove("hidden"));
   el("btnCloseSupport").onclick = () => el("supportModal").classList.add("hidden");
 
   // ---- Cloud Library (manual send/receive, terpisah dari autosave) ----
