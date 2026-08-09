@@ -1280,7 +1280,7 @@ window.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".exp-tab.is-active").forEach((t) => t.classList.remove("is-active"));
     btn.classList.add("is-active");
     clearTimeout(btn._expTimer);
-    btn._expTimer = setTimeout(() => btn.classList.remove("is-active"), 1100);
+    btn._expTimer = setTimeout(() => btn.classList.remove("is-active"), 1700);
   }
   document.querySelectorAll(".exp-tab").forEach((btn) => {
     btn.addEventListener("click", () => pulseExpTab(btn));

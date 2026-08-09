@@ -71,7 +71,7 @@ body.light .icon-btn:hover { background: rgba(0,0,0,0.06); }
   border-radius: 12px;
   padding: 9px;
   cursor: pointer;
-  transition: background .3s cubic-bezier(.2,.9,.3,1), color .3s ease, padding .3s cubic-bezier(.2,.9,.3,1);
+  transition: background .55s cubic-bezier(.16,.8,.24,1), color .5s ease, padding .55s cubic-bezier(.16,.8,.24,1);
   flex-shrink: 0;
 }
 .exp-tab:hover, .exp-tab:focus-visible {
@@ -88,7 +88,7 @@ body.light .icon-btn:hover { background: rgba(0,0,0,0.06); }
   font-size: 13px;
   font-weight: 600;
   margin-left: 0;
-  transition: max-width .35s cubic-bezier(.2,.9,.3,1), opacity .25s ease, margin-left .35s cubic-bezier(.2,.9,.3,1);
+  transition: max-width .6s cubic-bezier(.16,.8,.24,1), opacity .5s ease .05s, margin-left .6s cubic-bezier(.16,.8,.24,1);
 }
 .exp-tab:hover .exp-tab-label, .exp-tab:focus-visible .exp-tab-label { max-width: 140px; opacity: 1; margin-left: 7px; }
 .exp-tab.is-active { background: var(--bg-elevated); color: var(--text); padding-left: 14px; padding-right: 14px; }

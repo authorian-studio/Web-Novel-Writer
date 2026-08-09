@@ -1,6 +1,52 @@
-# Novelist Web — v0.4.3
+# Novelist Web — v0.5.0
 
-**Pembaruan terbaru:** halaman login diberi animasi baru terinspirasi
+**Pembaruan terbaru (v0.5.0):**
+- **Bar aksi baru di pojok kanan atas dashboard** — menggantikan tombol
+  "⋮ Pengaturan" lama, sekarang berupa pill berisi 5 ikon interaktif
+  terinspirasi komponen `ExpandableTabs` (21st.dev): ikon diam sebagai
+  icon-only, lalu melebar menampilkan label saat di-hover **atau diklik**
+  (klik memicu animasi expand-nya sendiri tanpa perlu arahkan kursor —
+  penting juga untuk pengguna HP/layar sentuh yang tidak punya hover).
+  Kecepatan animasinya sengaja dibuat pelan (~0.55–0.6 detik) supaya
+  transisinya tidak terlalu cepat dilihat.
+  - 🏠 **Tema** — toggle dark/light langsung
+  - ⬆ **Cloud Library** — ikon upload (panah ke atas + tray), buka Cloud
+    Library langsung satu klik
+  - ⚙️ **Pengaturan** — tetap buka dropdown lengkap (Ganti Tema/Cloud
+    Library/Logout) sebagai menu cadangan
+  - ❓ **Support** — buka modal "Panduan Penggunaan" yang menjelaskan
+    tiap fitur web (Write, Plot, Organize, Schedule, Cloud Library,
+    Autosave, Trash)
+  - 🚪 **Logout** — ikon pintu (bukan lagi shield), minta konfirmasi
+    dulu sebelum logout dari Google
+- **Sistem Trash di Cloud Library** — project yang dihapus tidak
+  langsung hilang permanen. Sekarang ada folder Drive terpisah
+  **"Novelist Web Trash"** dan tab ketiga **TRASH** di Cloud Library
+  (selain SEND TO CLOUD & RECEIVE FROM CLOUD), lengkap dengan tombol
+  **Pulihkan (⟲)** dan **Hapus Permanen (🗑, merah)** per item.
+- **Perbaikan bug "project hapus tapi muncul lagi"** — sebelumnya delete
+  cuma menghapus dari daftar lokal, filenya tetap ada di Drive. Sekarang
+  delete benar-benar memindahkan file ke folder Trash di Drive. Ada juga
+  guard race-condition (`_deleted` flag) supaya kalau ada autosave yang
+  masih berjalan pas project dihapus, hasil save itu otomatis ikut
+  dipindah ke Trash juga (bukan malah menghidupkan project yang sudah
+  dihapus).
+- **Empty state dashboard didesain ulang** meniru komponen `Empty` dari
+  reui: ikon folder dalam kotak rounded, judul "Belum ada apa-apa di
+  sini", deskripsi dengan link "membuat project pertamamu", dan tombol
+  "+ Project Baru" — semua trigger buka modal Add Project.
+- **Tombol "+ Add Project" (FAB) otomatis sembunyi** saat belum ada
+  project sama sekali, dan muncul lagi begitu ada minimal 1 project.
+- **Tombol back (←) di halaman project** diganti animasi ala FlowButton
+  (21st.dev): border pill yang berubah rounded-rect saat hover/tap, dan
+  lingkaran aksen yang membesar dari tengah.
+- **Tombol Exit (pengganti tombol back)** — versi penuh FlowButton
+  dengan teks "Exit", dua panah yang saling bertukar posisi, dan
+  lingkaran yang membesar memenuhi tombol saat hover/tap.
+
+
+
+**Pembaruan sebelumnya:** halaman login diberi animasi baru terinspirasi
 komponen "MinimalAuthPage" dari 21st.dev — partikel titik-titik halus yang
 melayang pelan di background (canvas, ikut bereaksi lembut saat mouse
 didekatkan), plus lapisan blob gradient abu-abu lembut di pojok kiri atas.
@@ -91,7 +137,8 @@ menutup tab, risiko kehilangan tulisan ditekan seminim mungkin.
 ## Cloud Library (kirim/ambil manual — beda dengan autosave)
 
 Selain autosave otomatis di atas, ada juga layar terpisah **Cloud Library**
-(buka lewat menu ⋮ di dashboard) untuk kontrol manual:
+(buka lewat ikon ⬆ di bar kanan atas dashboard, atau lewat menu ⚙
+Pengaturan) untuk kontrol manual — sekarang dengan 3 tab:
 
 - **SEND TO CLOUD** — daftar semua project yang ada di perangkat ini,
   tinggal pencet ikon ⬆ di project yang mau dikirim manual ke Drive.
@@ -99,6 +146,10 @@ Selain autosave otomatis di atas, ada juga layar terpisah **Cloud Library**
   (folder "Novelist Web Projects") lengkap dengan **waktu terakhir
   disimpan**, tinggal pencet salah satu untuk mengambil/membukanya di
   perangkat ini.
+- **TRASH** — project yang dihapus dari dashboard dipindah ke sini dulu
+  (folder Drive terpisah "Novelist Web Trash"), bukan langsung hilang.
+  Bisa **dipulihkan (⟲)** kapan saja, atau **dihapus permanen (🗑)** kalau
+  memang sudah yakin tidak dipakai lagi.
 
 Ini cocok dipakai kalau kamu ganti perangkat (nanti termasuk dari HP)
 dan mau pilih sendiri project mana yang diambil, terpisah dari mekanisme
