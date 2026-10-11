@@ -120,6 +120,10 @@ warna, dll) ada di `LOGIN_ART_OPTIONS` di bagian bawah `app.js`. Gambarnya
 (opsi `transparent: true`), jadi dot halftone hanya menutupi karakternya dan
 dot-grid di belakangnya tetap terlihat. Untuk ganti karakter: siapkan gambar
 PNG/WebP berlatar transparan lalu ganti `src` (file harus di-upload ke root repo).
+`login-art-data.js` berisi gambar yang sama dalam bentuk data URI: WebGL tidak boleh
+memakai gambar lokal saat halaman dibuka langsung dari file (`file://`), jadi tanpa
+file ini kolom kiri akan kosong kalau `index.html` di-klik dua kali. Via GitHub Pages /
+Live Server kedua cara jalan.
 
 **Pembaruan sebelumnya:** halaman login diberi animasi baru terinspirasi
 komponen "MinimalAuthPage" dari 21st.dev — partikel titik-titik halus yang
@@ -260,6 +264,7 @@ nama-repo/
 ├── app.js
 ├── halftone-reveal.js
 ├── login-art.webp
+├── login-art-data.js
 ├── config.js
 ├── manifest.json
 ```

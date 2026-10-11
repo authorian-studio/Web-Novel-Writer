@@ -1356,10 +1356,11 @@ function updateSyncIndicator(ok) {
 
 // ================= LOGIN ART (kolom kiri halaman login) =================
 // HalftoneReveal dari React Bits (sudah di-port ke JS biasa: halftone-reveal.js).
-// login-art.webp = ilustrasi karakter dengan background transparan (dibuang dari JPG asli), sejajar index.html.
+// Gambar = ilustrasi karakter dengan background transparan (dibuang dari JPG asli). Dimuat dari login-art-data.js (data URI,
+// berfungsi bahkan saat halaman dibuka dari file://); kalau file itu tidak ada, dipakai login-art.webp (butuh http/https).
 // transparent: true + gambar ber-alpha -> dot halftone hanya menutupi karakternya, dot-grid #loginView tetap terlihat di sekelilingnya.
 const LOGIN_ART_OPTIONS = {
-  src: "login-art.webp",
+  src: window.LOGIN_ART_DATA || "login-art.webp",
   transparent: true,
   fit: "contain",          // seluruh karakter terlihat, tidak terpotong
   mode: "mono",
@@ -1380,8 +1381,13 @@ function initLoginArt() {
   const wide = window.matchMedia("(min-width: 901px)");
   let art = null;
   const sync = () => {
-    if (wide.matches && !art) art = window.HalftoneReveal.create(host, LOGIN_ART_OPTIONS);
-    else if (!wide.matches && art) { art.destroy(); art = null; }
+    if (wide.matches && !art) {
+      art = window.HalftoneReveal.create(host, LOGIN_ART_OPTIONS);
+      // Browser tanpa WebGL2 (atau hardware acceleration mati): tampilkan gambar karakternya apa adanya supaya kolom kiri tidak kosong.
+      if (!art.supported) host.style.background = 'center / contain no-repeat url("' + LOGIN_ART_OPTIONS.src + '")';
+    } else if (!wide.matches && art) {
+      art.destroy(); art = null; host.style.background = "";
+    }
   };
   sync();
   wide.addEventListener("change", sync);

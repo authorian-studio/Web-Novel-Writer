@@ -737,7 +737,8 @@ void main() {
         wake();
       };
       image.onerror = function () {
-        console.warn("[HalftoneReveal] gambar gagal dimuat:", src);
+        console.warn("[HalftoneReveal] gambar gagal dimuat: " + String(src).slice(0, 80) +
+          " — kalau halaman dibuka dari file://, WebGL tidak boleh memakai gambar lokal; pakai data URI (login-art-data.js) atau buka lewat http/https.");
       };
       image.src = src;
     };
