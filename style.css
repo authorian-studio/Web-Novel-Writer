@@ -25,27 +25,77 @@ button, input, textarea { font-family: inherit; }
 .view { height: 100%; display: flex; flex-direction: column; }
 .hidden { display: none !important; }
 
-/* ============ LOGIN (particles + blob minimal) ============ */
-#loginView { align-items: center; justify-content: center; position: relative; overflow: hidden; background: #000; }
-.particles-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
-.blob-layer { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-.blob { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 50%, transparent 80%); }
-.blob1 { width: 560px; height: 1000px; top: -420px; left: -180px; transform: rotate(-45deg); }
-.blob2 { width: 260px; height: 900px; top: -380px; left: 60px; transform: rotate(-45deg); background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.015) 55%, transparent 80%); }
-.blob3 { width: 260px; height: 900px; top: -460px; left: 260px; transform: rotate(-45deg); background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.015) 55%, transparent 80%); }
+/* ============ LOGIN (dot grid ala React Flow + tombol OAuth bertumpuk) ============ */
+/* Halaman login SELALU gelap (tidak ikut tema light/dark) — semua warna dikunci lewat variabel --l-* */
+#loginView {
+  --l-bg: #111111;          /* default dark React Flow (hasil ukur dari screenshot referensi) */
+  --l-dot-gap: 20px;        /* jarak antar titik (gap default React Flow). Warna titik #91919a ada di dalam data-URI di bawah (%2391919a) */
+  --l-text: #eceae6;
+  --l-dim: #8f8f97;
+  --l-btn-bg: #19191c;          /* solid (bukan transparan) supaya titik-titik tidak tembus ke dalam tombol */
+  --l-btn-bg-hover: #212125;
+  --l-btn-border: rgba(255,255,255,0.10);
+  --l-btn-border-hover: rgba(255,255,255,0.22);
+  display: grid; grid-template-columns: 55fr 45fr; position: relative; overflow: hidden;   /* 55% art | 45% form, seperti referensi */
+  color: var(--l-text);
+  background-color: var(--l-bg);
+  /* tile 20x20 berisi 1 titik 1px = persis <Background variant="dots" /> milik React Flow */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Crect width='1' height='1' fill='%2391919a'/%3E%3C/svg%3E");
+  background-size: var(--l-dot-gap) var(--l-dot-gap);
+}
+#loginView .logo { color: var(--l-text); }
 
-.login-box { position: relative; z-index: 1; max-width: 380px; text-align: center; padding: 20px; animation: fadeSlideDown .5s ease; }
+/* kolom kiri: HalftoneReveal (canvas WebGL transparan diisi oleh halftone-reveal.js) — tanpa background sendiri,
+   jadi dot-grid #loginView terlihat menerus dari kiri ke kanan */
+.login-art { position: relative; min-width: 0; min-height: 0; cursor: crosshair; }
+.halftone-reveal { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.halftone-reveal-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+
+/* kolom kanan: form di tengah (dot-grid dari #loginView tetap terlihat di sini) */
+.login-panel { position: relative; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 24px; }
+
+/* desktop sempit: kolom form lebih kecil, jadi padding & font tombol dikurangi supaya tag "Segera" tidak menimpa label */
+@media (max-width: 1200px) {
+  .login-panel { padding: 16px; }
+  .btn-oauth { font-size: 13.5px; gap: 8px; }
+}
+/* layar sempit: art disembunyikan, form memenuhi layar */
+@media (max-width: 900px) {
+  #loginView { grid-template-columns: 1fr; }
+  .login-art { display: none; }
+  .login-panel { padding: 0; }
+}
+
+.login-box { position: relative; z-index: 1; width: 100%; max-width: 420px; text-align: center; padding: 20px; animation: fadeSlideDown .5s ease; }
 .login-logo { font-size: 40px; margin-bottom: 18px; }
 .login-heading h1 { font-size: 21px; font-weight: 700; letter-spacing: .2px; margin: 0 0 8px; }
-.login-tagline { color: var(--text-dim); font-size: 14px; margin-bottom: 26px; }
-.btn-google {
-  display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; background: var(--bg-panel); color: var(--text);
-  border: 1px solid var(--border); padding: 13px 22px; border-radius: 10px; cursor: pointer; font-size: 14.5px;
-  font-weight: 600; transition: transform .15s ease, border-color .15s ease;
+.login-tagline { color: var(--l-dim); font-size: 14px; margin: 0 0 26px; }
+
+/* tumpukan tombol: lebar penuh, tinggi seragam, ikon + label dipusatkan bersama */
+.login-options { display: flex; flex-direction: column; gap: 10px; container-type: inline-size; }
+/* tombol terlalu sempit untuk label + tag "Segera" sekaligus -> sembunyikan tag (klik tombolnya tetap menampilkan pesan) */
+@container (max-width: 350px) { .soon-tag { display: none; } .btn-oauth { padding: 0 14px; } }
+.login-option-wrap { display: flex; flex-direction: column; gap: 8px; }
+.btn-oauth {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 46px;
+  background: var(--l-btn-bg); color: var(--l-text); border: 1px solid var(--l-btn-border); border-radius: 12px;
+  padding: 0 44px; cursor: pointer; font-size: 14.5px; font-weight: 600; letter-spacing: .1px;
+  transition: background .15s ease, border-color .15s ease, transform .15s ease;
 }
-.btn-google:hover { transform: translateY(-2px); border-color: var(--accent); }
-.g-icon { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg,#4285F4,#EA4335,#FBBC05,#34A853); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; }
-.login-note { font-size: 11.5px; color: var(--text-dim); margin-top: 22px; line-height: 1.6; }
+.btn-oauth:hover { background: var(--l-btn-bg-hover); border-color: var(--l-btn-border-hover); transform: translateY(-1px); }
+.btn-oauth:active { transform: translateY(0); }
+.btn-oauth:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn-oauth:disabled { cursor: wait; opacity: .7; transform: none; }
+.btn-oauth-primary { background: #2a2a2e; border-color: rgba(255,255,255,0.18); }   /* tombol utama sedikit lebih terang */
+.btn-oauth-primary:hover { background: #333338; }
+.oauth-icon { width: 18px; height: 18px; flex: none; }
+.btn-oauth.is-soon { color: #b9b9c0; }
+.soon-tag { position: absolute; right: 12px; font-size: 10px; font-weight: 600; letter-spacing: .3px; color: var(--l-dim); border: 1px solid var(--l-btn-border); border-radius: 999px; padding: 1px 7px; }
+.login-last-used { margin: 0; font-size: 12px; color: var(--l-dim); }
+
+.login-notice { font-size: 12.5px; color: var(--l-dim); margin: 14px 0 0; line-height: 1.5; }
+@media (max-width: 440px) { .btn-oauth { font-size: 13.5px; gap: 8px; } .login-box { padding: 16px; } }
+.login-note { font-size: 11.5px; color: var(--l-dim); margin: 22px 0 0; line-height: 1.6; }
 .login-error { color: var(--danger); font-size: 12.5px; margin-top: 14px; }
 
 

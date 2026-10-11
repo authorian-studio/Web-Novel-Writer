@@ -154,11 +154,39 @@ function driveSignOut() {
   el("loginView").classList.remove("hidden");
 }
 
+const LAST_LOGIN_KEY = "novelist_last_login";
+
+function showLastLoginHint() {
+  let last = null;
+  try { last = localStorage.getItem(LAST_LOGIN_KEY); } catch (e) { /* storage bisa diblokir browser */ }
+  el("lastLoginHint").classList.toggle("hidden", last !== "google");
+}
+
+let loginNoticeTimer = null;
+function showLoginNotice(msg) {
+  const n = el("loginNotice");
+  n.textContent = msg;
+  n.classList.remove("hidden");
+  clearTimeout(loginNoticeTimer);
+  loginNoticeTimer = setTimeout(() => n.classList.add("hidden"), 4000);
+}
+
+// Discord / Apple / Email baru tampilan — project tersimpan di Google Drive, jadi sementara hanya Google yang aktif.
+function handleSoonProvider(provider) {
+  const names = { discord: "Discord", apple: "Apple", email: "Email" };
+  showLoginNotice("Login dengan " + (names[provider] || provider) + " belum tersedia. Untuk saat ini pakai Google dulu ya — project kamu disimpan di Google Drive-mu.");
+}
+
 async function handleLogin() {
+  const btn = el("btnLoginGoogle");
+  const label = btn.querySelector(".btn-label");
   el("loginError").classList.add("hidden");
-  el("btnLoginGoogle").textContent = "Menunggu login...";
+  el("loginNotice").classList.add("hidden");
+  btn.disabled = true;
+  label.textContent = "Menunggu login...";
   try {
     await driveSignIn(true);
+    try { localStorage.setItem(LAST_LOGIN_KEY, "google"); } catch (e) { /* abaikan */ }
     el("loginView").classList.add("hidden");
     el("dashboardView").classList.remove("hidden");
     await loadProjectsFromDrive(true);
@@ -167,7 +195,9 @@ async function handleLogin() {
     el("loginError").textContent = "Login gagal: " + (e.error || e.message || e);
     el("loginError").classList.remove("hidden");
   }
-  el("btnLoginGoogle").innerHTML = '<span class="g-icon">G</span> Login dengan Google';
+  btn.disabled = false;
+  label.textContent = "Lanjutkan dengan Google";
+  showLastLoginHint();
 }
 
 // ================= DASHBOARD RENDER =================
@@ -1324,91 +1354,45 @@ function updateSyncIndicator(ok) {
   ind.style.color = ok ? "var(--success)" : "var(--danger)";
 }
 
-// ================= PARTICLES BACKGROUND (halaman login) =================
-function initLoginParticles() {
-  const canvas = document.getElementById("particlesCanvas");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const QUANTITY = 110;
-  const EASE = 20; // makin besar makin "lembut" gerakan menjauh dari mouse
-  let particles = [];
-  let mouse = { x: -9999, y: -9999 };
-  let raf = null;
-  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+// ================= LOGIN ART (kolom kiri halaman login) =================
+// HalftoneReveal dari React Bits (sudah di-port ke JS biasa: halftone-reveal.js).
+// login-art.webp = ilustrasi karakter dengan background transparan (dibuang dari JPG asli), sejajar index.html.
+// transparent: true + gambar ber-alpha -> dot halftone hanya menutupi karakternya, dot-grid #loginView tetap terlihat di sekelilingnya.
+const LOGIN_ART_OPTIONS = {
+  src: "login-art.webp",
+  transparent: true,
+  fit: "contain",          // seluruh karakter terlihat, tidak terpotong
+  mode: "mono",
+  shape: "dot",
+  cellSize: 6,
+  angle: 45,
+  inkColor: "#f4f1ea",
+  paperColor: "#120f17",   // titik hitam untuk pemetaan terang-gelap dot (bukan lagi warna background kolom)
+  revealRadius: 160,
+  contrast: 1.5,           // karakternya serba terang -> contrast naik & brightness turun supaya wajah/rambut tidak menggumpal jadi putih
+  brightness: -0.22        // kembalikan ke default (contrast 1.1, brightness 0) kalau mau lebih terang
+};
 
-  function resize() {
-    canvas.width = canvas.clientWidth * dpr;
-    canvas.height = canvas.clientHeight * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-
-  function makeParticle() {
-    return {
-      x: Math.random() * canvas.clientWidth,
-      y: Math.random() * canvas.clientHeight,
-      baseX: 0, baseY: 0,
-      vx: (Math.random() - 0.5) * 0.15,
-      vy: (Math.random() - 0.5) * 0.15,
-      r: Math.random() * 1.4 + 0.4,
-      alpha: Math.random() * 0.5 + 0.2
-    };
-  }
-
-  function initParticles() {
-    particles = Array.from({ length: QUANTITY }, makeParticle);
-  }
-
-  function step() {
-    ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-    particles.forEach((p) => {
-      // drift lambat
-      p.x += p.vx;
-      p.y += p.vy;
-      // wrap di tepi layar
-      if (p.x < -5) p.x = canvas.clientWidth + 5;
-      if (p.x > canvas.clientWidth + 5) p.x = -5;
-      if (p.y < -5) p.y = canvas.clientHeight + 5;
-      if (p.y > canvas.clientHeight + 5) p.y = -5;
-
-      // dorongan halus menjauh dari mouse, lalu "ease" kembali
-      const dx = p.x - mouse.x, dy = p.y - mouse.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 110) {
-        const force = (110 - dist) / 110;
-        p.x += (dx / (dist || 1)) * force * (EASE / 10);
-        p.y += (dy / (dist || 1)) * force * (EASE / 10);
-      }
-
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(180,180,190,${p.alpha})`;
-      ctx.fill();
-    });
-    raf = requestAnimationFrame(step);
-  }
-
-  resize();
-  initParticles();
-  step();
-
-  window.addEventListener("resize", () => { resize(); });
-  window.addEventListener("load", () => { resize(); });
-  canvas.addEventListener("mousemove", (e) => { const r = canvas.getBoundingClientRect(); mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; });
-  canvas.addEventListener("mouseleave", () => { mouse.x = -9999; mouse.y = -9999; });
-
-  // hentikan animasi begitu halaman login sudah tidak terlihat (hemat CPU)
-  const loginViewEl = document.getElementById("loginView");
-  const observer = new MutationObserver(() => {
-    if (loginViewEl.classList.contains("hidden") && raf) { cancelAnimationFrame(raf); raf = null; }
-    else if (!loginViewEl.classList.contains("hidden") && !raf) { step(); }
-  });
-  observer.observe(loginViewEl, { attributes: true, attributeFilter: ["class"] });
+function initLoginArt() {
+  const host = el("loginArt");
+  if (!host || !window.HalftoneReveal) return;
+  // Hanya jalan saat kolom kiri terlihat (>900px) — di HP kolomnya disembunyikan, jadi WebGL tidak dibuat sama sekali.
+  const wide = window.matchMedia("(min-width: 901px)");
+  let art = null;
+  const sync = () => {
+    if (wide.matches && !art) art = window.HalftoneReveal.create(host, LOGIN_ART_OPTIONS);
+    else if (!wide.matches && art) { art.destroy(); art = null; }
+  };
+  sync();
+  wide.addEventListener("change", sync);
 }
 
 // ================= EVENT BINDING =================
 window.addEventListener("DOMContentLoaded", () => {
-  initLoginParticles();
+  initLoginArt();
   el("btnLoginGoogle").onclick = handleLogin;
+  document.querySelectorAll("#loginView .btn-oauth.is-soon").forEach((b) => b.onclick = () => handleSoonProvider(b.dataset.provider));
+  showLastLoginHint();
 
   el("btnAddProject").onclick = openAddProjectModal;
   el("emptyStateBtn").onclick = openAddProjectModal;

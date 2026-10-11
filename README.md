@@ -105,6 +105,22 @@
 
 
 
+**Pembaruan terbaru (halaman login):** layout login dijadikan dua kolom —
+kiri berisi komponen HalftoneReveal dari React Bits (foto yang tampil sebagai
+halftone dot, lalu "terbuka" jadi foto asli di bawah kursor; klik untuk
+ledakan reveal), kanan berisi form dengan tombol bertumpuk
+"Lanjutkan dengan Google / Discord / Apple / Email" di atas background
+dot-grid ala React Flow. Hanya Google yang aktif (project tersimpan di Google
+Drive); tiga tombol lainnya masih tampilan dengan tag "Segera". Komponen
+HalftoneReveal asli berbasis React, jadi di sini di-port ke JS biasa di file
+`halftone-reveal.js` (shader sama persis). Di layar < 900px kolom kiri
+disembunyikan dan WebGL tidak dijalankan. Opsi tampilan (foto, ukuran dot,
+warna, dll) ada di `LOGIN_ART_OPTIONS` di bagian bawah `app.js`. Gambarnya
+`login-art.webp` adalah ilustrasi karakter dengan background transparan
+(opsi `transparent: true`), jadi dot halftone hanya menutupi karakternya dan
+dot-grid di belakangnya tetap terlihat. Untuk ganti karakter: siapkan gambar
+PNG/WebP berlatar transparan lalu ganti `src` (file harus di-upload ke root repo).
+
 **Pembaruan sebelumnya:** halaman login diberi animasi baru terinspirasi
 komponen "MinimalAuthPage" dari 21st.dev — partikel titik-titik halus yang
 melayang pelan di background (canvas, ikut bereaksi lembut saat mouse
@@ -242,6 +258,8 @@ nama-repo/
 ├── index.html
 ├── style.css
 ├── app.js
+├── halftone-reveal.js
+├── login-art.webp
 ├── config.js
 ├── manifest.json
 ```
