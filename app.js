@@ -492,7 +492,6 @@ function openProject(id) {
   el("projectTitle").value = p.title;
   fitProjectTitle();
   applyProjectLook(p);
-  pickHomeGreeting();
   expandedFolders = new Set(p.data.scenes.filter((n) => n.type === "folder").map((n) => n.id));
   sceneHistory = []; sceneHistoryIndex = -1;
   renderSceneList();
@@ -576,22 +575,41 @@ function flushCurrentEdits() {
 function switchTab(tab) {
   if (tab === "home") { flushCurrentEdits(); renderProjectHome(); }
   document.querySelectorAll(".rail-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
-  ["home", "write", "organize", "plot", "schedule", "tools"].forEach((t) => el("tab" + capitalize(t)).classList.toggle("hidden", t !== tab));
+  ["home", "write", "organize", "timeline", "plot", "schedule", "tools"].forEach((t) => el("tab" + capitalize(t)).classList.toggle("hidden", t !== tab));
   updateSceneDrawerVisibility();
+  if (tab === "timeline") openTimelineTab();
 }
 
-// ---- HOME TAB (ala vvd): sapaan acak, statistik, kartu pintasan, canvas berisi titik-titik scene ----
-const HOME_GREETINGS = [
-  "Siap kapan pun kamu siap",
-  "Selamat datang kembali",
-  "Kita lanjut dari sini",
-  "Ceritamu menunggu",
-  "Satu scene lagi?",
-  "Duniamu masih di sini",
-];
-function pickHomeGreeting() {
-  el("homeGreeting").textContent = HOME_GREETINGS[Math.floor(Math.random() * HOME_GREETINGS.length)];
+// ---- TIMELINE: React + React Flow (folder vendor/) + timeline.js baru dimuat saat tab ini pertama kali dibuka ----
+let timelineLibPromise = null;
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src; s.onload = resolve; s.onerror = () => reject(new Error("Gagal memuat " + src));
+    document.head.appendChild(s);
+  });
 }
+function ensureTimelineLib() {
+  if (!timelineLibPromise) {
+    timelineLibPromise = ["vendor/react-18.3.1.min.js", "vendor/react-dom-18.3.1.min.js", "vendor/reactflow-11.11.4.umd.js", "timeline.js"]
+      .reduce((chain, src) => chain.then(() => loadScriptOnce(src)), Promise.resolve());
+    timelineLibPromise.catch(() => { timelineLibPromise = null; });   // boleh dicoba lagi
+  }
+  return timelineLibPromise;
+}
+async function openTimelineTab() {
+  try { await ensureTimelineLib(); }
+  catch (e) { el("tlFlow").innerHTML = '<div class="tl-loading">Timeline gagal dimuat. Periksa koneksi lalu buka tab ini lagi.</div>'; return; }
+  if (el("tabTimeline").classList.contains("hidden") || !currentProjectId) return;   // pengguna sudah pindah tab
+  window.NovelTimeline.show({
+    project: getProject(currentProjectId),
+    onChange: markDirtyAndSchedule,
+    getScenes: () => flattenScenes(getProject(currentProjectId).data.scenes),
+    openScene: (id) => { switchTab("write"); selectScene(id); },
+  });
+}
+
+// ---- HOME TAB: canvas berisi titik-titik scene ----
 // Background project = cover-nya (di-blur); kalau belum ada cover pakai foto default dashboard.
 function applyProjectLook(p) {
   const bg = p.cover ? `url("${p.cover}")` : `url("bg-canyon.jpg")`;
@@ -605,7 +623,6 @@ function flattenScenes(list, out = []) {
   (list || []).forEach((n) => { if (n.type === "folder") flattenScenes(n.children, out); else out.push(n); });
   return out;
 }
-function htmlToText(html) { const d = document.createElement("div"); d.innerHTML = html || ""; return (d.textContent || "").replace(/\s+/g, " ").trim(); }
 function hashUnit(str, salt) {   // angka 0..1 yang tetap untuk id yang sama (posisi node di canvas tidak loncat-loncat)
   let h = 2166136261 ^ salt;
   for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
@@ -615,26 +632,6 @@ function renderProjectHome() {
   const p = getProject(currentProjectId);
   if (!p) return;
   const scenes = flattenScenes(p.data.scenes);
-  const words = scenes.reduce((sum, s) => sum + countWordsFromHtml(s.content), 0);
-  const chars = (p.data.organize?.characters || []).length;
-  el("statWords").textContent = words.toLocaleString("id-ID");
-  el("statScenes").textContent = scenes.length;
-  el("statChars").textContent = chars;
-
-  // kartu Manuskrip: pratinjau scene yang sedang dibuka (atau scene pertama)
-  const cur = (currentSceneId && findScene(currentSceneId)) || scenes[0];
-  const excerpt = cur ? htmlToText(cur.content) : "";
-  el("homeWritePreview").innerHTML = cur
-    ? `<div class="home-preview-head"><span>${escapeHtml(cur.title || "(tanpa judul)")}</span><span>${countWordsFromHtml(cur.content)} kata</span></div>` +
-      (excerpt ? `<p class="home-preview-text">${escapeHtml(excerpt.slice(0, 220))}</p>` : `<div class="home-skeleton"><i></i><i></i><i></i></div>`)
-    : `<div class="home-preview-head"><span>Belum ada scene</span></div><div class="home-skeleton"><i></i><i></i><i></i></div>`;
-
-  // kartu Dunia & Karakter: chip nama karakter/lokasi
-  const org = p.data.organize || {};
-  const chips = [...(org.characters || []).map((c) => ["🧑", c.title]), ...(org.locations || []).map((l) => ["📍", l.title])].slice(0, 8);
-  el("homeOrganizePreview").innerHTML = chips.length
-    ? `<div class="home-chips">${chips.map(([i, t]) => `<span class="home-chip">${i} ${escapeHtml(t || "(tanpa nama)")}</span>`).join("")}</div>`
-    : `<div class="home-preview-head"><span>Belum ada karakter atau lokasi</span></div>`;
 
   // canvas: setiap scene = titik bercahaya + label, disambung garis tipis sesuai urutan
   const canvas = el("homeCanvas");
@@ -1770,10 +1767,6 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   document.querySelectorAll(".rail-btn").forEach((btn) => btn.onclick = () => switchTab(btn.dataset.tab));
-  [["homeCardWrite", "write"], ["homeCardOrganize", "organize"]].forEach(([id, tab]) => {
-    el(id).onclick = () => switchTab(tab);
-    el(id).onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); switchTab(tab); } };
-  });
   el("btnProjectTheme").onclick = () => document.body.classList.toggle("light");
 
   // Write tab

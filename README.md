@@ -1,6 +1,26 @@
-# Novelist Web — v0.7.0
+# Novelist Web — v0.8.0
 
-## Riwayat perubahan terbaru (v0.7.0) — paling baru di atas
+## Riwayat perubahan terbaru (v0.8.0) — paling baru di atas
+
+- **Fitur baru: Timeline (React Flow)** — tab **Timeline** di top bar kiri (di dalam project).
+  - Sidebar kiri: cari timeline, **+** untuk membuat timeline baru, klik untuk membuka.
+  - Header: nama timeline, rentang tahun (awal – akhir), tombol hapus timeline.
+  - Kanvas: **sumbu tahun** dengan label otomatis; **event** berupa kartu kecil dengan tiang ke
+    sumbu. Geser event ke kiri/kanan = tahunnya ikut berubah (langsung terlihat saat digeser),
+    atas/bawah = posisi bebas. Tarik titik di sisi kanan kartu ke kartu lain untuk
+    **menyambungkan event** (panah sebab-akibat). Pilih lalu tekan Delete/Backspace untuk hapus.
+  - Toolbar bawah: mode **pilih** (seret untuk memilih banyak) / **geser kanvas**, **+ Event**,
+    **tampilkan semua**; zoom di kanan bawah.
+  - Panel edit event: judul, tahun, catatan, **scene terkait** (tombol "Buka scene" langsung ke
+    editor), warna, hapus.
+  - Data timeline tersimpan di file project (`data.timelines`) bersama scene — ikut autosave &
+    backup ke Google Drive.
+  - Library React 18 + React Flow 11 disimpan di folder `vendor/` (tidak bergantung CDN) dan baru
+    dimuat saat tab Timeline pertama kali dibuka, jadi tidak memperlambat aplikasi.
+- **Home project disederhanakan** — sapaan, statistik, dan kartu Manuskrip / Dunia & Karakter
+  dihapus; Home sekarang hanya kanvas titik-titik scene.
+
+### v0.7.0
 
 - **Halaman login: logo & footer**
   - Tulisan "Novelist" diganti **logo animasi** (`login-logo.webm` / `login-logo.mp4`,
@@ -330,6 +350,8 @@ nama-repo/
 ├── logo-anim.mp4
 ├── logo-anim-poster.webp
 ├── login-logo.webm, login-logo.mp4, login-logo-poster.webp
+├── timeline.js
+├── vendor/   (react, react-dom, reactflow + lisensinya)
 ├── config.js
 ├── manifest.json
 ```
