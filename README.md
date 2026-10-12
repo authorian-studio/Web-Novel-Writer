@@ -105,6 +105,17 @@
 
 
 
+**Pembaruan terbaru (dashboard setelah login):** tampilan dashboard dirombak
+ala vvd — rail ikon di kiri (Cloud Library, Ganti Tema, Logout, Pengaturan),
+judul "Mau menulis apa hari ini?" di tengah, project berupa baris lebar
+(cover + judul + status sinkron + menu ⋯), tombol "Project Baru" di bawah
+daftar, dan tombol bantuan "?" di kanan bawah. Background: foto Milky Way
+(`bg-galaxy.jpg`) yang diredupkan + vignette, dengan dot-grid ala React Flow di
+seluruh halaman. Di tema terang foto disembunyikan dan hanya dot-grid yang
+tampil. Di HP rail berpindah jadi bar bawah. Bagian yang diatur di `style.css`
+(blok "DASHBOARD"): `.galaxy-photo` (opacity/blur foto), `.galaxy-dots`
+(kerapatan & transparansi titik).
+
 **Pembaruan terbaru (halaman login):** layout login dijadikan dua kolom —
 kiri berisi komponen HalftoneReveal dari React Bits (foto yang tampil sebagai
 halftone dot, lalu "terbuka" jadi foto asli di bawah kursor; klik untuk
@@ -265,6 +276,7 @@ nama-repo/
 ├── halftone-reveal.js
 ├── login-art.webp
 ├── login-art-data.js
+├── bg-galaxy.jpg
 ├── config.js
 ├── manifest.json
 ```

@@ -215,19 +215,19 @@ function renderDashboard() {
     const card = document.createElement("div");
     card.className = "project-card";
     card.style.animationDelay = (idx * 0.04) + "s";
+    if (p.description) card.title = p.description;   // deskripsi tampil sebagai tooltip (baris dibuat ringkas)
     const coverInner = p.cover
       ? `<img class="cover-img" src="${p.cover}" alt="" draggable="false" />`
       : `<span class="cover-letter">${escapeHtml((p.title || "?").charAt(0).toUpperCase())}</span>`;
     card.innerHTML = `
-      <div class="cover" style="background-image:linear-gradient(135deg, ${p.colorA}, ${p.colorB})">
-        <button class="card-gear" title="Opsi">⚙️</button>
-        ${coverInner}
-      </div>
+      <div class="cover" style="background-image:linear-gradient(135deg, ${p.colorA}, ${p.colorB})">${coverInner}</div>
       <div class="card-body">
         <div class="card-title">${escapeHtml(p.title)}</div>
-        <div class="card-desc">${escapeHtml(p.description || "")}</div>
         <div class="card-meta">${p.driveFileId ? '<span class="drive-dot"></span> Tersinkron' : "Belum disinkron"} · ${timeAgo(p.updatedAt)}</div>
-      </div>`;
+      </div>
+      <button class="card-gear" title="Opsi" aria-label="Opsi project">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+      </button>`;
     card.addEventListener("click", (e) => { if (!e.target.closest(".card-gear")) openProject(p.id); });
     card.querySelector(".card-gear").addEventListener("click", (e) => { e.stopPropagation(); openCardMenu(p.id, e.currentTarget); });
     grid.appendChild(card);
@@ -1412,7 +1412,14 @@ window.addEventListener("DOMContentLoaded", () => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const menu = el("settingsMenu");
-    menu.style.top = rect.bottom + 6 + "px"; menu.style.right = (window.innerWidth - rect.right) + "px"; menu.style.left = "auto";
+    menu.style.top = "auto"; menu.style.right = "auto";
+    if (window.innerWidth <= 700) {   // bar bawah: menu muncul di atas tombol
+      menu.style.bottom = (window.innerHeight - rect.top + 8) + "px";
+      menu.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 230)) + "px";
+    } else {                          // rail kiri: menu muncul di sebelah kanan tombol, sejajar bagian bawahnya
+      menu.style.bottom = Math.max(8, window.innerHeight - rect.bottom) + "px";
+      menu.style.left = (rect.right + 10) + "px";
+    }
     menu.classList.toggle("hidden");
   };
   document.addEventListener("click", closeAllDropdowns);
@@ -1420,18 +1427,7 @@ window.addEventListener("DOMContentLoaded", () => {
   el("menuCloudLibrary").onclick = openCloudLibrary;
   el("menuDriveLogout").onclick = () => { if (confirm("Logout dari Google?")) driveSignOut(); };
 
-  // ---- Quick action icons (top-right expandable tabs bar) ----
-  // Klik langsung memicu animasi "expand" (menampilkan label) tanpa perlu hover dulu —
-  // penting juga untuk perangkat sentuh yang tidak punya state hover sama sekali.
-  function pulseExpTab(btn) {
-    document.querySelectorAll(".exp-tab.is-active").forEach((t) => t.classList.remove("is-active"));
-    btn.classList.add("is-active");
-    clearTimeout(btn._expTimer);
-    btn._expTimer = setTimeout(() => btn.classList.remove("is-active"), 1700);
-  }
-  document.querySelectorAll(".exp-tab").forEach((btn) => {
-    btn.addEventListener("click", () => pulseExpTab(btn));
-  });
+  // ---- Ikon aksi di rail kiri dashboard ----
   el("btnQuickTheme").addEventListener("click", () => document.body.classList.toggle("light"));
   el("btnQuickCloud").addEventListener("click", openCloudLibrary);
   el("btnQuickLogout").addEventListener("click", () => { if (confirm("Logout dari Google?")) driveSignOut(); });
