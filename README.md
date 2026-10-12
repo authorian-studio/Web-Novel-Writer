@@ -119,8 +119,8 @@ aktif, dan tidak diputar bila pengguna memilih "reduce motion".
 ala vvd — rail ikon di kiri (Cloud Library, Ganti Tema, Logout, Pengaturan),
 judul "Mau menulis apa hari ini?" di tengah, project berupa baris lebar
 (cover + judul + status sinkron + menu ⋯), tombol "Project Baru" di bawah
-daftar, dan tombol bantuan "?" di kanan bawah. Background: foto Milky Way
-(`bg-galaxy.jpg`) yang diredupkan + vignette, dengan dot-grid ala React Flow di
+daftar, dan tombol bantuan "?" di kanan bawah. Background: foto
+(`bg-canyon.jpg`, ngarai bersalju + aurora) yang diredupkan + di-blur + vignette, dengan dot-grid ala React Flow di
 seluruh halaman. Di tema terang foto disembunyikan dan hanya dot-grid yang
 tampil. Di HP rail berpindah jadi bar bawah. Bagian yang diatur di `style.css`
 (blok "DASHBOARD"): `.galaxy-photo` (opacity/blur foto), `.galaxy-dots`
@@ -286,7 +286,8 @@ nama-repo/
 ├── halftone-reveal.js
 ├── login-art.webp
 ├── login-art-data.js
-├── bg-galaxy.jpg
+├── bg-canyon.jpg
+├── favicon-32.png, apple-touch-icon.png, icon-192.png, icon-512.png
 ├── logo-anim.mp4
 ├── logo-anim-poster.webp
 ├── config.js

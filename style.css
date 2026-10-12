@@ -193,18 +193,18 @@ body.light .icon-btn:hover { background: rgba(0,0,0,0.06); }
 /* ============ DASHBOARD (layout ala vvd: rail ikon di kiri, judul + daftar project di tengah) ============ */
 #dashboardView { position: relative; overflow: hidden; }
 
-/* --- background: foto Milky Way + vignette + dot-grid ala React Flow di seluruh halaman --- */
+/* --- background: foto ngarai + aurora (di-blur) + vignette + dot-grid ala React Flow (di-blur tipis) di seluruh halaman --- */
 .galaxy-bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; background: var(--bg); }
-.galaxy-photo { position: absolute; inset: -24px; background: url("bg-galaxy.jpg") center / cover no-repeat; opacity: .55; filter: blur(2px) saturate(1.15); }   /* dicampur ke warna dasar: diredupkan + sedikit di-blur seperti background vvd */
+.galaxy-photo { position: absolute; inset: -48px; background: url("bg-canyon.jpg") center / cover no-repeat; opacity: .6; filter: blur(5px) saturate(1.1); }   /* inset negatif supaya tepi blur tidak memudar ke warna dasar */
 .galaxy-photo::after {   /* vignette: tepi digelapkan supaya UI di tengah tetap terbaca */
   content: ""; position: absolute; inset: 0;
   background:
     radial-gradient(ellipse 85% 75% at 50% 45%, rgba(10,10,12,0) 0%, rgba(10,10,12,.6) 100%),
     linear-gradient(to bottom, rgba(10,10,12,.55) 0%, rgba(10,10,12,0) 28%);
 }
-.galaxy-dots {   /* tile 20x20 berisi 1 titik 1px = <Background variant="dots" /> React Flow, dibuat agak transparan di atas foto */
-  position: absolute; inset: 0; background-size: 20px 20px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Crect width='1' height='1' fill='%2391919a' fill-opacity='.7'/%3E%3C/svg%3E");
+.galaxy-dots {   /* tile 20x20 berisi 1 titik = <Background variant="dots" /> React Flow; titik dibuat sedikit lebih besar lalu di-blur supaya samar tapi tetap terlihat */
+  position: absolute; inset: 0; background-size: 20px 20px; filter: blur(.7px); opacity: .8;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='1' cy='1' r='1' fill='%23a6a6b0' fill-opacity='.75'/%3E%3C/svg%3E");
 }
 body.light .galaxy-photo { display: none; }   /* tema terang: tanpa foto, hanya dot-grid */
 body.light .galaxy-dots { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Crect width='1' height='1' fill='%23000' fill-opacity='.22'/%3E%3C/svg%3E"); }
@@ -216,9 +216,14 @@ body.light .galaxy-dots { background-image: url("data:image/svg+xml,%3Csvg xmlns
 /* logo animasi: latar video hitam pekat -> mix-blend-mode: screen membuatnya transparan di atas foto/dot-grid.
    Elemen ini HARUS di luar .dash-rail (yang membuat stacking context sendiri), kalau tidak blend-nya tidak "melihat" background. */
 .rail-logo { position: absolute; top: 6px; left: 4px; width: 48px; height: 48px; z-index: 6; mix-blend-mode: screen; user-select: none; }
-.rail-logo video { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.rail-logo video { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none;
+  transform: scale(calc(.92 + var(--logo-energy, 0) * .1)); filter: brightness(calc(.8 + var(--logo-energy, 0) * .5)); }   /* tanpa drop-shadow: video opaque, bayangannya jadi kotak */
+/* idle: logo "bernapas" pelan (naik-turun & redup-terang halus); saat kursor mendekat, JS menaikkan --logo-energy (0..1) */
+.rail-logo { animation: railLogoIdle 6s ease-in-out infinite; }
+@keyframes railLogoIdle { 0%, 100% { translate: 0 0; opacity: .85; } 50% { translate: 0 -1.5px; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .rail-logo { animation: none; } }
 body.light .rail-logo { mix-blend-mode: multiply; }          /* tema terang: dibalik jadi garis gelap di atas latar terang */
-body.light .rail-logo video { filter: invert(1); }
+body.light .rail-logo video { filter: invert(1) brightness(calc(1 - var(--logo-energy, 0) * .2)); }
 .dash-rail-top { padding-top: 54px; }                          /* sisakan ruang untuk logo di atas ikon pertama */
 .dash-rail-btn { position: relative; width: 40px; height: 40px; border: none; border-radius: 12px; background: transparent; color: var(--text-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .2s ease, color .2s ease; }
 .dash-rail-btn:hover, .dash-rail-btn:focus-visible { background: rgba(255,255,255,0.09); color: var(--text); outline: none; }

@@ -1394,15 +1394,42 @@ function initLoginArt() {
 }
 
 // ================= LOGO ANIMASI (rail dashboard) =================
+// Dua mode: IDLE = video diputar sangat pelan (+ "napas" CSS) supaya tidak kaku; AKTIF = saat kursor mendekat, kecepatan
+// naik ke normal dan logo sedikit membesar/bersinar. Perpindahannya di-lerp tiap frame jadi transisinya halus.
 // Video hanya diputar saat terlihat (dashboard tampil & tab aktif) supaya tidak boros baterai; dihentikan bila pengguna
 // memilih "reduce motion" (yang tampil cuma frame pertama / poster).
+const LOGO_IDLE_RATE = 0.3;      // kecepatan video saat idle
+const LOGO_ACTIVE_RATE = 1;      // kecepatan video saat kursor dekat
+const LOGO_NEAR_RADIUS = 170;    // px dari pusat logo: mulai "terbangun"
+const LOGO_FULL_RADIUS = 50;     // px dari pusat logo: mode aktif penuh
 function initRailLogo() {
   const v = el("railLogoVideo");
   if (!v) return;
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  let inView = false;
+  const box = v.parentElement;
+  let inView = false, energy = 0, target = 0, raf = 0;
   const sync = () => { if (inView && !document.hidden) v.play().catch(() => {}); else v.pause(); };
-  new IntersectionObserver((entries) => { inView = entries.some((e) => e.isIntersecting); sync(); }).observe(v);
+  const apply = () => {
+    box.style.setProperty("--logo-energy", energy.toFixed(3));
+    v.playbackRate = LOGO_IDLE_RATE + (LOGO_ACTIVE_RATE - LOGO_IDLE_RATE) * energy;
+  };
+  const tick = () => {
+    energy += (target - energy) * (target > energy ? 0.12 : 0.04);   // bangun agak cepat, kembali idle perlahan
+    if (Math.abs(target - energy) < 0.002) { energy = target; raf = 0; } else raf = requestAnimationFrame(tick);
+    apply();
+  };
+  const setTarget = (t) => { target = t; if (!raf) raf = requestAnimationFrame(tick); };
+  document.addEventListener("pointermove", (e) => {
+    if (!inView || e.pointerType === "touch") return;
+    const r = box.getBoundingClientRect();
+    const d = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+    const t = Math.min(1, Math.max(0, (LOGO_NEAR_RADIUS - d) / (LOGO_NEAR_RADIUS - LOGO_FULL_RADIUS)));
+    setTarget(t * t * (3 - 2 * t));   // smoothstep
+  }, { passive: true });
+  document.documentElement.addEventListener("mouseleave", () => setTarget(0));
+  v.addEventListener("loadedmetadata", apply);
+  apply();
+  new IntersectionObserver((entries) => { inView = entries.some((e) => e.isIntersecting); if (!inView) setTarget(0); sync(); }).observe(v);
   document.addEventListener("visibilitychange", sync);
 }
 
