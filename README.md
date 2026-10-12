@@ -115,7 +115,16 @@ audionya dibuang — sekarang ±180 KB. Latar hitamnya jadi transparan lewat CSS
 "melihat" foto background. Video hanya diputar saat dashboard terlihat & tab
 aktif, dan tidak diputar bila pengguna memilih "reduce motion".
 
-**Pembaruan terbaru (dashboard setelah login):** tampilan dashboard dirombak
+**Pembaruan terbaru (tampilan dalam project, ala vvd):** saat project dibuka,
+background-nya memakai cover project yang di-blur (fallback `bg-canyon.jpg`) +
+dot-grid samar. Top bar berupa chip: logo (kembali ke dashboard), chip project
+(cover + judul + menu ▾), dan tab Home / Write / Organize / Plot / Schedule /
+Tools, plus jam di kanan atas. Tab **Home** berisi sapaan acak, statistik (kata,
+scene, karakter), kartu "Manuskrip" & "Dunia & Karakter", dan canvas berisi
+titik-titik scene (klik untuk langsung menulis scene itu). Write & Organize
+tampil sebagai panel kaca di atas background yang sama.
+
+**Pembaruan sebelumnya (dashboard setelah login):** tampilan dashboard dirombak
 ala vvd — rail ikon di kiri (Cloud Library, Ganti Tema, Logout, Pengaturan),
 judul "Mau menulis apa hari ini?" di tengah, project berupa baris lebar
 (cover + judul + status sinkron + menu ⋯), tombol "Project Baru" di bawah

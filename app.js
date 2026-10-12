@@ -411,7 +411,9 @@ function openProject(id) {
   currentProjectId = id;
   const p = getProject(id);
   el("projectTitle").value = p.title;
-  switchTab("write");
+  fitProjectTitle();
+  applyProjectLook(p);
+  pickHomeGreeting();
   expandedFolders = new Set(p.data.scenes.filter((n) => n.type === "folder").map((n) => n.id));
   sceneHistory = []; sceneHistoryIndex = -1;
   renderSceneList();
@@ -426,8 +428,10 @@ function openProject(id) {
   currentOrgItemId = null;
   renderOrganizeDetail();
   markSaved();
+  switchTab("home");
   el("dashboardView").classList.add("hidden");
   el("editorView").classList.remove("hidden");
+  startProjClock();
 }
 function backToLibrary() {
   flushCurrentEdits();
@@ -435,6 +439,7 @@ function backToLibrary() {
   if (p) { p.title = el("projectTitle").value; p.data.title = p.title; p.updatedAt = new Date().toISOString(); }
   saveProjectToDriveMain(p);
   closeSceneDrawer();
+  stopProjClock();
   el("editorView").classList.add("hidden");
   el("dashboardView").classList.remove("hidden");
   renderDashboard();
@@ -445,10 +450,83 @@ function flushCurrentEdits() {
 }
 
 function switchTab(tab) {
+  if (tab === "home") { flushCurrentEdits(); renderProjectHome(); }
   document.querySelectorAll(".rail-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
-  ["write", "organize", "plot", "schedule", "tools"].forEach((t) => el("tab" + capitalize(t)).classList.toggle("hidden", t !== tab));
+  ["home", "write", "organize", "plot", "schedule", "tools"].forEach((t) => el("tab" + capitalize(t)).classList.toggle("hidden", t !== tab));
   updateSceneDrawerVisibility();
 }
+
+// ---- HOME TAB (ala vvd): sapaan acak, statistik, kartu pintasan, canvas berisi titik-titik scene ----
+const HOME_GREETINGS = [
+  "Siap kapan pun kamu siap",
+  "Selamat datang kembali",
+  "Kita lanjut dari sini",
+  "Ceritamu menunggu",
+  "Satu scene lagi?",
+  "Duniamu masih di sini",
+];
+function pickHomeGreeting() {
+  el("homeGreeting").textContent = HOME_GREETINGS[Math.floor(Math.random() * HOME_GREETINGS.length)];
+}
+// Background project = cover-nya (di-blur); kalau belum ada cover pakai foto default dashboard.
+function applyProjectLook(p) {
+  const bg = p.cover ? `url("${p.cover}")` : `url("bg-canyon.jpg")`;
+  el("projBgPhoto").style.backgroundImage = bg;
+  el("projChipCover").style.backgroundImage = p.cover ? `url("${p.cover}")` : `linear-gradient(135deg, ${p.colorA}, ${p.colorB})`;
+  el("projChipCover").textContent = p.cover ? "" : (p.title || "?").charAt(0).toUpperCase();
+}
+// lebar input judul di chip mengikuti panjang judulnya
+function fitProjectTitle() { const t = el("projectTitle"); t.style.width = Math.max(4, t.value.length + 1) + "ch"; }
+function flattenScenes(list, out = []) {
+  (list || []).forEach((n) => { if (n.type === "folder") flattenScenes(n.children, out); else out.push(n); });
+  return out;
+}
+function htmlToText(html) { const d = document.createElement("div"); d.innerHTML = html || ""; return (d.textContent || "").replace(/\s+/g, " ").trim(); }
+function hashUnit(str, salt) {   // angka 0..1 yang tetap untuk id yang sama (posisi node di canvas tidak loncat-loncat)
+  let h = 2166136261 ^ salt;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return ((h >>> 0) % 10000) / 10000;
+}
+function renderProjectHome() {
+  const p = getProject(currentProjectId);
+  if (!p) return;
+  const scenes = flattenScenes(p.data.scenes);
+  const words = scenes.reduce((sum, s) => sum + countWordsFromHtml(s.content), 0);
+  const chars = (p.data.organize?.characters || []).length;
+  el("statWords").textContent = words.toLocaleString("id-ID");
+  el("statScenes").textContent = scenes.length;
+  el("statChars").textContent = chars;
+
+  // kartu Manuskrip: pratinjau scene yang sedang dibuka (atau scene pertama)
+  const cur = (currentSceneId && findScene(currentSceneId)) || scenes[0];
+  const excerpt = cur ? htmlToText(cur.content) : "";
+  el("homeWritePreview").innerHTML = cur
+    ? `<div class="home-preview-head"><span>${escapeHtml(cur.title || "(tanpa judul)")}</span><span>${countWordsFromHtml(cur.content)} kata</span></div>` +
+      (excerpt ? `<p class="home-preview-text">${escapeHtml(excerpt.slice(0, 220))}</p>` : `<div class="home-skeleton"><i></i><i></i><i></i></div>`)
+    : `<div class="home-preview-head"><span>Belum ada scene</span></div><div class="home-skeleton"><i></i><i></i><i></i></div>`;
+
+  // kartu Dunia & Karakter: chip nama karakter/lokasi
+  const org = p.data.organize || {};
+  const chips = [...(org.characters || []).map((c) => ["🧑", c.title]), ...(org.locations || []).map((l) => ["📍", l.title])].slice(0, 8);
+  el("homeOrganizePreview").innerHTML = chips.length
+    ? `<div class="home-chips">${chips.map(([i, t]) => `<span class="home-chip">${i} ${escapeHtml(t || "(tanpa nama)")}</span>`).join("")}</div>`
+    : `<div class="home-preview-head"><span>Belum ada karakter atau lokasi</span></div>`;
+
+  // canvas: setiap scene = titik bercahaya + label, disambung garis tipis sesuai urutan
+  const canvas = el("homeCanvas");
+  const pts = scenes.map((s, i) => ({ s, x: 0.08 + hashUnit(s.id, 1) * 0.84, y: 0.12 + (scenes.length > 1 ? (i / (scenes.length - 1)) * 0.7 : 0.3) + (hashUnit(s.id, 2) - 0.5) * 0.08 }));
+  const lines = pts.slice(1).map((pt, i) => `<line x1="${pts[i].x * 100}%" y1="${pts[i].y * 100}%" x2="${pt.x * 100}%" y2="${pt.y * 100}%" />`).join("");
+  canvas.innerHTML = `<div class="home-canvas-area"><svg class="home-links" aria-hidden="true">${lines}</svg>` +
+    pts.map((pt) => `<button class="home-node${pt.s.id === currentSceneId ? " is-current" : ""}" data-id="${pt.s.id}" style="left:${pt.x * 100}%;top:${pt.y * 100}%">` +
+      `<span class="home-node-dot ${pt.s.status || "todo"}"></span><span class="home-node-label">${escapeHtml(pt.s.title || "(tanpa judul)")}</span></button>`).join("") + `</div>`;
+  canvas.querySelectorAll(".home-node").forEach((b) => b.onclick = () => { switchTab("write"); selectScene(b.dataset.id); });
+}
+
+// jam kecil di pojok kanan atas (seperti vvd)
+let projClockHandle = null;
+function tickProjClock() { el("projClock").textContent = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }); }
+function startProjClock() { tickProjClock(); stopProjClock(); projClockHandle = setInterval(tickProjClock, 15000); }
+function stopProjClock() { if (projClockHandle) clearInterval(projClockHandle); projClockHandle = null; }
 function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 // ---- WRITE TAB : binder bertingkat (folder/chapter berisi scene), tampil sebagai tree view ----
@@ -1540,7 +1618,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // ---- project view ----
   el("btnBack").onclick = backToLibrary;
-  el("projectTitle").addEventListener("input", markDirtyAndSchedule);
+  el("projectTitle").addEventListener("input", () => { fitProjectTitle(); markDirtyAndSchedule(); });
   el("btnPreview").onclick = openPreview;
   el("btnClosePreview").onclick = () => el("previewModal").classList.add("hidden");
 
@@ -1548,7 +1626,7 @@ window.addEventListener("DOMContentLoaded", () => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const menu = el("projectMenu");
-    menu.style.top = rect.bottom + 6 + "px"; menu.style.right = (window.innerWidth - rect.right) + "px"; menu.style.left = "auto";
+    menu.style.top = rect.bottom + 6 + "px"; menu.style.left = Math.max(8, rect.right - 210) + "px"; menu.style.right = "auto";
     menu.classList.remove("hidden");
   };
   document.querySelectorAll("#projectMenu button").forEach((btn) => btn.onclick = async () => {
@@ -1562,6 +1640,11 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   document.querySelectorAll(".rail-btn").forEach((btn) => btn.onclick = () => switchTab(btn.dataset.tab));
+  [["homeCardWrite", "write"], ["homeCardOrganize", "organize"]].forEach(([id, tab]) => {
+    el(id).onclick = () => switchTab(tab);
+    el(id).onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); switchTab(tab); } };
+  });
+  el("btnProjectTheme").onclick = () => document.body.classList.toggle("light");
 
   // Write tab
   el("btnAddScene").onclick = () => openAddSceneModal(null);
