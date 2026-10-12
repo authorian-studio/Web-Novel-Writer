@@ -201,7 +201,46 @@ async function handleLogin() {
 }
 
 // ================= DASHBOARD RENDER =================
+// Judul dashboard dipilih acak tiap kali halaman dimuat/di-refresh (tidak sama dengan yang terakhir tampil).
+const DASH_TITLES = [
+  "Mau menulis apa hari ini?",
+  "Cerita apa yang menunggumu hari ini?",
+  "Siap melanjutkan petualangan?",
+  "Bab berikutnya menantimu.",
+  "Dunia mana yang mau kamu bangun hari ini?",
+  "Satu kalimat dulu, sisanya menyusul.",
+  "Tokoh-tokohmu sudah menunggu.",
+  "Halaman kosong ini milikmu.",
+  "Ayo lanjutkan kisahmu.",
+  "Ide apa yang muncul hari ini?",
+];
+function pickDashTitle() {
+  let last = null;
+  try { last = localStorage.getItem("dashTitleLast"); } catch (e) {}
+  const pool = DASH_TITLES.filter((t) => t !== last);
+  const t = pool[Math.floor(Math.random() * pool.length)];
+  try { localStorage.setItem("dashTitleLast", t); } catch (e) {}
+  el("dashTitle").textContent = t;
+}
+
+// Saat kursor di atas kartu project, sampulnya memudar masuk ke background; memudar keluar saat kursor pergi.
+// Dua lapisan dipakai bergantian supaya pindah dari kartu ke kartu jadi crossfade, bukan kedip.
+let dashCoverFront = "A";
+function showDashCover(p) {
+  const next = dashCoverFront === "A" ? "B" : "A";
+  const layer = el("dashCoverBg" + next);
+  layer.style.backgroundImage = p.cover ? `url("${p.cover}")` : `linear-gradient(135deg, ${p.colorA}, ${p.colorB})`;
+  el("dashCoverBg" + dashCoverFront).classList.remove("is-on");
+  layer.classList.add("is-on");
+  dashCoverFront = next;
+}
+function hideDashCover() {
+  el("dashCoverBgA").classList.remove("is-on");
+  el("dashCoverBgB").classList.remove("is-on");
+}
+
 function renderDashboard() {
+  hideDashCover();
   const grid = el("projectGrid");
   grid.innerHTML = "";
   el("loadingState").classList.add("hidden");
@@ -229,6 +268,8 @@ function renderDashboard() {
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
       </button>`;
     card.addEventListener("click", (e) => { if (!e.target.closest(".card-gear")) openProject(p.id); });
+    card.addEventListener("mouseenter", () => showDashCover(p));
+    card.addEventListener("mouseleave", hideDashCover);
     card.querySelector(".card-gear").addEventListener("click", (e) => { e.stopPropagation(); openCardMenu(p.id, e.currentTarget); });
     grid.appendChild(card);
   });
@@ -366,6 +407,7 @@ function exportProjectToWord(p) {
 
 // ================= PROJECT VIEW (Write / Organize) =================
 function openProject(id) {
+  hideDashCover();
   currentProjectId = id;
   const p = getProject(id);
   el("projectTitle").value = p.title;
@@ -1437,6 +1479,7 @@ function initRailLogo() {
 window.addEventListener("DOMContentLoaded", () => {
   initLoginArt();
   initRailLogo();
+  pickDashTitle();
   el("btnLoginGoogle").onclick = handleLogin;
   document.querySelectorAll("#loginView .btn-oauth.is-soon").forEach((b) => b.onclick = () => handleSoonProvider(b.dataset.provider));
   showLastLoginHint();

@@ -125,6 +125,9 @@ seluruh halaman. Di tema terang foto disembunyikan dan hanya dot-grid yang
 tampil. Di HP rail berpindah jadi bar bawah. Bagian yang diatur di `style.css`
 (blok "DASHBOARD"): `.galaxy-photo` (opacity/blur foto), `.galaxy-dots`
 (kerapatan & transparansi titik).
+Project tampil sebagai kartu sampul buku di kiri atas (`.dash-shelf`); saat kursor
+di atas kartu, sampulnya memudar masuk ke background (`.galaxy-cover`). Judul di
+tengah diacak tiap refresh dari daftar `DASH_TITLES` di `app.js`.
 
 **Pembaruan terbaru (halaman login):** layout login dijadikan dua kolom —
 kiri berisi komponen HalftoneReveal dari React Bits (foto yang tampil sebagai

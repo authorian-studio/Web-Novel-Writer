@@ -209,9 +209,13 @@ body.light .icon-btn:hover { background: rgba(0,0,0,0.06); }
   backdrop-filter: blur(6px) saturate(1.05); -webkit-backdrop-filter: blur(6px) saturate(1.05);
 }
 .galaxy-dots::before {   /* tile 20x20 berisi 1 titik = <Background variant="dots" /> React Flow; di-blur tipis supaya samar tapi tetap terlihat */
-  content: ""; position: absolute; inset: 0; background-size: 20px 20px; filter: blur(.8px); opacity: .75;
+  content: ""; position: absolute; inset: 0; background-size: 20px 20px; filter: blur(1.2px); opacity: .9;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Ccircle cx='1' cy='1' r='1' fill='%23a6a6b0' fill-opacity='.75'/%3E%3C/svg%3E");
 }
+/* cover project yang di-hover: memudar masuk perlahan, memudar keluar saat kursor pergi (diatur app.js) */
+.galaxy-cover { position: absolute; inset: -48px; background: center / cover no-repeat; opacity: 0; filter: blur(2px) saturate(1.1); transition: opacity 1.1s ease; }
+.galaxy-cover.is-on { opacity: .75; transition-duration: .8s; }
+body.light .galaxy-cover.is-on { opacity: .35; }
 body.light .galaxy-photo { display: none; }   /* tema terang: tanpa foto, hanya dot-grid */
 body.light .galaxy-dots { background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
 body.light .galaxy-dots::before { filter: none; opacity: 1; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Crect width='1' height='1' fill='%23000' fill-opacity='.22'/%3E%3C/svg%3E"); }
@@ -245,34 +249,42 @@ body.light .sync-indicator { text-shadow: none; }
 body.light .help-fab { background: rgba(255,255,255,.85); }
 .help-fab:hover { transform: scale(1.08); background: var(--bg-elevated); }
 
-/* --- isi tengah: judul + daftar project berupa baris lebar --- */
+/* --- isi tengah: judul acak + tombol Project Baru; project berupa kartu sampul buku di kiri atas --- */
 #dashBody { position: relative; z-index: 2; flex: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center; padding: 56px 24px; }
-.dash-center { margin: auto 0; width: 100%; max-width: 460px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
-.dash-title { margin: 0 0 8px; font-size: 26px; font-weight: 800; letter-spacing: -.2px; text-align: center; text-shadow: 0 2px 24px rgba(0,0,0,.55); }
+.dash-center { margin: auto 0; width: 100%; max-width: 460px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.dash-title { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -.2px; text-align: center; text-shadow: 0 2px 24px rgba(0,0,0,.55); }
 body.light .dash-title { text-shadow: none; }
-.dash-center .empty-state { margin-top: 0; }
-#projectGrid { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+.dash-center .empty-state { margin-top: 12px; }
+/* rak: mulai tepat di kanan rail, melebar ke kanan sampai sebelum area judul di tengah, lalu turun ke baris berikut */
+.dash-shelf {
+  position: absolute; top: 40px; left: 92px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 16px;
+  width: max(160px, calc(50% - 360px)); max-height: calc(100% - 80px); overflow-y: auto; padding: 4px 4px 12px; scrollbar-width: thin;
+}
+.dash-shelf:empty { display: none; }
 
 .project-card {
-  position: relative; display: flex; align-items: center; height: 76px; border-radius: 16px; overflow: hidden; cursor: pointer; color: #fff;
-  background: var(--bg-card); border: 1px solid rgba(255,255,255,0.10); box-shadow: 0 8px 26px rgba(0,0,0,0.35);
+  position: relative; flex: 0 0 auto; width: 150px; height: 220px; border-radius: 14px; overflow: hidden; cursor: pointer; color: #fff;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  background: var(--bg-card); border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 8px 26px rgba(0,0,0,0.4);
   opacity: 0; transform: translateY(14px) scale(.97); animation: cardIn .45s cubic-bezier(.2,.8,.2,1) forwards;
-  transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+  transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
 }
-.project-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.24); box-shadow: 0 14px 34px rgba(0,0,0,0.5); }
+.project-card:hover { transform: translateY(-4px); border-color: rgba(255,255,255,0.3); box-shadow: 0 16px 38px rgba(0,0,0,0.55); }
 .project-card .cover { position: absolute; inset: 0; z-index: 0; font-family: "Dancing Script", cursive; color: #fff; }
 .project-card .cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
-.project-card .cover-letter { position: absolute; right: 64px; top: 50%; transform: translateY(-50%); font-size: 48px; opacity: .3; }
-.project-card::after {   /* lapisan gelap di kiri supaya judul selalu terbaca di atas cover apa pun */
+.project-card .cover-letter { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); font-size: 72px; opacity: .35; }
+.project-card::after {   /* lapisan gelap di bawah supaya judul selalu terbaca di atas cover apa pun */
   content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
-  background: linear-gradient(90deg, rgba(8,9,12,.84) 0%, rgba(8,9,12,.5) 55%, rgba(8,9,12,.2) 100%);
+  background: linear-gradient(to top, rgba(8,9,12,.88) 0%, rgba(8,9,12,.45) 38%, rgba(8,9,12,0) 65%);
 }
-.project-card .card-body { position: relative; z-index: 2; flex: 1; min-width: 0; padding: 0 56px 0 18px; display: flex; flex-direction: column; gap: 4px; }
-.project-card .card-title { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.project-card .card-meta { font-size: 12px; color: rgba(255,255,255,0.68); display: flex; align-items: center; gap: 6px; }
-.card-meta .drive-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
-.project-card .card-gear { position: absolute; z-index: 3; right: 12px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border: none; border-radius: 9px; background: transparent; color: rgba(255,255,255,0.8); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .2s ease, color .2s ease; }
+.project-card .card-body { position: relative; z-index: 2; min-width: 0; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 4px; }
+.project-card .card-title { font-weight: 700; font-size: 14px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.project-card .card-meta { font-size: 11px; line-height: 1.35; color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 5px; }
+.card-meta .drive-dot { flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+.project-card .card-gear { position: absolute; z-index: 3; right: 8px; top: 8px; width: 30px; height: 30px; border: none; border-radius: 9px; background: rgba(8,9,12,.35); color: rgba(255,255,255,0.85); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: background .2s ease, color .2s ease, opacity .2s ease; }
+.project-card:hover .card-gear, .project-card .card-gear:focus-visible { opacity: 1; }
 .project-card .card-gear:hover, .project-card .card-gear:focus-visible { background: rgba(255,255,255,0.18); color: #fff; outline: none; }
+@media (hover: none) { .project-card .card-gear { opacity: 1; } }   /* layar sentuh: tidak ada hover, tombol opsi selalu tampil */
 
 .dash-new { text-shadow: 0 1px 10px rgba(0,0,0,.6); display: inline-flex; align-items: center; gap: 8px; background: none; border: none; color: var(--text-dim); font-size: 14px; font-weight: 500; padding: 10px 16px; border-radius: 10px; cursor: pointer; transition: background .2s ease, color .2s ease; }
 .dash-new:hover { color: var(--text); background: rgba(255,255,255,0.07); }
@@ -638,7 +650,11 @@ body.light .drawer-close-btn:hover { background: rgba(0,0,0,0.06); }
   .rail-logo { top: auto; bottom: 4px; left: 12px; }       /* di bar bawah: logo di kiri bar */
   .dash-rail-top { padding-top: 0; padding-left: 58px; }
   .rail-tip { display: none; }
-  #dashBody { padding: 40px 18px 84px; }
+  #dashBody { padding: 40px 18px 84px; justify-content: flex-start; }
+  .dash-center { margin: 24px 0 20px; }
+  .dash-shelf { position: static; width: 100%; max-height: none; overflow: visible; justify-content: center; }   /* HP: rak turun di bawah judul */
+  .project-card { width: 132px; height: 194px; }
+  .project-card .card-gear { opacity: 1; }
   .dash-title { font-size: 22px; }
   .help-fab { bottom: 70px; right: 14px; }
   .sync-indicator { top: 14px; right: 16px; }

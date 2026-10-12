@@ -68,6 +68,9 @@
     <!-- Background: foto ngarai bersalju + aurora (bg-canyon.jpg, di-blur) + vignette + dot-grid ala React Flow (di-blur tipis) -->
     <div class="galaxy-bg" aria-hidden="true">
       <div class="galaxy-photo"></div>
+      <!-- cover project yang sedang di-hover memudar masuk ke sini (2 lapisan bergantian supaya bisa crossfade) -->
+      <div class="galaxy-cover" id="dashCoverBgA"></div>
+      <div class="galaxy-cover" id="dashCoverBgB"></div>
       <div class="galaxy-dots"></div>
     </div>
 
@@ -107,7 +110,11 @@
 
     <div id="dashBody">
       <div class="dash-center">
-        <h1 class="dash-title">Mau menulis apa hari ini?</h1>
+        <h1 class="dash-title" id="dashTitle">Mau menulis apa hari ini?</h1>
+        <button id="btnAddProject" class="dash-new hidden">
+          <span class="dash-new-icon">+</span>
+          <span>Project Baru</span>
+        </button>
         <div id="loadingState" class="empty-state hidden">
           <div class="spinner"></div>
           <p>Memuat project dari Google Drive...</p>
@@ -120,12 +127,9 @@
         <div class="empty-desc">Belum ada project yang dibuat. Mulai dengan <a href="#" id="emptyStateLink">membuat project pertamamu</a>.</div>
         <button id="emptyStateBtn" class="empty-btn"><span>+</span> Project Baru</button>
       </div>
-        <div id="projectGrid"></div>
-        <button id="btnAddProject" class="dash-new hidden">
-          <span class="dash-new-icon">+</span>
-          <span>Project Baru</span>
-        </button>
       </div>
+      <!-- rak project: kartu sampul buku (portrait) di kiri atas, di samping rail -->
+      <div id="projectGrid" class="dash-shelf"></div>
     </div>
 
     <button id="btnSupport" class="help-fab" title="Support" aria-label="Support">?</button>
