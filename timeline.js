@@ -1,135 +1,221 @@
 // ================= TIMELINE (React Flow) =================
 // Dimuat lazy oleh app.js (ensureTimelineLib) saat tab Timeline pertama kali dibuka, setelah React, ReactDOM &
-// React Flow (folder vendor/). Data disimpan di project: p.data.timelines = [{ id, title, start, end, events, links }]
-//   event = { id, title, year, y, desc, color, sceneId }   -> x di kanvas dihitung dari tahun, y = posisi vertikal bebas
-//   link  = { id, source, target }                          -> garis sambung antar event (sebab-akibat, dll.)
+// React Flow (folder vendor/). Data disimpan di project: p.data.timelines = [{ id, title, start, end, events }]
+//   start/end = rentang dasar garis waktu (default 1500–1900, TIDAK bisa diubah pengguna)
+//   event     = { id, title, year, month, day, desc, color, sceneId }  (month/day boleh kosong)
+// Aturan garis waktu (ala vvd):
+//   - garisnya selalu satu garis horizontal; event menempel di garis itu (hanya bisa digeser kiri/kanan)
+//   - arahkan kursor ke garis -> muncul tanggal + "klik untuk menambah"; bisa juga di luar ujung garis
+//   - event di luar rentang dasar (mis. 1464 < 1500) membuat garis otomatis memanjang sampai tanggal itu
 // React hanya menggambar kanvas; sidebar daftar timeline, header & panel edit event memakai DOM biasa.
 (function () {
   const h = React.createElement;
   const RF = window.ReactFlow;
-  const { ReactFlowProvider, Controls, Handle, Position, useNodesState, useEdgesState, useReactFlow, MarkerType } = RF;
+  const { ReactFlowProvider, Controls, useNodesState, useReactFlow } = RF;
   const Flow = RF.default || RF.ReactFlow;
 
-  const AXIS_W = 1600;          // panjang sumbu tahun di kanvas (px, sebelum zoom)
-  const AXIS_LINE_Y = 14;       // posisi garis sumbu di dalam node sumbu
-  const CARD_W = 172, CARD_H = 54;
+  const AXIS_W = 1600;          // panjang garis di kanvas (satuan flow, sebelum zoom) untuk seluruh rentang yang tampil
+  const NODE_W = 220;           // lebar kotak node event (transparan; yang terlihat hanya pill + tiang + titik)
+  const DOT = 10, STEM_BASE = 14, LEVEL_GAP = 34, MAX_LEVELS = 4;
+  const HOVER_BAND = 16;        // jarak (px layar) dari garis agar tooltip "klik untuk menambah" muncul
   const COLORS = ["#e8e8ec", "#d7a86e", "#4caf82", "#6aa8ff", "#c77dff", "#e15c5c"];
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+  const MDAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const CUM = MDAYS.reduce((a, d, i) => (a.push(i ? a[i - 1] + MDAYS[i - 1] : 0), a), []);
 
   let ctx = null;               // { project, onChange, getScenes, openScene }
   let tl = null;                // timeline yang sedang dibuka
   let selectedId = null;        // event yang sedang dipilih
-  let rev = 0;                  // dinaikkan tiap data berubah dari luar kanvas -> node dibangun ulang
+  let rev = 0;                  // dinaikkan tiap data berubah -> node dibangun ulang
   let mode = "pan";
-  let api = null;               // instance React Flow (fitView, screenToFlowPosition)
+  let api = null;               // instance React Flow
   let root = null;
   let bound = false;
   const $ = (id) => document.getElementById(id);
-
   const uid = (p) => p + "-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const timelines = () => { const d = ctx.project.data; if (!Array.isArray(d.timelines)) d.timelines = []; return d.timelines; };
-  const scaleOf = (t) => AXIS_W / Math.max(1, t.end - t.start);
-  const yearToX = (t, year) => (year - t.start) * scaleOf(t);
-  const xToYear = (t, x) => Math.round(t.start + x / scaleOf(t));
-  function niceStep(span) {   // jarak label tahun supaya sekitar 8 label di sepanjang sumbu
-    const raw = span / 8, p = Math.pow(10, Math.floor(Math.log10(raw)));
-    for (const m of [1, 2, 5, 10]) if (m * p >= raw) return Math.max(1, m * p);
-    return 10 * p;
-  }
-  function changed() { rev++; renderFlow(); ctx.onChange(); }
   const findEvent = (id) => tl && tl.events.find((e) => e.id === id);
+  function changed() { rev++; renderFlow(); renderHead(); ctx.onChange(); }
 
-  // ---------- node: sumbu tahun ----------
-  function AxisNode({ data }) {
-    const { start, end } = data, span = Math.max(1, end - start), sc = AXIS_W / span;
-    const step = niceStep(span), minor = step >= 5 ? step / 5 : 0;
-    const parts = [h("line", { key: "l", x1: 0, y1: AXIS_LINE_Y, x2: AXIS_W, y2: AXIS_LINE_Y, className: "tl-axis-line" }),
-      h("circle", { key: "a", cx: 0, cy: AXIS_LINE_Y, r: 3.5, className: "tl-axis-end" }),
-      h("circle", { key: "b", cx: AXIS_W, cy: AXIS_LINE_Y, r: 3.5, className: "tl-axis-end" })];
-    if (minor >= 1) for (let y = Math.ceil(start / minor) * minor; y <= end; y += minor) {
-      if (y % step === 0) continue;
-      const x = (y - start) * sc;
-      parts.push(h("line", { key: "m" + y, x1: x, y1: AXIS_LINE_Y - 2, x2: x, y2: AXIS_LINE_Y + 2, className: "tl-axis-tick minor" }));
-    }
-    for (let y = Math.ceil(start / step) * step; y <= end; y += step) {
-      const x = (y - start) * sc;
-      parts.push(h("line", { key: "t" + y, x1: x, y1: AXIS_LINE_Y - 4, x2: x, y2: AXIS_LINE_Y + 4, className: "tl-axis-tick" }));
-      parts.push(h("text", { key: "x" + y, x, y: AXIS_LINE_Y + 20, className: "tl-axis-label" }, String(y)));
-    }
-    return h("svg", { className: "tl-axis", width: AXIS_W, height: AXIS_LINE_Y + 28, style: { overflow: "visible" } }, parts);
+  // ---------- tanggal <-> posisi ----------
+  const dateToFrac = (ev) => ev.year + (ev.month ? (CUM[ev.month - 1] + (ev.day ? ev.day - 1 : 0)) / 365 : 0);
+  function fracToDate(f, prec) {
+    if (prec === "year") return { year: Math.round(f), month: null, day: null };
+    const year = Math.floor(f), doy = Math.min(364, Math.floor((f - year) * 365));
+    let m = 0; while (m < 11 && CUM[m + 1] <= doy) m++;
+    return prec === "month" ? { year, month: m + 1, day: null } : { year, month: m + 1, day: doy - CUM[m] + 1 };
+  }
+  const fmtDate = (d) => (d.month ? (d.day ? d.day + " " : "") + MONTHS[d.month - 1] + " " : "") + d.year;
+  // rentang garis = rentang dasar, diperpanjang otomatis supaya semua event masuk
+  function rangeOf(t) {
+    let start = t.start, end = t.end;
+    t.events.forEach((ev) => { const f = dateToFrac(ev); if (f < start) start = Math.floor(f); if (f > end) end = Math.ceil(f); });
+    return { start, end };
+  }
+  const scaleOf = (r) => AXIS_W / Math.max(1, r.end - r.start);
+  const fracToX = (r, f) => (f - r.start) * scaleOf(r);
+  const xToFrac = (r, x) => r.start + x / scaleOf(r);
+  // presisi tanggal mengikuti zoom: makin dekat, makin detail (tahun -> bulan -> hari)
+  function precisionNow(r) {
+    const pxPerYear = scaleOf(r) * (api ? api.getZoom() : 1);
+    return pxPerYear >= 365 * 3 ? "day" : pxPerYear >= 12 * 6 ? "month" : "year";
+  }
+  // jarak label di garis (dalam bulan) supaya label berjarak minimal ~90px di layar
+  const STEP_MONTHS = [1, 2, 3, 6, 12, 24, 60, 120, 240, 600, 1200, 2400, 6000, 12000, 24000, 60000, 120000];
+  function axisStep(pxPerYear) {
+    for (const m of STEP_MONTHS) if ((m / 12) * pxPerYear >= 90) return m;
+    return STEP_MONTHS[STEP_MONTHS.length - 1];
+  }
+  function fitAxis(duration) {   // tampilkan seluruh garis waktu
+    const box = $("tlFlow");
+    if (!api || !box.clientWidth) return;
+    api.setViewport({ x: box.clientWidth * 0.08, y: box.clientHeight * 0.6, zoom: (box.clientWidth * 0.84) / AXIS_W }, { duration: duration || 0 });
   }
 
-  // ---------- node: event (kartu kecil + tiang ke sumbu); tahun ikut berubah langsung saat digeser ----------
-  function EventNode({ data, selected, xPos, yPos }) {
-    const t = data.tl, cy = yPos + CARD_H / 2, year = xToYear(t, xPos + CARD_W / 2);
-    const stem = Math.max(0, Math.abs(cy) - CARD_H / 2);
+  // ---------- garis waktu: digambar di koordinat layar (ukuran teks & garis tetap, label menyesuaikan zoom) ----------
+  function AxisLayer({ range }) {
+    const [tx, ty, zoom] = RF.useStore((st) => st.transform);
+    const width = RF.useStore((st) => st.width);
+    const pxYear = scaleOf(range) * zoom;
+    const left = tx, right = tx + AXIS_W * zoom, y = ty;
+    const parts = [h("line", { key: "l", x1: Math.max(left, -20), y1: y, x2: Math.min(right, width + 20), y2: y, className: "tl-axis-line" })];
+    if (left >= -10 && left <= width + 10) parts.push(h("circle", { key: "a", cx: left, cy: y, r: 3.5, className: "tl-axis-end" }));
+    if (right >= -10 && right <= width + 10) parts.push(h("circle", { key: "b", cx: right, cy: y, r: 3.5, className: "tl-axis-end" }));
+    const step = axisStep(pxYear);
+    const minor = step >= 60 ? step / 5 : step === 12 && pxYear / 12 >= 6 ? 1 : step === 24 ? 12 : 0;
+    const fyL = Math.max(range.start, range.start + (0 - tx) / pxYear), fyR = Math.min(range.end, range.start + (width - tx) / pxYear);
+    const xOf = (idx) => tx + (idx / 12 - range.start) * pxYear;
+    if (minor) for (let i = Math.ceil(fyL * 12 / minor) * minor, n = 0; i <= fyR * 12 && n < 600; i += minor, n++) {
+      if (i % step === 0) continue;
+      parts.push(h("line", { key: "m" + i, x1: xOf(i), y1: y - 2, x2: xOf(i), y2: y + 2, className: "tl-axis-tick minor" }));
+    }
+    for (let i = Math.ceil(fyL * 12 / step) * step, n = 0; i <= fyR * 12 && n < 300; i += step, n++) {
+      const yr = Math.floor(i / 12), mo = ((i % 12) + 12) % 12, x = xOf(i);
+      parts.push(h("line", { key: "t" + i, x1: x, y1: y - 4, x2: x, y2: y + 4, className: "tl-axis-tick" }));
+      parts.push(h("text", { key: "x" + i, x, y: y + 20, className: "tl-axis-label" }, mo === 0 ? String(yr) : MONTHS[mo] + " " + yr));
+    }
+    return h("svg", { className: "tl-axis-layer", width: "100%", height: "100%" }, parts);
+  }
+
+  // ---------- node: event = label (pill) + tiang + titik di garis; tanggal ikut berubah langsung saat digeser ----------
+  function EventNode({ data, selected, xPos, dragging }) {
+    const zoom = RF.useStore((st) => st.transform[2]);
+    const live = dragging ? fmtDate(fracToDate(xToFrac(data.range, xPos + NODE_W / 2), data.prec)) : data.dateLabel;
     return h("div", { className: "tl-event" + (selected ? " is-selected" : ""), style: { "--ev": data.color || COLORS[0] } },
-      h(Handle, { type: "target", position: Position.Left, className: "tl-handle" }),
-      h(Handle, { type: "source", position: Position.Right, className: "tl-handle" }),
-      stem > 0 ? h("span", { className: "tl-stem " + (cy < 0 ? "down" : "up"), style: { height: stem } }) : null,
-      h("span", { className: "tl-event-meta" }, h("b", null, String(year)), data.sceneTitle ? h("span", null, "· " + data.sceneTitle) : null),
-      h("span", { className: "tl-event-title" }, data.title || "(tanpa judul)"));
+      h("div", { className: "tl-event-inner", style: { transform: `scale(${1 / zoom}) translateY(${DOT / 2}px)` } },
+        h("div", { className: "tl-pill", title: data.title + " — " + live },
+          h("span", { className: "tl-pill-title" }, data.title || "(tanpa judul)"),
+          dragging ? h("span", { className: "tl-pill-date" }, live) : null),
+        h("span", { className: "tl-stem", style: { height: data.stem } }),
+        h("span", { className: "tl-dot" })));
   }
-  const nodeTypes = { axis: AxisNode, event: EventNode };
+  const nodeTypes = { event: EventNode };
 
-  function buildNodes() {
-    const scenes = ctx.getScenes();
-    const axis = { id: "__axis", type: "axis", position: { x: 0, y: -AXIS_LINE_Y }, data: { start: tl.start, end: tl.end },
-      draggable: false, selectable: false, connectable: false, deletable: false, zIndex: 0 };
-    return [axis].concat(tl.events.map((ev) => ({
-      id: ev.id, type: "event", zIndex: 1, selected: ev.id === selectedId,
-      position: { x: yearToX(tl, ev.year) - CARD_W / 2, y: ev.y - CARD_H / 2 },
-      data: { tl, title: ev.title, color: ev.color, sceneTitle: (scenes.find((s) => s.id === ev.sceneId) || {}).title },
-    })));
+  // label yang berdekatan ditumpuk di beberapa "tingkat" supaya tidak saling menutupi
+  function assignLevels(items, zoom) {
+    const ends = [];
+    items.slice().sort((a, b) => a.x - b.x).forEach((it) => {
+      const w = Math.min(NODE_W - 8, 26 + (it.label || "").length * 6.6) / zoom, left = it.x - w / 2;
+      let lvl = ends.findIndex((end) => end + 10 / zoom < left);
+      if (lvl === -1) lvl = ends.length < MAX_LEVELS ? ends.length : ends.indexOf(Math.min(...ends));
+      ends[lvl] = it.x + w / 2;
+      it.level = lvl;
+    });
   }
-  const buildEdges = () => (tl.links || []).map((l) => ({ id: l.id, source: l.source, target: l.target, type: "smoothstep", className: "tl-link", markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 } }));
+  function buildNodes() {
+    const r = rangeOf(tl), prec = precisionNow(r), scenes = ctx.getScenes(), zoom = api ? api.getZoom() : 1;
+    const items = tl.events.map((ev) => {
+      const scene = scenes.find((s) => s.id === ev.sceneId);
+      return { ev, x: fracToX(r, dateToFrac(ev)), label: (ev.title || "(tanpa judul)") + (scene ? "  ·  " + scene.title : "") };
+    });
+    assignLevels(items, zoom);
+    return items.map(({ ev, x, label, level }) => {
+      const stem = STEM_BASE + level * LEVEL_GAP;
+      return {
+        id: ev.id, type: "event", zIndex: 1, selected: ev.id === selectedId, connectable: false,
+        position: { x: x - NODE_W / 2, y: -1 },   // kotak setinggi 2px yang tengahnya tepat di garis (y = 0)
+        data: { title: label, color: ev.color, dateLabel: fmtDate(ev), range: r, prec, stem },
+      };
+    });
+  }
 
   function FlowApp({ tlRev, panMode }) {
-    const [nodes, setNodes, onNodesChange] = useNodesState([]);
-    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    const [nodes, setNodes, onNodesChangeBase] = useNodesState([]);
+    const [ghost, setGhost] = React.useState(null);   // penanda + tooltip "klik untuk menambah"
+    const lastVp = React.useRef(null);
+    // saat zoom, garis tetap di ketinggian layar yang sama (kalau tidak, zoom dalam bisa "melempar" garis keluar layar)
+    const onMove = (_e, v) => {
+      const prev = lastVp.current;
+      if (prev && v.zoom !== prev.zoom && v.y !== prev.y) {
+        lastVp.current = { x: v.x, y: prev.y, zoom: v.zoom };
+        api.setViewport(lastVp.current);
+        return;
+      }
+      lastVp.current = v;
+    };
     api = useReactFlow();
-    React.useEffect(() => { setNodes(buildNodes()); setEdges(buildEdges()); }, [tlRev]);
+    React.useEffect(() => { setNodes(buildNodes()); }, [tlRev]);
 
-    const onNodeDragStop = (_e, _node, dragged) => {
-      (dragged || [_node]).forEach((n) => {
+    // event hanya boleh bergeser mendatar: posisi y dikunci ke garis
+    const onNodesChange = (changes) => onNodesChangeBase(changes.map((c) => {
+      if (c.type !== "position" || !c.position) return c;
+      const n = nodes.find((x) => x.id === c.id);
+      return n ? { ...c, position: { x: c.position.x, y: n.position.y }, positionAbsolute: c.positionAbsolute && { x: c.positionAbsolute.x, y: n.position.y } } : c;
+    }));
+    const onNodeDragStart = (_e, node) => {
+      if (node.type !== "event") return;
+      if (node.id !== selectedId) { selectedId = node.id; fillEditor(); }
+      setGhost(null);
+    };
+    const onNodeDragStop = (_e, node, dragged) => {
+      const r = rangeOf(tl), prec = precisionNow(r);
+      (dragged || [node]).forEach((n) => {
         const ev = findEvent(n.id); if (!ev) return;
-        ev.year = xToYear(tl, n.position.x + CARD_W / 2);
-        ev.y = Math.round(n.position.y + CARD_H / 2);
+        Object.assign(ev, fracToDate(xToFrac(r, n.position.x + NODE_W / 2), prec));
       });
       if (selectedId) fillEditor();
-      changed();   // posisi x dirapikan tepat ke tahunnya
-    };
-    const onConnect = (c) => {
-      if (!c.source || !c.target || c.source === c.target) return;
-      if ((tl.links || []).some((l) => l.source === c.source && l.target === c.target)) return;
-      (tl.links = tl.links || []).push({ id: uid("lk"), source: c.source, target: c.target });
-      changed();
+      changed();   // garis memanjang otomatis bila event digeser keluar rentang
     };
     const onNodesDelete = (del) => {
       const ids = new Set(del.map((n) => n.id));
       tl.events = tl.events.filter((e) => !ids.has(e.id));
-      tl.links = (tl.links || []).filter((l) => !ids.has(l.source) && !ids.has(l.target));
       if (ids.has(selectedId)) { selectedId = null; hideEditor(); }
       changed();
     };
-    const onEdgesDelete = (del) => {
-      const ids = new Set(del.map((e) => e.id));
-      tl.links = (tl.links || []).filter((l) => !ids.has(l.id));
-      changed();
+    const onNodeClick = (_e, node) => { if (node.type === "event" && node.id !== selectedId) { selectedId = node.id; fillEditor(); } };
+
+    // posisi kursor -> tanggal di garis (null bila kursor tidak dekat garis)
+    const hoverAt = (e) => {
+      const wrap = $("tlFlow").getBoundingClientRect();
+      const p = api.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      const axisY = api.flowToScreenPosition({ x: p.x, y: 0 }).y;
+      if (Math.abs(e.clientY - axisY) > HOVER_BAND) return null;
+      const r = rangeOf(tl), date = fracToDate(xToFrac(r, p.x), precisionNow(r));
+      const left = e.clientX - wrap.left;
+      const edge = left < 130 ? " at-left" : left > wrap.width - 130 ? " at-right" : "";   // tooltip tidak terpotong di tepi
+      return { left, top: axisY - wrap.top, date, edge };
     };
-    // pilih event = klik / mulai geser node; klik area kosong = batal pilih
-    const selectEvent = (_e, node) => {
-      if (node.type !== "event" || node.id === selectedId) return;
-      selectedId = node.id; fillEditor();
+    const onPaneMouseMove = (e) => setGhost(hoverAt(e));
+    const onPaneClick = (e) => {
+      const g = hoverAt(e);
+      if (g) { addEventAt(g.date); setGhost(null); return; }
+      if (selectedId) { selectedId = null; hideEditor(); rev++; renderFlow(); }
     };
-    const onPaneClick = () => { if (!selectedId) return; selectedId = null; hideEditor(); };
 
     return h(Flow, {
-      nodes, edges, nodeTypes, onNodesChange, onEdgesChange, onNodeDragStop, onConnect, onNodesDelete, onEdgesDelete, onPaneClick,
-      onNodeClick: selectEvent, onNodeDragStart: selectEvent,
+      nodes, edges: [], nodeTypes, onNodesChange, onNodeDragStart, onNodeDragStop, onNodesDelete, onNodeClick,
+      onPaneMouseMove, onPaneMouseLeave: () => setGhost(null), onPaneClick, onMoveEnd: () => setNodes(buildNodes()),
+      onInit: (inst) => { api = inst; fitAxis(); setNodes(buildNodes()); }, onMove,
       panOnDrag: panMode ? true : [1, 2], selectionOnDrag: !panMode, panOnScroll: false, zoomOnDoubleClick: false,
-      fitView: true, fitViewOptions: { padding: 0.25 }, minZoom: 0.1, maxZoom: 2.5, deleteKeyCode: ["Backspace", "Delete"],
-      attributionPosition: "bottom-left",
-    }, h(Controls, { showInteractive: false, position: "bottom-right", className: "tl-controls" }));
+      nodesConnectable: false, minZoom: 0.05, maxZoom: 1000,
+      deleteKeyCode: ["Backspace", "Delete"], attributionPosition: "bottom-left",
+      className: ghost ? "is-adding" : "",
+    },
+      h(AxisLayer, { range: rangeOf(tl) }),
+      h(Controls, { showInteractive: false, showFitView: false, position: "bottom-right", className: "tl-controls" }),
+      ghost ? h("div", { className: "tl-ghost", style: { left: ghost.left, top: ghost.top } },
+        h("span", { className: "tl-ghost-tip" + ghost.edge }, h("b", null, fmtDate(ghost.date)), " · klik untuk menambah"),
+        h("span", { className: "tl-ghost-plus" }, "+")) : null);
   }
 
   function renderFlow() {
@@ -164,9 +250,9 @@
     const main = document.querySelector("#tabTimeline .tl-main");
     main.classList.toggle("is-empty", !tl);
     if (!tl) return;
-    $("tlTitle").value = tl.title || "";
-    $("tlStart").value = tl.start;
-    $("tlEnd").value = tl.end;
+    if (document.activeElement !== $("tlTitle")) $("tlTitle").value = tl.title || "";
+    const r = rangeOf(tl);
+    $("tlRangeText").textContent = `${r.start} – ${r.end} · ${tl.events.length} event`;
   }
   function openTimeline(id) {
     tl = timelines().find((t) => t.id === id) || null;
@@ -175,12 +261,30 @@
     renderList(); renderHead(); renderFlow();
   }
 
-  // ---------- panel edit event ----------
+  // ---------- event: tambah & panel edit ----------
+  function addEventAt(date) {
+    const ev = { id: uid("ev"), title: "Event baru", year: date.year, month: date.month || null, day: date.day || null, desc: "", color: COLORS[0], sceneId: "" };
+    tl.events.push(ev);
+    selectedId = ev.id;
+    fillEditor();
+    changed();
+    setTimeout(() => { $("tlEvTitle").focus(); $("tlEvTitle").select(); }, 0);
+  }
+  function addEventAtCenter() {
+    if (!tl) return;
+    const r = rangeOf(tl), box = $("tlFlow").getBoundingClientRect();
+    let f = (r.start + r.end) / 2;
+    if (api) f = xToFrac(r, api.screenToFlowPosition({ x: box.left + box.width / 2, y: box.top + box.height / 2 }).x);
+    addEventAt(fracToDate(f, precisionNow(r)));
+  }
   function fillEditor() {
     const ev = findEvent(selectedId);
     if (!ev) return hideEditor();
     $("tlEvTitle").value = ev.title || "";
     $("tlEvYear").value = ev.year;
+    $("tlEvMonth").value = ev.month || "";
+    $("tlEvDay").value = ev.day || "";
+    $("tlEvDay").disabled = !ev.month;
     $("tlEvDesc").value = ev.desc || "";
     const sel = $("tlEvScene");
     sel.innerHTML = '<option value="">— tidak ada —</option>';
@@ -191,44 +295,27 @@
     $("tlEditor").classList.remove("hidden");
   }
   function hideEditor() { $("tlEditor").classList.add("hidden"); }
-
-  function addEvent() {
-    if (!tl) return;
-    let year = Math.round((tl.start + tl.end) / 2), y = -110;
-    const box = $("tlFlow").getBoundingClientRect();
-    if (api && api.screenToFlowPosition) {   // taruh di tengah layar yang sedang dilihat
-      const p = api.screenToFlowPosition({ x: box.left + box.width / 2, y: box.top + box.height / 2 });
-      year = Math.min(tl.end, Math.max(tl.start, xToYear(tl, p.x)));
-      if (Math.abs(p.y) > 70) y = Math.round(p.y);
-    }
-    const near = tl.events.filter((e) => Math.abs(yearToX(tl, e.year) - yearToX(tl, year)) < CARD_W && Math.abs(e.y - y) < CARD_H + 10).length;
-    const ev = { id: uid("ev"), title: "Event baru", year, y: y + near * (CARD_H + 16) * Math.sign(y || -1), desc: "", color: COLORS[0], sceneId: "" };
-    tl.events.push(ev);
-    selectedId = ev.id;
+  // baca ulang tahun/bulan/tanggal dari form (tanggal dibatasi sesuai jumlah hari bulan itu)
+  function readDateFields(ev) {
+    const y = parseInt($("tlEvYear").value, 10);
+    if (!Number.isNaN(y)) ev.year = y;
+    const m = parseInt($("tlEvMonth").value, 10);
+    ev.month = m >= 1 && m <= 12 ? m : null;
+    const d = parseInt($("tlEvDay").value, 10);
+    ev.day = ev.month && d >= 1 ? Math.min(d, MDAYS[ev.month - 1]) : null;
     fillEditor();
-    changed();
-    setTimeout(() => { $("tlEvTitle").focus(); $("tlEvTitle").select(); }, 0);
   }
 
   function bindOnce() {
     if (bound) return; bound = true;
     $("tlSearch").addEventListener("input", renderList);
     $("tlNew").onclick = () => {
-      const t = { id: uid("tl"), title: "Timeline Baru", start: 1500, end: 1900, events: [], links: [] };
+      const t = { id: uid("tl"), title: "Timeline Baru", start: 1500, end: 1900, events: [] };
       timelines().push(t); ctx.onChange(); openTimeline(t.id);
       setTimeout(() => { $("tlTitle").focus(); $("tlTitle").select(); }, 0);
     };
     $("tlCreateFirst").onclick = () => $("tlNew").click();
     $("tlTitle").addEventListener("input", () => { if (!tl) return; tl.title = $("tlTitle").value; renderList(); ctx.onChange(); });
-    const onRange = () => {
-      if (!tl) return;
-      const s = parseInt($("tlStart").value, 10), e = parseInt($("tlEnd").value, 10);
-      if (Number.isNaN(s) || Number.isNaN(e) || e <= s) { renderHead(); return; }   // rentang tidak valid -> kembalikan
-      tl.start = s; tl.end = e; changed();
-      setTimeout(() => api && api.fitView({ padding: 0.25, duration: 300 }), 30);
-    };
-    $("tlStart").addEventListener("change", onRange);
-    $("tlEnd").addEventListener("change", onRange);
     $("tlDelete").onclick = () => {
       if (!tl || !confirm(`Hapus timeline "${tl.title || "(tanpa nama)"}"?`)) return;
       ctx.project.data.timelines = timelines().filter((t) => t.id !== tl.id);
@@ -240,9 +327,10 @@
     const setMode = (m) => { mode = m; $("tlModePan").classList.toggle("is-active", m === "pan"); $("tlModeSelect").classList.toggle("is-active", m === "select"); renderFlow(); };
     $("tlModePan").onclick = () => setMode("pan");
     $("tlModeSelect").onclick = () => setMode("select");
-    $("tlAddEvent").onclick = addEvent;
-    $("tlFit").onclick = () => api && api.fitView({ padding: 0.25, duration: 400 });
+    $("tlAddEvent").onclick = addEventAtCenter;
+    $("tlFit").onclick = () => fitAxis(400);
 
+    $("tlEvMonth").innerHTML = '<option value="">—</option>' + MONTHS.map((m, i) => `<option value="${i + 1}">${m}</option>`).join("");
     const colors = $("tlEvColors");
     COLORS.forEach((c) => {
       const b = document.createElement("button");
@@ -252,14 +340,13 @@
     });
     const edit = (fn) => () => { const ev = findEvent(selectedId); if (!ev) return; fn(ev); changed(); };
     $("tlEvTitle").addEventListener("input", edit((ev) => { ev.title = $("tlEvTitle").value; }));
+    ["tlEvYear", "tlEvMonth", "tlEvDay"].forEach((id) => $(id).addEventListener("change", edit(readDateFields)));
     $("tlEvDesc").addEventListener("input", () => { const ev = findEvent(selectedId); if (ev) { ev.desc = $("tlEvDesc").value; ctx.onChange(); } });
-    $("tlEvYear").addEventListener("change", edit((ev) => { const y = parseInt($("tlEvYear").value, 10); if (!Number.isNaN(y)) ev.year = y; $("tlEvYear").value = ev.year; }));
     $("tlEvScene").addEventListener("change", edit((ev) => { ev.sceneId = $("tlEvScene").value; $("tlEvOpenScene").disabled = !ev.sceneId; }));
     $("tlEvOpenScene").onclick = () => { const ev = findEvent(selectedId); if (ev && ev.sceneId) ctx.openScene(ev.sceneId); };
     $("tlEvDelete").onclick = () => {
       const ev = findEvent(selectedId); if (!ev) return;
       tl.events = tl.events.filter((e) => e.id !== ev.id);
-      tl.links = (tl.links || []).filter((l) => l.source !== ev.id && l.target !== ev.id);
       selectedId = null; hideEditor(); changed();
     };
     $("tlEditorClose").onclick = () => { selectedId = null; hideEditor(); rev++; renderFlow(); };
@@ -271,7 +358,7 @@
       const sameProject = ctx && ctx.project === c.project;
       ctx = c;
       bindOnce();
-      $("tlSearch").value = sameProject ? $("tlSearch").value : "";
+      if (!sameProject) $("tlSearch").value = "";
       const keep = sameProject && tl && timelines().includes(tl) ? tl.id : (timelines()[0] || {}).id;
       if (keep) openTimeline(keep);
       else { tl = null; selectedId = null; hideEditor(); renderList(); renderHead(); renderFlow(); }

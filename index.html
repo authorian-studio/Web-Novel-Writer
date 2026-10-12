@@ -332,7 +332,7 @@
           </div>
         </div>
 
-        <!-- ============ TIMELINE TAB (React Flow: sumbu tahun + event yang bisa digeser & disambung) ============ -->
+        <!-- ============ TIMELINE TAB (React Flow: satu garis waktu horizontal, event menempel di garis) ============ -->
         <div id="tabTimeline" class="tab-panel hidden">
           <aside class="tl-side">
             <div class="tl-side-top">
@@ -347,11 +347,7 @@
           <section class="tl-main">
             <header class="tl-head">
               <input id="tlTitle" class="tl-title" aria-label="Nama timeline" />
-              <div class="tl-range">
-                <input id="tlStart" type="number" aria-label="Tahun awal" title="Tahun awal" />
-                <span>–</span>
-                <input id="tlEnd" type="number" aria-label="Tahun akhir" title="Tahun akhir" />
-              </div>
+<span id="tlRangeText" class="tl-range-text" title="Garis waktu memanjang otomatis mengikuti event"></span>
               <button id="tlDelete" class="tl-head-btn" title="Hapus timeline ini" aria-label="Hapus timeline ini">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
               </button>
@@ -388,7 +384,13 @@
                 </button>
               </div>
               <label class="tl-field"><span>Judul</span><input id="tlEvTitle" /></label>
-              <label class="tl-field"><span>Tahun</span><input id="tlEvYear" type="number" /></label>
+              <div class="tl-field"><span>Waktu</span>
+                <div class="tl-date">
+                  <input id="tlEvDay" type="number" min="1" max="31" placeholder="Tgl" aria-label="Tanggal" />
+                  <select id="tlEvMonth" aria-label="Bulan"></select>
+                  <input id="tlEvYear" type="number" placeholder="Tahun" aria-label="Tahun" />
+                </div>
+              </div>
               <label class="tl-field"><span>Catatan</span><textarea id="tlEvDesc" rows="3"></textarea></label>
               <label class="tl-field"><span>Scene terkait</span><select id="tlEvScene"></select></label>
               <div class="tl-field"><span>Warna</span><div id="tlEvColors" class="tl-colors"></div></div>

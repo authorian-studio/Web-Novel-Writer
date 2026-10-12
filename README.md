@@ -1,6 +1,21 @@
-# Novelist Web — v0.8.0
+# Novelist Web — v0.8.1
 
-## Riwayat perubahan terbaru (v0.8.0) — paling baru di atas
+## Riwayat perubahan terbaru (v0.8.1) — paling baru di atas
+
+- **Timeline: satu garis waktu horizontal ala vvd**
+  - Garis waktu **tidak bisa diubah manual** (input rentang tahun dihapus). Rentang dasarnya
+    1500–1900, dan garis **memanjang otomatis** kalau ada event di luar rentang itu — mis. event
+    tahun 1472 membuat garis mulai dari 1472.
+  - Semua event **menempel di garis** (label + tiang + titik) dan hanya bisa digeser **mendatar**;
+    tanggalnya tampil langsung saat digeser. Label yang berdekatan otomatis ditumpuk bertingkat.
+  - **Tambah event dari garis:** arahkan kursor ke garis (juga di luar ujungnya) → muncul
+    "tanggal · klik untuk menambah", klik untuk membuat event di tanggal itu.
+  - **Waktu event bisa diedit:** tanggal, bulan, tahun (bulan & tanggal boleh kosong).
+  - **Zoom sampai level hari:** label di garis berubah dari tahun → bulan, dan presisi tanggal saat
+    menambah/menggeser ikut zoom (tahun → bulan → hari). Ukuran label tetap di layar berapa pun zoom-nya.
+  - Fitur sambungan panah antar event dihapus (semua event kini satu garis).
+
+### v0.8.0
 
 - **Fitur baru: Timeline (React Flow)** — tab **Timeline** di top bar kiri (di dalam project).
   - Sidebar kiri: cari timeline, **+** untuk membuat timeline baru, klik untuk membuka.
