@@ -117,7 +117,8 @@ aktif, dan tidak diputar bila pengguna memilih "reduce motion".
 
 **Pembaruan terbaru (tampilan dalam project, ala vvd):** saat project dibuka,
 background-nya memakai cover project yang di-blur (fallback `bg-canyon.jpg`) +
-dot-grid samar. Top bar berupa chip: logo (kembali ke dashboard), chip project
+dot-grid samar. Top bar berupa chip: logo (membuka sidebar: keluar ke dashboard,
+pindah project, simpan, ganti tema), chip project
 (cover + judul + menu ▾), dan tab Home / Write / Organize / Plot / Schedule /
 Tools, plus jam di kanan atas. Tab **Home** berisi sapaan acak, statistik (kata,
 scene, karakter), kartu "Manuskrip" & "Dunia & Karakter", dan canvas berisi

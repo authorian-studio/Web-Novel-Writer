@@ -161,10 +161,38 @@
       <div class="galaxy-dots"></div>
     </div>
 
+    <!-- sidebar project: dibuka lewat logo di kiri atas; berisi keluar ke dashboard, pindah project, tema & simpan -->
+    <div id="projSidebarScrim" class="proj-sidebar-scrim"></div>
+    <aside id="projSidebar" class="proj-sidebar" aria-hidden="true" aria-label="Sidebar project">
+      <div class="proj-sidebar-head">
+        <img src="icon-192.png" alt="" draggable="false" class="proj-sidebar-logo" />
+        <span class="proj-sidebar-brand">Novelist</span>
+        <button id="btnProjSidebarClose" class="proj-sidebar-close" title="Tutup sidebar" aria-label="Tutup sidebar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+      </div>
+      <button id="btnBack" class="proj-side-item">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span>Keluar ke Dashboard</span>
+      </button>
+      <div class="proj-side-label">Project</div>
+      <div id="projSidebarList" class="proj-side-list"></div>
+      <div class="proj-side-bottom">
+        <button id="btnSideSave" class="proj-side-item">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.78A6 6 0 1 0 6 16.9"/><path d="M12 12v9"/><path d="m8 16 4-4 4 4"/></svg>
+          <span>Simpan ke Drive</span>
+        </button>
+        <button id="btnSideTheme" class="proj-side-item">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          <span>Ganti Tema</span>
+        </button>
+      </div>
+    </aside>
+
     <header id="projectTopbar">
-      <button id="btnBack" class="proj-logo-btn" title="Kembali ke dashboard" aria-label="Kembali ke dashboard">
+      <button id="btnProjSidebar" class="proj-logo-btn" title="Buka sidebar" aria-label="Buka sidebar" aria-controls="projSidebar" aria-expanded="false">
         <img src="icon-192.png" alt="" draggable="false" />
-        <svg class="proj-logo-back" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        <svg class="proj-logo-back" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18"/></svg>
       </button>
       <div class="proj-chip">
         <span class="proj-chip-cover" id="projChipCover"></span>

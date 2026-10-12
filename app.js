@@ -433,7 +433,52 @@ function openProject(id) {
   el("editorView").classList.remove("hidden");
   startProjClock();
 }
+// ---- SIDEBAR PROJECT (dibuka dari logo kiri atas) ----
+function renderProjSidebarList() {
+  const list = el("projSidebarList");
+  list.innerHTML = "";
+  projects.forEach((p) => {
+    const b = document.createElement("button");
+    b.className = "proj-side-project" + (p.id === currentProjectId ? " is-current" : "");
+    const thumb = p.cover ? `<span class="proj-side-thumb" style="background-image:url('${p.cover}')"></span>`
+      : `<span class="proj-side-thumb" style="background-image:linear-gradient(135deg, ${p.colorA}, ${p.colorB})">${escapeHtml((p.title || "?").charAt(0).toUpperCase())}</span>`;
+    b.innerHTML = `${thumb}<span class="proj-side-title">${escapeHtml(p.id === currentProjectId ? el("projectTitle").value : p.title)}</span>`;
+    b.onclick = () => { closeProjSidebar(); if (p.id !== currentProjectId) switchToProject(p.id); };
+    list.appendChild(b);
+  });
+}
+function projSidebarKeyHandler(e) { if (e.key === "Escape") closeProjSidebar(); }
+function openProjSidebar() {
+  renderProjSidebarList();
+  el("projSidebar").classList.add("is-open");
+  el("projSidebarScrim").classList.add("is-open");
+  el("projSidebar").setAttribute("aria-hidden", "false");
+  el("btnProjSidebar").setAttribute("aria-expanded", "true");
+  document.addEventListener("keydown", projSidebarKeyHandler);
+}
+function closeProjSidebar() {
+  el("projSidebar").classList.remove("is-open");
+  el("projSidebarScrim").classList.remove("is-open");
+  el("projSidebar").setAttribute("aria-hidden", "true");
+  el("btnProjSidebar").setAttribute("aria-expanded", "false");
+  document.removeEventListener("keydown", projSidebarKeyHandler);
+}
+// simpan project yang sedang dibuka (judul + isi) lalu kirim ke Drive
+function saveCurrentProject() {
+  flushCurrentEdits();
+  const p = getProject(currentProjectId);
+  if (!p) return Promise.resolve();
+  p.title = el("projectTitle").value; p.data.title = p.title; p.updatedAt = new Date().toISOString();
+  return saveProjectToDriveMain(p);
+}
+function switchToProject(id) {
+  saveCurrentProject();
+  closeSceneDrawer();
+  openProject(id);
+}
+
 function backToLibrary() {
+  closeProjSidebar();
   flushCurrentEdits();
   const p = getProject(currentProjectId);
   if (p) { p.title = el("projectTitle").value; p.data.title = p.title; p.updatedAt = new Date().toISOString(); }
@@ -1618,6 +1663,11 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // ---- project view ----
   el("btnBack").onclick = backToLibrary;
+  el("btnProjSidebar").onclick = () => (el("projSidebar").classList.contains("is-open") ? closeProjSidebar() : openProjSidebar());
+  el("btnProjSidebarClose").onclick = closeProjSidebar;
+  el("projSidebarScrim").onclick = closeProjSidebar;
+  el("btnSideTheme").onclick = () => document.body.classList.toggle("light");
+  el("btnSideSave").onclick = async () => { closeProjSidebar(); await saveCurrentProject(); toast("Tersimpan ke Drive ✅"); };
   el("projectTitle").addEventListener("input", () => { fitProjectTitle(); markDirtyAndSchedule(); });
   el("btnPreview").onclick = openPreview;
   el("btnClosePreview").onclick = () => el("previewModal").classList.add("hidden");

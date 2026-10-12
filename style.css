@@ -406,6 +406,36 @@ body.light .proj-bg-photo::after { display: none; }
 body.light .proj-logo-btn img { mix-blend-mode: multiply; filter: invert(1); }
 body.light .proj-logo-btn:hover { background: rgba(0,0,0,.06); }
 
+/* sidebar project: geser masuk dari kiri, tertutup = tersembunyi di luar layar */
+.proj-sidebar-scrim { position: absolute; inset: 0; z-index: 30; background: rgba(0,0,0,.35); opacity: 0; pointer-events: none; transition: opacity .3s ease; }
+.proj-sidebar-scrim.is-open { opacity: 1; pointer-events: auto; }
+.proj-sidebar {
+  position: absolute; z-index: 31; top: 8px; bottom: 8px; left: 8px; width: 264px; display: flex; flex-direction: column; gap: 4px; padding: 10px;
+  border-radius: 16px; background: var(--glass); border: 1px solid var(--glass-border); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 20px 50px rgba(0,0,0,.45); transform: translateX(calc(-100% - 16px)); visibility: hidden;
+  transition: transform .38s cubic-bezier(.32,.72,0,1), visibility 0s linear .38s;
+}
+.proj-sidebar.is-open { transform: none; visibility: visible; transition: transform .38s cubic-bezier(.32,.72,0,1), visibility 0s; }
+body:not(.light) .proj-sidebar { background: rgba(14,15,19,.82); }
+.proj-sidebar-head { display: flex; align-items: center; gap: 10px; padding: 2px 2px 12px; margin-bottom: 4px; border-bottom: 1px solid var(--glass-border); }
+.proj-sidebar-logo { width: 28px; height: 28px; border-radius: 7px; mix-blend-mode: screen; }
+body.light .proj-sidebar-logo { mix-blend-mode: multiply; filter: invert(1); }
+.proj-sidebar-brand { flex: 1; font-weight: 800; font-size: 15px; }
+.proj-sidebar-close { width: 30px; height: 30px; border: none; border-radius: 8px; background: transparent; color: var(--text-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.proj-sidebar-close:hover { background: rgba(255,255,255,.08); color: var(--text); }
+.proj-side-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: none; border-radius: 10px; background: transparent; color: var(--text); font-size: 13.5px; font-weight: 500; cursor: pointer; text-align: left; transition: background .15s ease; }
+.proj-side-item svg { color: var(--text-dim); flex-shrink: 0; }
+.proj-side-item:hover, .proj-side-project:hover { background: rgba(255,255,255,.07); }
+body.light .proj-side-item:hover, body.light .proj-side-project:hover { background: rgba(0,0,0,.05); }
+.proj-side-label { margin: 12px 10px 4px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.proj-side-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.proj-side-project { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; border: none; border-radius: 10px; background: transparent; color: var(--text-dim); font-size: 13px; cursor: pointer; text-align: left; }
+.proj-side-project.is-current { background: rgba(255,255,255,.1); color: var(--text); font-weight: 600; }
+body.light .proj-side-project.is-current { background: rgba(0,0,0,.07); }
+.proj-side-thumb { width: 24px; height: 32px; flex-shrink: 0; border-radius: 5px; background: center / cover no-repeat; display: flex; align-items: center; justify-content: center; font-family: "Dancing Script", cursive; font-size: 14px; color: #fff; }
+.proj-side-title { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.proj-side-bottom { border-top: 1px solid var(--glass-border); padding-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+
 .proj-chip { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 4px 0 5px; border-radius: 10px; background: var(--glass); border: 1px solid var(--glass-border); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 .proj-chip-cover { width: 24px; height: 24px; flex-shrink: 0; border-radius: 7px; background: center / cover no-repeat; display: flex; align-items: center; justify-content: center; font-family: "Dancing Script", cursive; font-size: 15px; color: #fff; }
 #projectTitle { width: 12ch; max-width: 30ch; background: none; border: none; color: var(--text); font-size: 13.5px; font-weight: 700; padding: 0; }
