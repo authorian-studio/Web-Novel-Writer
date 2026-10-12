@@ -52,22 +52,33 @@ button, input, textarea { font-family: inherit; }
 .halftone-reveal-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 
 /* kolom kanan: form di tengah (dot-grid dari #loginView tetap terlihat di sini) */
-.login-panel { position: relative; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.login-panel { position: relative; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 24px 24px 64px; }   /* ruang bawah untuk footer */
 
 /* desktop sempit: kolom form lebih kecil, jadi padding & font tombol dikurangi supaya tag "Segera" tidak menimpa label */
 @media (max-width: 1200px) {
-  .login-panel { padding: 16px; }
+  .login-panel { padding: 16px 16px 64px; }
   .btn-oauth { font-size: 13.5px; gap: 8px; }
 }
 /* layar sempit: art disembunyikan, form memenuhi layar */
 @media (max-width: 900px) {
   #loginView { grid-template-columns: 1fr; }
   .login-art { display: none; }
-  .login-panel { padding: 0; }
+  .login-panel { padding: 0 0 56px; }
 }
 
-.login-box { position: relative; z-index: 1; width: 100%; max-width: 420px; text-align: center; padding: 20px; animation: fadeSlideDown .5s ease; }
-.login-logo { font-size: 40px; margin-bottom: 18px; }
+.login-box { position: relative; width: 100%; max-width: 420px; text-align: center; padding: 20px; animation: fadeSlideDown .5s ease; }   /* tanpa z-index: stacking context sendiri akan memutus mix-blend logo dari dot-grid */
+.login-logo { width: 104px; height: 104px; margin: 0 auto 14px; mix-blend-mode: screen; }   /* latar hitam video -> transparan di atas dot-grid */
+.login-logo video { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+
+/* footer kecil di bawah kolom form: Help | Terms | Privacy | bahasa */
+.login-footer { position: absolute; left: 0; right: 0; bottom: 18px; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--l-dim); }
+.login-foot-link { display: inline-flex; align-items: center; gap: 4px; background: none; border: none; padding: 4px 2px; color: #a9a9b2; font: inherit; font-weight: 500; cursor: pointer; transition: color .15s ease; }
+.login-foot-link:hover, .login-foot-link:focus-visible { color: var(--l-text); outline: none; text-decoration: underline; text-underline-offset: 3px; }
+.login-foot-sep { opacity: .5; }
+.login-lang { position: relative; }
+.login-lang-menu { position: absolute; bottom: calc(100% + 8px); right: -8px; min-width: 170px; padding: 6px; border-radius: 10px; background: var(--l-btn-bg); border: 1px solid var(--l-btn-border); box-shadow: 0 10px 30px rgba(0,0,0,.5); animation: popIn .16s cubic-bezier(.2,.9,.3,1.2) forwards; }
+.login-lang-menu button { display: block; width: 100%; text-align: left; padding: 8px 10px; border: none; border-radius: 7px; background: none; color: var(--l-text); font: inherit; font-size: 13px; cursor: pointer; }
+.login-lang-menu button:hover { background: rgba(255,255,255,.07); }
 .login-heading h1 { font-size: 21px; font-weight: 700; letter-spacing: .2px; margin: 0 0 8px; }
 .login-tagline { color: var(--l-dim); font-size: 14px; margin: 0 0 26px; }
 

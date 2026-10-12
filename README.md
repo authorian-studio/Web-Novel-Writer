@@ -1,4 +1,30 @@
-# Novelist Web — v0.6.2
+# Novelist Web — v0.7.0
+
+## Riwayat perubahan terbaru (v0.7.0) — paling baru di atas
+
+- **Halaman login: logo & footer**
+  - Tulisan "Novelist" diganti **logo animasi** (`login-logo.webm` / `login-logo.mp4`,
+    poster `login-logo-poster.webp`) — dipotong 360×360 dari video logo asli, tanpa suara,
+    latar hitamnya menyatu dengan dot-grid.
+  - **Footer** di bawah: **Bantuan | Ketentuan | Privasi | ID ⌄**. Bantuan membuka panduan,
+    Ketentuan & Privasi membuka modal, dan pilihan bahasa (Bahasa Indonesia / English)
+    mengganti semua teks halaman login (tersimpan di browser).
+- **Sidebar project** — logo di kiri atas (di dalam project) membuka sidebar yang bisa
+  ditutup (klik logo lagi, tombol ‹, klik di luar, atau Esc). Isinya: Keluar ke Dashboard,
+  daftar project (pindah langsung), Simpan ke Drive, Ganti Tema.
+- **Tampilan dalam project dirombak ala vvd** — background cover project di-blur + dot-grid
+  samar, top bar berupa chip (project + tab Home/Write/Organize/Plot/Schedule/Tools + jam),
+  tab **Home** (sapaan acak, statistik kata/scene/karakter, kartu Manuskrip & Dunia &
+  Karakter, canvas titik-titik scene), Write & Organize jadi panel kaca.
+- **Dashboard** — project tampil sebagai kartu sampul buku di kiri atas; judul tengah diacak
+  tiap refresh; "+ Project Baru" tepat di bawah judul; hover kartu = sampulnya memudar ke
+  background; dot-grid dibuat samar ala vvd.
+- **Background & logo** — foto background diganti ngarai + aurora (`bg-canyon.jpg`, di-blur),
+  logo dashboard punya mode idle pelan & aktif saat kursor mendekat, favicon/ikon PWA
+  diganti logo heksagon.
+
+---
+
 
 **Pembaruan terbaru (v0.6.2):**
 - **Area menulis dilebarkan penuh** — batas max-width dihapus total (sebelumnya
@@ -303,6 +329,7 @@ nama-repo/
 ├── favicon-32.png, apple-touch-icon.png, icon-192.png, icon-512.png
 ├── logo-anim.mp4
 ├── logo-anim-poster.webp
+├── login-logo.webm, login-logo.mp4, login-logo-poster.webp
 ├── config.js
 ├── manifest.json
 ```

@@ -171,10 +171,89 @@ function showLoginNotice(msg) {
   loginNoticeTimer = setTimeout(() => n.classList.add("hidden"), 4000);
 }
 
+// ---- BAHASA HALAMAN LOGIN (ID / EN) + footer Help | Terms | Privacy ----
+const LOGIN_LANG_KEY = "novelist_login_lang";
+const LOGIN_I18N = {
+  id: {
+    heading: "Sign In atau Mulai Menulis", tagline: "Tulis novelmu, tersimpan otomatis ke Google Drive-mu sendiri.",
+    google: "Lanjutkan dengan Google", discord: "Lanjutkan dengan Discord", apple: "Lanjutkan dengan Apple", email: "Lanjutkan dengan Email",
+    soon: "Segera", lastUsed: "Terakhir kamu login pakai Google", waiting: "Menunggu login...", loginFailed: "Login gagal: ",
+    note: "Login diperlukan supaya project kamu aman tersimpan & ter-backup otomatis di Google Drive-mu. Tidak ada data yang disimpan di server kami.",
+    soonNotice: (n) => `Login dengan ${n} belum tersedia. Untuk saat ini pakai Google dulu ya — project kamu disimpan di Google Drive-mu.`,
+    help: "Bantuan", terms: "Ketentuan", privacy: "Privasi",
+    termsTitle: "Ketentuan Penggunaan",
+    termsBody: [
+      ["Pemakaian", "Novelist adalah alat bantu menulis novel. Kamu bebas memakainya untuk karya pribadi maupun komersial."],
+      ["Karyamu milikmu", "Semua tulisan, karakter, dan cerita yang kamu buat sepenuhnya milikmu. Kami tidak mengklaim hak apa pun atas karyamu."],
+      ["Penyimpanan", "Project disimpan di Google Drive milikmu. Kamu bertanggung jawab menjaga akses akun Google-mu."],
+      ["Tanpa jaminan", "Aplikasi disediakan apa adanya. Kami berusaha menjaga datamu aman lewat autosave & backup, tapi tetap simpan cadangan untuk karya penting."],
+    ],
+    privacyTitle: "Kebijakan Privasi",
+    privacyBody: [
+      ["Data yang kami simpan", "Tidak ada. Novelist berjalan di browser-mu dan tidak punya server penyimpanan sendiri."],
+      ["Google Drive", "Project disimpan sebagai file di Google Drive-mu sendiri. Akses Drive hanya dipakai untuk membaca & menyimpan file project Novelist."],
+      ["Penyimpanan lokal", "Browser menyimpan beberapa preferensi kecil (misalnya tema, bahasa, dan login terakhir) di perangkatmu."],
+      ["Mencabut akses", "Kamu bisa mencabut akses Novelist kapan saja lewat pengaturan keamanan akun Google-mu."],
+    ],
+  },
+  en: {
+    heading: "Sign In or Start Writing", tagline: "Write your novel, saved automatically to your own Google Drive.",
+    google: "Continue with Google", discord: "Continue with Discord", apple: "Continue with Apple", email: "Continue with Email",
+    soon: "Soon", lastUsed: "You last signed in with Google", waiting: "Waiting for sign-in...", loginFailed: "Sign-in failed: ",
+    note: "Sign-in is required so your projects are safely saved & backed up automatically to your Google Drive. No data is stored on our servers.",
+    soonNotice: (n) => `Signing in with ${n} isn't available yet. Please use Google for now — your projects are stored in your Google Drive.`,
+    help: "Help", terms: "Terms", privacy: "Privacy",
+    termsTitle: "Terms of Use",
+    termsBody: [
+      ["Use", "Novelist is a novel-writing tool. You're free to use it for personal and commercial work."],
+      ["Your work is yours", "All writing, characters, and stories you create belong entirely to you. We claim no rights over your work."],
+      ["Storage", "Projects are stored in your own Google Drive. You're responsible for keeping your Google account secure."],
+      ["No warranty", "The app is provided as is. We try to keep your data safe with autosave & backups, but keep your own copies of important work."],
+    ],
+    privacyTitle: "Privacy Policy",
+    privacyBody: [
+      ["Data we store", "None. Novelist runs in your browser and has no storage server of its own."],
+      ["Google Drive", "Projects are saved as files in your own Google Drive. Drive access is only used to read & save Novelist project files."],
+      ["Local storage", "Your browser keeps a few small preferences (such as theme, language, and last sign-in) on your device."],
+      ["Revoking access", "You can revoke Novelist's access at any time from your Google account's security settings."],
+    ],
+  },
+};
+let loginLang = "id";
+function lt(key) { return LOGIN_I18N[loginLang][key]; }
+function applyLoginLang(lang) {
+  loginLang = LOGIN_I18N[lang] ? lang : "id";
+  try { localStorage.setItem(LOGIN_LANG_KEY, loginLang); } catch (e) { /* abaikan */ }
+  document.querySelectorAll("#loginView [data-i18n]").forEach((n) => { n.textContent = lt(n.dataset.i18n); });
+  el("loginLangLabel").textContent = loginLang.toUpperCase();
+  document.documentElement.lang = loginLang;
+}
+function openLegalModal(kind) {
+  el("legalTitle").textContent = lt(kind + "Title");
+  el("legalBody").innerHTML = lt(kind + "Body").map(([t, d]) => `<div class="support-item"><div class="support-item-title">${escapeHtml(t)}</div><p>${escapeHtml(d)}</p></div>`).join("");
+  el("legalModal").classList.remove("hidden");
+}
+function initLoginFooter() {
+  let saved = null;
+  try { saved = localStorage.getItem(LOGIN_LANG_KEY); } catch (e) { /* abaikan */ }
+  applyLoginLang(saved || "id");
+  el("btnLoginHelp").onclick = () => el("supportModal").classList.remove("hidden");
+  el("btnLoginTerms").onclick = () => openLegalModal("terms");
+  el("btnLoginPrivacy").onclick = () => openLegalModal("privacy");
+  el("btnCloseLegal").onclick = () => el("legalModal").classList.add("hidden");
+  const menu = el("loginLangMenu"), btn = el("btnLoginLang");
+  const setOpen = (open) => { menu.classList.toggle("hidden", !open); btn.setAttribute("aria-expanded", String(open)); };
+  btn.onclick = (e) => { e.stopPropagation(); setOpen(menu.classList.contains("hidden")); };
+  menu.querySelectorAll("button").forEach((b) => b.onclick = () => { applyLoginLang(b.dataset.lang); setOpen(false); });
+  document.addEventListener("click", () => setOpen(false));
+  // logo animasi login: diam di frame pertama bila pengguna memilih "reduce motion"
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { const v = el("loginLogoVideo"); v.removeAttribute("autoplay"); v.pause(); }
+}
+
 // Discord / Apple / Email baru tampilan — project tersimpan di Google Drive, jadi sementara hanya Google yang aktif.
 function handleSoonProvider(provider) {
   const names = { discord: "Discord", apple: "Apple", email: "Email" };
-  showLoginNotice("Login dengan " + (names[provider] || provider) + " belum tersedia. Untuk saat ini pakai Google dulu ya — project kamu disimpan di Google Drive-mu.");
+  showLoginNotice(lt("soonNotice")(names[provider] || provider));
 }
 
 async function handleLogin() {
@@ -183,7 +262,7 @@ async function handleLogin() {
   el("loginError").classList.add("hidden");
   el("loginNotice").classList.add("hidden");
   btn.disabled = true;
-  label.textContent = "Menunggu login...";
+  label.textContent = lt("waiting");
   try {
     await driveSignIn(true);
     try { localStorage.setItem(LAST_LOGIN_KEY, "google"); } catch (e) { /* abaikan */ }
@@ -192,11 +271,11 @@ async function handleLogin() {
     await loadProjectsFromDrive(true);
     startBackupInterval();
   } catch (e) {
-    el("loginError").textContent = "Login gagal: " + (e.error || e.message || e);
+    el("loginError").textContent = lt("loginFailed") + (e.error || e.message || e);
     el("loginError").classList.remove("hidden");
   }
   btn.disabled = false;
-  label.textContent = "Lanjutkan dengan Google";
+  label.textContent = lt("google");
   showLastLoginHint();
 }
 
@@ -1601,6 +1680,7 @@ function initRailLogo() {
 // ================= EVENT BINDING =================
 window.addEventListener("DOMContentLoaded", () => {
   initLoginArt();
+  initLoginFooter();
   initRailLogo();
   pickDashTitle();
   el("btnLoginGoogle").onclick = handleLogin;
