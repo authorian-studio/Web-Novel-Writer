@@ -213,7 +213,13 @@ body.light .galaxy-dots { background-image: url("data:image/svg+xml,%3Csvg xmlns
 .dash-rail { position: absolute; left: 0; top: 0; bottom: 0; width: 56px; z-index: 5; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 14px 0; }
 .dash-rail-top, .dash-rail-bottom { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .dash-rail-bottom::before { content: ""; width: 24px; height: 1px; background: var(--border); margin-bottom: 6px; }
-.rail-logo { font-family: "Dancing Script", cursive; font-size: 32px; font-weight: 700; line-height: 1; color: var(--text); margin-bottom: 12px; user-select: none; }
+/* logo animasi: latar video hitam pekat -> mix-blend-mode: screen membuatnya transparan di atas foto/dot-grid.
+   Elemen ini HARUS di luar .dash-rail (yang membuat stacking context sendiri), kalau tidak blend-nya tidak "melihat" background. */
+.rail-logo { position: absolute; top: 6px; left: 4px; width: 48px; height: 48px; z-index: 6; mix-blend-mode: screen; user-select: none; }
+.rail-logo video { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+body.light .rail-logo { mix-blend-mode: multiply; }          /* tema terang: dibalik jadi garis gelap di atas latar terang */
+body.light .rail-logo video { filter: invert(1); }
+.dash-rail-top { padding-top: 54px; }                          /* sisakan ruang untuk logo di atas ikon pertama */
 .dash-rail-btn { position: relative; width: 40px; height: 40px; border: none; border-radius: 12px; background: transparent; color: var(--text-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .2s ease, color .2s ease; }
 .dash-rail-btn:hover, .dash-rail-btn:focus-visible { background: rgba(255,255,255,0.09); color: var(--text); outline: none; }
 body.light .dash-rail-btn:hover, body.light .dash-rail-btn:focus-visible { background: rgba(0,0,0,0.06); }
@@ -617,7 +623,8 @@ body.light .drawer-close-btn:hover { background: rgba(0,0,0,0.06); }
   body.light .dash-rail { background: rgba(255,255,255,.92); }
   .dash-rail-top, .dash-rail-bottom { flex-direction: row; }
   .dash-rail-bottom::before { display: none; }
-  .rail-logo { margin: 0 8px 0 0; }
+  .rail-logo { top: auto; bottom: 4px; left: 12px; }       /* di bar bawah: logo di kiri bar */
+  .dash-rail-top { padding-top: 0; padding-left: 58px; }
   .rail-tip { display: none; }
   #dashBody { padding: 40px 18px 84px; }
   .dash-title { font-size: 22px; }

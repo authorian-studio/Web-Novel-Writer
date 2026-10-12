@@ -1393,9 +1393,23 @@ function initLoginArt() {
   wide.addEventListener("change", sync);
 }
 
+// ================= LOGO ANIMASI (rail dashboard) =================
+// Video hanya diputar saat terlihat (dashboard tampil & tab aktif) supaya tidak boros baterai; dihentikan bila pengguna
+// memilih "reduce motion" (yang tampil cuma frame pertama / poster).
+function initRailLogo() {
+  const v = el("railLogoVideo");
+  if (!v) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  let inView = false;
+  const sync = () => { if (inView && !document.hidden) v.play().catch(() => {}); else v.pause(); };
+  new IntersectionObserver((entries) => { inView = entries.some((e) => e.isIntersecting); sync(); }).observe(v);
+  document.addEventListener("visibilitychange", sync);
+}
+
 // ================= EVENT BINDING =================
 window.addEventListener("DOMContentLoaded", () => {
   initLoginArt();
+  initRailLogo();
   el("btnLoginGoogle").onclick = handleLogin;
   document.querySelectorAll("#loginView .btn-oauth.is-soon").forEach((b) => b.onclick = () => handleSoonProvider(b.dataset.provider));
   showLastLoginHint();

@@ -71,7 +71,6 @@
     <!-- Rail ikon di kiri -->
     <nav class="dash-rail" aria-label="Menu utama">
       <div class="dash-rail-top">
-        <div class="rail-logo" title="Novelist">N</div>
         <button class="dash-rail-btn" id="btnQuickCloud" aria-label="Cloud Library">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <span class="rail-tip">Cloud Library</span>
@@ -92,6 +91,14 @@
         </button>
       </div>
     </nav>
+
+    <!-- Logo animasi Novelist (logo-anim.mp4, looping, tanpa suara). Diletakkan DI LUAR rail supaya mix-blend-mode
+         bisa menyatu dengan foto background (latar hitam videonya jadi transparan). -->
+    <div class="rail-logo" title="Novelist">
+      <video id="railLogoVideo" muted loop playsinline preload="auto" poster="logo-anim-poster.webp" aria-hidden="true" tabindex="-1">
+        <source src="logo-anim.mp4" type="video/mp4">
+      </video>
+    </div>
 
     <span id="syncIndicator" class="sync-indicator">☁ Tersinkron</span>
 

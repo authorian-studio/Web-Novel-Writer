@@ -105,6 +105,16 @@
 
 
 
+**Pembaruan terbaru (logo animasi):** monogram "N" di pojok kiri atas dashboard
+diganti logo geometris animasi Novelist (`logo-anim.mp4`, looping tanpa suara,
+poster `logo-anim-poster.webp`). Video asli (1920x1080, 4,5 MB, ada audio)
+dipotong ke area logo, latarnya dihitamkan murni, tepinya dibuat memudar, dan
+audionya dibuang — sekarang ±180 KB. Latar hitamnya jadi transparan lewat CSS
+`mix-blend-mode: screen` (tema terang: warna dibalik + `multiply`). Elemen
+`.rail-logo` HARUS tetap di luar `.dash-rail`; di dalamnya blend tidak bisa
+"melihat" foto background. Video hanya diputar saat dashboard terlihat & tab
+aktif, dan tidak diputar bila pengguna memilih "reduce motion".
+
 **Pembaruan terbaru (dashboard setelah login):** tampilan dashboard dirombak
 ala vvd — rail ikon di kiri (Cloud Library, Ganti Tema, Logout, Pengaturan),
 judul "Mau menulis apa hari ini?" di tengah, project berupa baris lebar
@@ -277,6 +287,8 @@ nama-repo/
 ├── login-art.webp
 ├── login-art-data.js
 ├── bg-galaxy.jpg
+├── logo-anim.mp4
+├── logo-anim-poster.webp
 ├── config.js
 ├── manifest.json
 ```
