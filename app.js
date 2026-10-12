@@ -149,6 +149,7 @@ function driveSignOut() {
   accessToken = null;
   projects = [];
   stopBackupInterval();
+  if (window.NovelMap) window.NovelMap.hide();
   el("dashboardView").classList.add("hidden");
   el("editorView").classList.add("hidden");
   el("loginView").classList.remove("hidden");
@@ -558,6 +559,7 @@ function switchToProject(id) {
 function backToLibrary() {
   closeProjSidebar();
   flushCurrentEdits();
+  if (window.NovelMap) window.NovelMap.hide();
   const p = getProject(currentProjectId);
   if (p) { p.title = el("projectTitle").value; p.data.title = p.title; p.updatedAt = new Date().toISOString(); }
   saveProjectToDriveMain(p);
@@ -570,14 +572,18 @@ function backToLibrary() {
 function flushCurrentEdits() {
   syncSceneFromDetail();
   syncOrganizeFromDetail();
+  if (window.NovelMap) window.NovelMap.flush();
 }
 
 function switchTab(tab) {
   if (tab === "home") { flushCurrentEdits(); renderProjectHome(); }
   document.querySelectorAll(".rail-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
-  ["home", "write", "organize", "timeline", "plot", "schedule", "tools"].forEach((t) => el("tab" + capitalize(t)).classList.toggle("hidden", t !== tab));
+  ["home", "write", "organize", "timeline", "map", "plot", "schedule", "tools"].forEach((t) => el("tab" + capitalize(t)).classList.toggle("hidden", t !== tab));
+  el("editorView").dataset.tab = tab;
   updateSceneDrawerVisibility();
+  if (tab !== "map" && window.NovelMap) window.NovelMap.hide();   // hentikan render loop 3D
   if (tab === "timeline") openTimelineTab();
+  if (tab === "map") openMapTab();
 }
 
 // ---- TIMELINE: React + React Flow (folder vendor/) + timeline.js baru dimuat saat tab ini pertama kali dibuka ----
@@ -602,6 +608,31 @@ async function openTimelineTab() {
   catch (e) { el("tlFlow").innerHTML = '<div class="tl-loading">Timeline gagal dimuat. Periksa koneksi lalu buka tab ini lagi.</div>'; return; }
   if (el("tabTimeline").classList.contains("hidden") || !currentProjectId) return;   // pengguna sudah pindah tab
   window.NovelTimeline.show({
+    project: getProject(currentProjectId),
+    onChange: markDirtyAndSchedule,
+    getScenes: () => flattenScenes(getProject(currentProjectId).data.scenes),
+    openScene: (id) => { switchTab("write"); selectScene(id); },
+  });
+}
+
+// ---- MAP: map-core.js (data) + map2d.js (editor 2D) + map-ui.js (shell) baru dimuat saat tab ini pertama kali dibuka.
+// map3d.js + three.js (vendor/) di-import oleh map-ui.js hanya saat pengguna beralih ke tampilan 3D.
+let mapLibPromise = null;
+function ensureMapLib() {
+  if (!mapLibPromise) {
+    mapLibPromise = ["map-core.js", "map2d.js", "map-ui.js"]
+      .reduce((chain, src) => chain.then(() => loadScriptOnce(src)), Promise.resolve());
+    mapLibPromise.catch(() => { mapLibPromise = null; });   // boleh dicoba lagi
+  }
+  return mapLibPromise;
+}
+async function openMapTab() {
+  const main = el("tabMap").querySelector(".mp-main");
+  if (!window.NovelMap) { main.dataset.state = "loading"; el("mpStatus").textContent = "Memuat peta…"; }
+  try { await ensureMapLib(); }
+  catch (e) { main.dataset.state = "error"; el("mpStatus").textContent = "Peta gagal dimuat. Periksa koneksi lalu buka tab ini lagi."; return; }
+  if (el("tabMap").classList.contains("hidden") || !currentProjectId) return;   // pengguna sudah pindah tab
+  window.NovelMap.show({
     project: getProject(currentProjectId),
     onChange: markDirtyAndSchedule,
     getScenes: () => flattenScenes(getProject(currentProjectId).data.scenes),

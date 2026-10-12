@@ -1,6 +1,36 @@
-# Novelist Web — v0.8.1
+# Novelist Web — v0.9.0
 
-## Riwayat perubahan terbaru (v0.8.1) — paling baru di atas
+## Riwayat perubahan terbaru (v0.9.0) — paling baru di atas
+
+- **Fitur baru: Map (peta world-building ala vvd)** — tab **Map** di top bar project (di sebelah Timeline).
+  - Sidebar kiri: cari peta, **+** untuk membuat peta baru, klik untuk membuka. Header: nama peta
+    (langsung bisa diganti), ukuran **128 × 128 km** (1 kotak = 1 km), tombol hapus peta (dengan konfirmasi).
+  - **Lukis daratan dengan kuas** di tampilan 2D (dilihat dari atas): laut biru berbintik awan dalam
+    bingkai krem. Popover kuas berisi **11 bioma** dengan pratinjau tekstur — Laut & danau, Padang rumput,
+    Ladang, Hutan, Hutan pinus, Rimba, Rawa, Gurun, Tundra, Tanah retak, Pegunungan — plus slider
+    **ukuran kuas** (1–20 km) dengan pratinjau lingkaran. Pantai, pohon & simbol gunung tergambar otomatis.
+  - Toolbar bawah: **Pilih** (klik/geser objek, Delete untuk hapus), **Kuas**, **Penghapus** (jadi laut),
+    **Ketinggian** (naik/turun + kekuatan), **Sungai** & **Jalan** (gambar bebas sambil diseret; jalan raya /
+    setapak), **Tempat** (8 ikon: kota, desa, kastil, pelabuhan, kuil, reruntuhan, perkemahan, penanda),
+    **Wilayah** (klik titik-titik batas, dobel-klik / Enter untuk selesai), **Label** (gaya wilayah,
+    perairan, kecil), lalu **Undo / Redo** (juga Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y). Shortcut alat: V, B, E, K,
+    S, J, T, W, L.
+  - **Layers** (kiri atas): tampilkan/sembunyikan daratan, sungai, jalan, tempat, wilayah, label.
+    Kanan bawah: tombol **3D/2D**, zoom, tampilkan seluruh peta. Kiri bawah: **skala km** yang
+    panjangnya mengikuti zoom. Geser peta: tombol tengah/kanan mouse, Spasi + seret, atau dua jari di HP.
+  - Panel kanan untuk objek terpilih: nama/teks, ikon, ukuran & rotasi label, warna wilayah, lebar
+    sungai, jenis jalan, **catatan**, dan **scene terkait** (tombol "Buka scene" langsung ke editor).
+  - **Tampilan 3D**: peta jadi diorama/slab tebal — air transparan, sisi tanah bergaris, pohon, gunung
+    bersalju, sungai, jalan, wilayah, pin tempat & label. Seret untuk memutar, klik kanan untuk menggeser,
+    scroll untuk zoom; klik pin tempat untuk membuka panelnya.
+  - Data peta tersimpan di file project (`data.maps`, grid dikompres RLE + base64 jadi kecil) — ikut
+    autosave & backup ke Google Drive.
+  - Semua file baru dimuat **hanya saat tab Map dibuka** (`map-core.js`, `map2d.js`, `map-ui.js`), dan
+    three.js (`vendor/`, tanpa CDN) + `map3d.js` baru dimuat saat pertama kali beralih ke 3D.
+  - Responsif: di HP daftar peta jadi deretan chip, toolbar & pilihan bioma bisa digeser mendatar,
+    panel objek muncul dari bawah.
+
+### v0.8.1
 
 - **Timeline: satu garis waktu horizontal ala vvd**
   - Garis waktu **tidak bisa diubah manual** (input rentang tahun dihapus). Rentang dasarnya
@@ -366,7 +396,8 @@ nama-repo/
 ├── logo-anim-poster.webp
 ├── login-logo.webm, login-logo.mp4, login-logo-poster.webp
 ├── timeline.js
-├── vendor/   (react, react-dom, reactflow + lisensinya)
+├── map-core.js, map2d.js, map3d.js, map-ui.js   (fitur Map: data, editor 2D, tampilan 3D, UI tab)
+├── vendor/   (react, react-dom, reactflow, three.js r169 + OrbitControls + lisensinya)
 ├── config.js
 ├── manifest.json
 ```
