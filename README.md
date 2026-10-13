@@ -425,7 +425,7 @@ nama-repo/
 ├── login-logo.webm, login-logo.mp4, login-logo-poster.webp
 ├── timeline.js
 ├── map-core.js, map2d.js, map3d.js, map-ui.js   (fitur Map: data, editor 2D, tampilan 3D, UI tab)
-├── vendor/   (react, react-dom, reactflow, three.js r169 + OrbitControls + lisensinya)
+├── vendor/   (react, react-dom, reactflow, three.js r169 + OrbitControls, motion 13.4.3 + lisensinya)
 ├── config.js
 ├── manifest.json
 ```
