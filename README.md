@@ -1,6 +1,19 @@
-# Novelist Web — v0.9.1
+# Novelist Web — v0.9.2
 
-## Riwayat perubahan terbaru (v0.9.1) — paling baru di atas
+## Riwayat perubahan terbaru (v0.9.2) — paling baru di atas
+
+- **Library animasi Motion (motion.dev) terpasang** — `vendor/motion-13.4.3.min.js` (build UMD, MIT, tanpa CDN)
+  dimuat di `index.html` sebelum `app.js`, jadi tersedia global sebagai `window.Motion` untuk pengembangan
+  animasi UI berikutnya. Contoh pemakaian di kode:
+  ```js
+  const { animate, stagger, inView, spring } = window.Motion;
+  animate(".project-card", { opacity: [0, 1], y: [12, 0] }, { delay: stagger(0.05), duration: 0.4 });
+  animate(el, { scale: 1.05 }, { type: spring, stiffness: 300, damping: 20 });
+  inView(".dash-title", (el) => { animate(el, { opacity: 1 }); });
+  ```
+  Dokumentasi: https://motion.dev/docs (bagian JavaScript / "animate").
+
+### v0.9.1
 
 - **Map: perbaikan hasil review**
   - **3D lebih mirip referensi:** slab jauh lebih tebal dengan dinding air biru di sisi laut, permukaan
