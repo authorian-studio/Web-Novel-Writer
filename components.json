@@ -5,7 +5,7 @@
   "tsx": true,
   "tailwind": {
     "config": "",
-    "css": "tailwind.input.css",
+    "css": "tools/tailwind.input.css",
     "baseColor": "neutral",
     "cssVariables": true,
     "prefix": ""

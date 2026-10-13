@@ -1,6 +1,13 @@
-# Novelist Web — v0.9.5
+# Novelist Web — v0.9.6
 
-## Riwayat perubahan terbaru (v0.9.5) — paling baru di atas
+## Riwayat perubahan terbaru (v0.9.6) — paling baru di atas
+
+- **Perbaikan deploy Cloudflare Workers:** alat build (`package.json`, `package-lock.json`, `tailwind.input.css`)
+  dipindah dari root repo ke folder `tools/`. Saat `package.json` ada di root, Cloudflare Workers Builds menganggap
+  situs ini proyek Node dan deploy gagal (sejak v0.9.4). Root repo kembali berisi situs statis saja; isi `vendor/`
+  tidak berubah (hasil build ulang identik). Membangun ulang library/CSS sekarang: `cd tools && npm install && npm run build`.
+
+### v0.9.5
 
 - **Map 3D: tampilan bergaya ilustrasi seperti vvd + bisa melukis langsung di 3D**
   - **Pohon baru** (bukan bola-bola kecil lagi): gaya kartun dengan garis tepi gelap & shading bertingkat —
@@ -21,9 +28,9 @@
 
 - **Tailwind CSS v4, Radix UI & shadcn/ui terpasang** (semua tanpa CDN; situs tetap statis tanpa build step).
   - **Tailwind CSS 4.3.3** → `vendor/tailwind.css` (±81 KB, ±12 KB terkompres), dimuat di `index.html`, dikompilasi dari
-    `tailwind.input.css`. **Tanpa preflight** dan semuanya di dalam `@layer`, jadi `style.css` tetap menang dan tampilan
+    `tools/tailwind.input.css`. **Tanpa preflight** dan semuanya di dalam `@layer`, jadi `style.css` tetap menang dan tampilan
     lama tidak berubah. Kelas dipindai dari `components/ui`, `index.html`, `app.js`, `map-ui.js`, `timeline.js` — setelah
-    menambah kelas Tailwind baru jalankan `npm install` (sekali) lalu `npm run build:css`.
+    menambah kelas Tailwind baru jalankan `cd tools && npm install` (sekali) lalu `npm run build:css`.
   - **Radix UI 1.6.7** → `vendor/radix-ui-1.6.7.min.js` → `window.RadixUI` (primitive tanpa gaya). Muat dengan
     `await ensureRadixUI()`.
   - **shadcn/ui** (registry `shadcn@4.21.0`, gaya new-york) — seperti cara kerja shadcn, **kode sumber komponennya ada di
@@ -41,7 +48,7 @@
         h(UI.DialogContent, null, h(UI.DialogHeader, null, h(UI.DialogTitle, null, "Yakin?")),
           h(UI.DialogFooter, null, h(UI.Button, { variant: "destructive" }, "Hapus")))));
     ```
-  - Semua library React (Base UI, Radix, shadcn) dibangun ulang dengan `npm run build:vendor` (`tools/build-vendor.mjs`,
+  - Semua library React (Base UI, Radix, shadcn) dibangun ulang dengan `cd tools && npm run build:vendor` (`tools/build-vendor.mjs`,
     esbuild) dan memakai **satu** React 18 yang sama dari `vendor/`. `npm run build` = vendor + CSS.
   - Belum termasuk (butuh library tambahan): calendar, chart, carousel, command, drawer, form, input-otp, resizable,
     sidebar, sonner, toast. Komponen ditulis untuk React 19: di React 18 semuanya berfungsi, hanya `ref` ke komponen
@@ -497,7 +504,7 @@ nama-repo/
 ├── vendor/   (react, react-dom, reactflow, three.js r169 + OrbitControls, motion 13.4.3, base-ui 1.8.0,
 │              radix-ui 1.6.7, shadcn-ui, tailwind.css + lisensinya)
 ├── components/ui/*.tsx, lib/utils.ts, components.json   (kode sumber shadcn/ui)
-├── tailwind.input.css, tools/, package.json   (hanya untuk membangun ulang vendor/: npm run build)
+├── tools/   (package.json, tailwind.input.css, build-vendor.mjs — hanya untuk membangun ulang vendor/: cd tools && npm install && npm run build)
 ├── config.js
 ├── manifest.json
 ```

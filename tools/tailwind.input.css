@@ -1,6 +1,6 @@
 /* ================= TAILWIND CSS v4 untuk Novelist =================
-   Hasil kompilasi: vendor/tailwind.css (dimuat di index.html). Bangun ulang setelah menambah kelas Tailwind baru:
-     npm install && npm run build:css
+   Hasil kompilasi: ../vendor/tailwind.css (dimuat di index.html). Bangun ulang setelah menambah kelas Tailwind baru:
+     cd tools && npm install && npm run build:css
    Catatan penting supaya tampilan lama tidak berubah:
    - TANPA preflight (reset CSS bawaan Tailwind) — hanya theme + utilities, semuanya di dalam @layer, sehingga
      style.css (tanpa layer) selalu menang bila ada aturan yang bentrok.
@@ -12,13 +12,13 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
 @import "tw-animate-css";
-@import "./tools/shadcn-tailwind.css";
+@import "./shadcn-tailwind.css";
 
-@source "./components/ui/**/*.tsx";
-@source "./index.html";
-@source "./app.js";
-@source "./map-ui.js";
-@source "./timeline.js";
+@source "../components/ui/**/*.tsx";
+@source "../index.html";
+@source "../app.js";
+@source "../map-ui.js";
+@source "../timeline.js";
 
 @custom-variant dark (&:is(body:not(.light) *));
 
