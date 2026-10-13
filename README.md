@@ -1,6 +1,21 @@
-# Novelist Web — v0.9.0
+# Novelist Web — v0.9.1
 
-## Riwayat perubahan terbaru (v0.9.0) — paling baru di atas
+## Riwayat perubahan terbaru (v0.9.1) — paling baru di atas
+
+- **Map: perbaikan hasil review**
+  - **3D lebih mirip referensi:** slab jauh lebih tebal dengan dinding air biru di sisi laut, permukaan
+    bertekstur (sama dengan 2D, pantai halus), gunung berbatu runcing dengan salju hanya di puncak, padang
+    rumput sedikit bergelombang, pohon lebih variatif. Label peta kini "tercetak" di permukaan dan pin tempat
+    bergaya sama dengan 2D (tidak lagi menutupi layar). Kamera awal di HP/tablet lebih miring.
+  - **2D:** nama wilayah tidak lagi tertimpa sungai/jalan, isian wilayah lebih transparan, pin & nama tempat
+    menyesuaikan zoom, label yang terlalu kecil disembunyikan, sungai berhenti di pantai, sorotan objek lebih jelas.
+  - **Bug:** tombol Delete/Backspace di tab Map tidak lagi ikut menghapus event Timeline yang sedang terpilih;
+    ketukan di peta (HP) tidak lagi "tembus" ke panel objek yang baru muncul; palet kuas langsung tampil saat tab
+    Map dibuka; objek lama yang dipulihkan lewat undo tidak lagi dianggap baru.
+  - **Tampilan:** panel objek di HP tidak menutupi seluruh peta, Layers tidak tertutup panel objek, skala km
+    punya latar, popover Tempat/Jalan lebih ringkas, contoh garis jalan sesuai gaya di peta.
+
+### v0.9.0
 
 - **Fitur baru: Map (peta world-building ala vvd)** — tab **Map** di top bar project (di sebelah Timeline).
   - Sidebar kiri: cari peta, **+** untuk membuat peta baru, klik untuk membuka. Header: nama peta

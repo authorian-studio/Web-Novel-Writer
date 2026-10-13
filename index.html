@@ -460,7 +460,7 @@
 
               <!-- popover alat (di atas toolbar): bioma + ukuran kuas, ketinggian, ikon tempat, jenis jalan -->
               <div id="mpToolPop" class="mp-toolpop hidden">
-                <div class="mp-pop-sec" data-tools="brush"><div id="mpBiomes" class="mp-biomes" role="radiogroup" aria-label="Bioma"></div></div>
+                <div class="mp-pop-sec" data-tools="brush"><div id="mpBiomes" class="mp-biomes mp-fade-x" role="radiogroup" aria-label="Bioma"></div></div>
                 <div class="mp-pop-sec mp-elev-sec" data-tools="elevation">
                   <div id="mpElevMode" class="mp-seg" role="radiogroup" aria-label="Arah ketinggian">
                     <button data-mode="raise" role="radio">
@@ -488,46 +488,48 @@
 
               <!-- toolbar bawah (ala vvd): alat edit | undo, redo -->
               <div class="mp-toolbar" role="toolbar" aria-label="Alat peta">
-                <div id="mpTools" class="mp-tools">
-                  <button class="mp-tool" data-tool="select" title="Pilih &amp; pindahkan (V)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m4 4 7.07 17 2.51-7.39L21 11.07Z"/></svg><span>Pilih</span>
+                <div id="mpToolScroll" class="mp-toolbar-scroll mp-fade-x">
+                  <div id="mpTools" class="mp-tools">
+                    <button class="mp-tool" data-tool="select" title="Pilih &amp; pindahkan (V)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m4 4 7.07 17 2.51-7.39L21 11.07Z"/></svg><span>Pilih</span>
+                    </button>
+                    <button class="mp-tool" data-tool="brush" title="Kuas bioma (B)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m18.4 2.6-8.9 8.9 3 3 8.9-8.9a2.12 2.12 0 0 0-3-3Z"/><path d="M9.5 11.5c-2.5 0-4 1.5-4 3.6 0 1.7-1.2 2.9-3 3.4 1.6 1.6 3.4 2.5 5.5 2.5 3.4 0 4.5-2.2 4.5-4.5"/></svg><span>Kuas</span>
+                    </button>
+                    <button class="mp-tool" data-tool="eraser" title="Penghapus — jadikan laut (E)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3a2.4 2.4 0 0 1 0-3.4l9.6-9.6a2.4 2.4 0 0 1 3.4 0l5.6 5.6a2.4 2.4 0 0 1 0 3.4L13 21"/><path d="M22 21H7M5 11l9 9"/></svg><span>Penghapus</span>
+                    </button>
+                    <button class="mp-tool" data-tool="elevation" title="Naikkan / turunkan medan (K)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m8 4 4 7 3-3 7 12H2Z"/></svg><span>Ketinggian</span>
+                    </button>
+                    <button class="mp-tool" data-tool="river" title="Gambar sungai (S)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/><path d="M2 12c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/><path d="M2 17c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/></svg><span>Sungai</span>
+                    </button>
+                    <button class="mp-tool" data-tool="path" title="Gambar jalan (J)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19h8a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7h8"/></svg><span>Jalan</span>
+                    </button>
+                    <button class="mp-tool" data-tool="place" title="Tambah tempat (T)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg><span>Tempat</span>
+                    </button>
+                    <button class="mp-tool" data-tool="zone" title="Gambar wilayah (W)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7.5 11 4l8 3.5 1 8-6.5 5L5 17Z" stroke-dasharray="3 2.4"/><circle cx="5" cy="7.5" r="1.4" fill="currentColor"/><circle cx="19" cy="7.5" r="1.4" fill="currentColor"/><circle cx="13.5" cy="20.5" r="1.4" fill="currentColor"/></svg><span>Wilayah</span>
+                    </button>
+                    <button class="mp-tool" data-tool="label" title="Tambah label (L)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg><span>Label</span>
+                    </button>
+                  </div>
+                  <span id="mp3dHint" class="mp-3d-hint">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+                    <span id="mp3dHintText">Seret untuk memutar · klik kanan untuk menggeser</span>
+                  </span>
+                  <span class="mp-tool-sep"></span>
+                  <button id="mpUndo" class="mp-tool" title="Urungkan (Ctrl+Z)" aria-label="Urungkan" disabled>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span>Undo</span>
                   </button>
-                  <button class="mp-tool" data-tool="brush" title="Kuas bioma (B)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m18.4 2.6-8.9 8.9 3 3 8.9-8.9a2.12 2.12 0 0 0-3-3Z"/><path d="M9.5 11.5c-2.5 0-4 1.5-4 3.6 0 1.7-1.2 2.9-3 3.4 1.6 1.6 3.4 2.5 5.5 2.5 3.4 0 4.5-2.2 4.5-4.5"/></svg><span>Kuas</span>
-                  </button>
-                  <button class="mp-tool" data-tool="eraser" title="Penghapus — jadikan laut (E)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3a2.4 2.4 0 0 1 0-3.4l9.6-9.6a2.4 2.4 0 0 1 3.4 0l5.6 5.6a2.4 2.4 0 0 1 0 3.4L13 21"/><path d="M22 21H7M5 11l9 9"/></svg><span>Penghapus</span>
-                  </button>
-                  <button class="mp-tool" data-tool="elevation" title="Naikkan / turunkan medan (K)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m8 4 4 7 3-3 7 12H2Z"/></svg><span>Ketinggian</span>
-                  </button>
-                  <button class="mp-tool" data-tool="river" title="Gambar sungai (S)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/><path d="M2 12c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/><path d="M2 17c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/></svg><span>Sungai</span>
-                  </button>
-                  <button class="mp-tool" data-tool="path" title="Gambar jalan (J)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19h8a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7h8"/></svg><span>Jalan</span>
-                  </button>
-                  <button class="mp-tool" data-tool="place" title="Tambah tempat (T)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg><span>Tempat</span>
-                  </button>
-                  <button class="mp-tool" data-tool="zone" title="Gambar wilayah (W)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7.5 11 4l8 3.5 1 8-6.5 5L5 17Z" stroke-dasharray="3 2.4"/><circle cx="5" cy="7.5" r="1.4" fill="currentColor"/><circle cx="19" cy="7.5" r="1.4" fill="currentColor"/><circle cx="13.5" cy="20.5" r="1.4" fill="currentColor"/></svg><span>Wilayah</span>
-                  </button>
-                  <button class="mp-tool" data-tool="label" title="Tambah label (L)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg><span>Label</span>
+                  <button id="mpRedo" class="mp-tool" title="Ulangi (Ctrl+Shift+Z)" aria-label="Ulangi" disabled>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg><span>Redo</span>
                   </button>
                 </div>
-                <span id="mp3dHint" class="mp-3d-hint">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
-                  <span id="mp3dHintText">Seret untuk memutar · klik kanan untuk menggeser</span>
-                </span>
-                <span class="mp-tool-sep"></span>
-                <button id="mpUndo" class="mp-tool" title="Urungkan (Ctrl+Z)" aria-label="Urungkan" disabled>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span>Undo</span>
-                </button>
-                <button id="mpRedo" class="mp-tool" title="Ulangi (Ctrl+Shift+Z)" aria-label="Ulangi" disabled>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg><span>Redo</span>
-                </button>
               </div>
 
               <!-- panel inspektor objek terpilih (tempat, label, wilayah, sungai, jalan) -->

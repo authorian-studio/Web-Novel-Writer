@@ -150,6 +150,7 @@ function driveSignOut() {
   projects = [];
   stopBackupInterval();
   if (window.NovelMap) window.NovelMap.hide();
+  muteTimelineKeys(true);
   el("dashboardView").classList.add("hidden");
   el("editorView").classList.add("hidden");
   el("loginView").classList.remove("hidden");
@@ -560,6 +561,7 @@ function backToLibrary() {
   closeProjSidebar();
   flushCurrentEdits();
   if (window.NovelMap) window.NovelMap.hide();
+  muteTimelineKeys(true);
   const p = getProject(currentProjectId);
   if (p) { p.title = el("projectTitle").value; p.data.title = p.title; p.updatedAt = new Date().toISOString(); }
   saveProjectToDriveMain(p);
@@ -581,10 +583,16 @@ function switchTab(tab) {
   ["home", "write", "organize", "timeline", "map", "plot", "schedule", "tools"].forEach((t) => el("tab" + capitalize(t)).classList.toggle("hidden", t !== tab));
   el("editorView").dataset.tab = tab;
   updateSceneDrawerVisibility();
+  muteTimelineKeys(tab !== "timeline");
   if (tab !== "map" && window.NovelMap) window.NovelMap.hide();   // hentikan render loop 3D
   if (tab === "timeline") openTimelineTab();
   if (tab === "map") openMapTab();
 }
+
+// React Flow (Timeline) tetap mendengar Delete/Backspace di document walau tabnya tersembunyi, jadi event timeline
+// yang masih terpilih ikut terhapus saat tombol itu dipakai di tab lain (mis. menghapus objek di Map).
+// Kelas "nokey" di <body> membuat React Flow mengabaikan semua tombol selama tab Timeline tidak tampil.
+function muteTimelineKeys(mute) { document.body.classList.toggle("nokey", mute); }
 
 // ---- TIMELINE: React + React Flow (folder vendor/) + timeline.js baru dimuat saat tab ini pertama kali dibuka ----
 let timelineLibPromise = null;

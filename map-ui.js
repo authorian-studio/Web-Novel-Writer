@@ -57,6 +57,8 @@
   let popOpen = true;        // popover alat terbuka (klik alat yang aktif = buka/tutup)
   let refreshRaf = 0;
   let knownIds = null;       // id objek sebelum perubahan terakhir -> objek baru dikenali saat dipilih
+  let lastTouch = false;     // pointer terakhir bukan mouse (laptop layar sentuh juga): keyboard tidak dibuka otomatis
+  const touchInput = () => lastTouch || isTouch();
   let bound = false;
   const prefs = loadPrefs();
 
@@ -102,11 +104,11 @@
     cur.ser = ser;
   }
   // dipanggil setelah data peta berubah (kanvas 2D, inspektor, undo/redo)
-  function commit(redraw2d) {
+  // in3d = false: perubahan tidak tampil di 3D (catatan, scene, nama wilayah/sungai/jalan) -> tanpa bangun ulang 3D
+  function commit(redraw2d, in3d = true) {
     if (!cur) return;
     writeCurrent();
-    dirty3d = true;
-    if (mode === "3d") schedule3d(250);
+    if (in3d) { dirty3d = true; if (mode === "3d") schedule3d(250); }
     if (redraw2d) refresh2d();
     updateUndo();
     ctx.onChange();
@@ -152,7 +154,7 @@
   }
   function openMap(id) {
     cur = id ? entryFor(id) : null;
-    selection = null; editKey = null; hideInspector();
+    selection = null; editKey = null; knownIds = null; hideInspector(); sel3d();
     renderList();
     if (!cur) {
       if (mode === "3d") setMode("2d");
@@ -160,6 +162,7 @@
       if (view3d) view3d.setMap(null);   // lepas geometri peta lama
       dirty3d = true;
       setState("empty");
+      renderTools();
       return;
     }
     setState("ready");
@@ -169,6 +172,7 @@
     editor.setSelection(null);
     renderLayers();
     updateUndo();
+    renderTools();   // popover alat (bioma, ukuran, ikon, ...) mengikuti peta yang baru dibuka
     updateScale(editor.getPxPerCell());
     dirty3d = true;
     if (mode === "3d") activate3d();
@@ -183,7 +187,7 @@
     openMap(map.id);
     setTool("brush", true);   // peta baru = laut kosong: langsung siap melukis daratan
     // langsung ketik nama peta (perangkat ber-mouse saja; di HP keyboard tidak dibuka)
-    if (!isTouch()) setTimeout(() => { if (cur && cur.map.id === map.id) { $("mpTitle").focus(); $("mpTitle").select(); } }, 0);
+    if (!touchInput()) setTimeout(() => { if (cur && cur.map.id === map.id) { $("mpTitle").focus(); $("mpTitle").select(); } }, 0);
   }
   function deleteMap() {
     if (!cur || !confirm(`Hapus peta "${cur.map.title || "(tanpa nama)"}"? Tindakan ini tidak bisa dibatalkan.`)) return;
@@ -208,15 +212,29 @@
         knownIds = new Set();
         Object.values(ARR).forEach((k) => (cur.map[k] || []).forEach((o) => knownIds.add(o.id)));
       },
-      onChange: () => commit(false),
+      // map2d memanggil onSelect objek baru sinkron tepat setelah onChange; sesudah itu knownIds dibuang supaya
+      // objek lama (mis. dipulihkan lewat undo) tidak dikira baru saat dipilih nanti
+      onChange: () => { commit(false); queueMicrotask(() => { knownIds = null; }); },
       onSelect: (s) => select(s),
       onViewChange: (v) => updateScale(v && v.pxPerCell),
     });
+    updateFitInsets();
     editor.setTool(prefs.tool);
     editor.setBrush({ biome: prefs.biome, size: prefs.size });
     editor.setElevation({ mode: prefs.elevMode, strength: prefs.elevStrength, size: prefs.elevSize });
     editor.setPlaceIcon(prefs.placeIcon);
     editor.setPathKind(prefs.pathKind);
+  }
+
+  // kanvas sempit & tegak (HP): peta dirapatkan ke atas, tepat di bawah baris Layers/3D, supaya ruang bawah untuk
+  // popover alat & lembar inspektor tidak menutupi peta. Area fit tetap persegi selebar kanvas -> skala tidak berubah.
+  // Kanvas lebar: tanpa inset (peta di tengah). setFitInsets opsional di map2d.js; hanya berlaku saat masih auto-fit.
+  function updateFitInsets() {
+    if (!editor || typeof editor.setFitInsets !== "function") return;
+    const st = $("mpStage"), w = st.clientWidth, h = st.clientHeight, top = 48;
+    if (!w || !h) return;   // tab / panggung tersembunyi
+    const slack = h - top - w;
+    editor.setFitInsets(w <= 760 && slack > 56 ? { top, bottom: slack } : {});
   }
 
   // ---------- skala "10 km" (panjang garis mengikuti zoom) ----------
@@ -243,7 +261,7 @@
     btn.setAttribute("aria-label", btn.title);
     closeLayers();
     // toolbar bisa sudah tergeser (HP): di 3D mulai dari kiri, di 2D alat aktif digeser ke tampilan
-    if (is3d) document.querySelector("#tabMap .mp-toolbar").scrollLeft = 0;
+    if (is3d) $("mpToolScroll").scrollLeft = 0;
     renderTools();
     if (is3d) { ensure3D(); return; }
     clearTimeout(refresh3dTimer);
@@ -276,6 +294,7 @@
     if (!view3d) return;
     if (mode !== "3d" || !shown || !cur) { view3d.setActive(false); return; }
     if (dirty3d) { view3d.setMap(cur.map); dirty3d = false; }
+    sel3d();
     view3d.setActive(true);
     view3d.resize();
   }
@@ -316,15 +335,20 @@
     writeCurrent();
     ctx.onChange();
   }
+  // .is-open menaikkan popover di atas inspektor (di layar sempit lembar inspektor menutupi area popover)
   function openLayers() {
     $("mpLayersPop").classList.remove("hidden");
+    $("mpLayersPop").parentElement.classList.add("is-open");
     $("mpLayersBtn").setAttribute("aria-expanded", "true");
     $("mpLayersBtn").classList.add("is-active");
   }
   function closeLayers() {
-    $("mpLayersPop").classList.add("hidden");
+    const pop = $("mpLayersPop");
+    pop.classList.add("hidden");
+    pop.parentElement.classList.remove("is-open");
     $("mpLayersBtn").setAttribute("aria-expanded", "false");
     $("mpLayersBtn").classList.remove("is-active");
+    if (pop.contains(document.activeElement)) document.activeElement.blur();   // fokus jangan tertinggal di sakelar tersembunyi
   }
 
   // ---------- alat + popover ----------
@@ -339,19 +363,26 @@
     renderTools();
   }
   function renderTools() {
-    const bar = document.querySelector("#tabMap .mp-toolbar");
+    const bar = $("mpToolScroll");
     $("mpTools").querySelectorAll(".mp-tool").forEach((b) => {
       const on = b.dataset.tool === prefs.tool;
       b.classList.toggle("is-active", on);
       b.setAttribute("aria-pressed", on ? "true" : "false");
-      // toolbar bisa digeser mendatar (HP): pastikan alat aktif terlihat
+      // toolbar bisa digeser mendatar (HP): pastikan alat aktif terlihat utuh (di luar tepi yang memudar)
       if (on && bar.scrollWidth > bar.clientWidth) {
-        const l = b.offsetLeft, r = l + b.offsetWidth;
-        if (l < bar.scrollLeft) bar.scrollLeft = l - 8;
-        else if (r > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = r - bar.clientWidth + 8;
+        const l = b.offsetLeft, r = l + b.offsetWidth, m = 30;
+        if (l - m < bar.scrollLeft) bar.scrollLeft = l - m;
+        else if (r + m > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = r - bar.clientWidth + m;
       }
     });
     renderToolPop();
+    updateFade(bar);
+  }
+  // baris yang bisa digeser mendatar (HP: toolbar & palet bioma): sisi yang masih menyimpan isi dibuat memudar
+  function updateFade(el) {
+    const max = el.scrollWidth - el.clientWidth;
+    el.classList.toggle("fade-l", max > 1 && el.scrollLeft > 1);
+    el.classList.toggle("fade-r", max > 1 && el.scrollLeft < max - 1);
   }
   function renderToolPop() {
     const pop = $("mpToolPop"), t = prefs.tool;
@@ -365,6 +396,7 @@
     $("mpHint").textContent = hint;
     $("mpHint").classList.toggle("hidden", !hint);
     pop.dataset.tool = t;
+    pop.classList.toggle("has-sec", any);   // ada kontrol: lebar popover mengikuti kontrol, petunjuk ikut membungkus
     pop.classList.toggle("hidden", !(cur && mode === "2d" && popOpen && (any || hint)));
     // nilai kontrol
     $("mpBiomes").querySelectorAll(".mp-biome").forEach((b) => {
@@ -386,6 +418,7 @@
       b.classList.toggle("is-on", on); b.setAttribute("aria-checked", on ? "true" : "false");
     });
     renderSize();
+    updateFade($("mpBiomes"));
   }
   // pratinjau lingkaran ukuran kuas (diameter mengikuti ukuran; warna mengikuti bioma / alat)
   function renderSize() {
@@ -547,10 +580,11 @@
     knownIds = null;
     selection = o ? { type: s.type, id: s.id } : null;
     editKey = null;
+    sel3d();
     if (!selection) { hideInspector(); return; }
     fillInspector();
-    // objek baru (tempat/label/wilayah) -> langsung ketik namanya (hanya perangkat ber-mouse; di HP keyboard tidak dibuka)
-    if (fresh && /^(place|label|zone)$/.test(selection.type) && !isTouch()) {
+    // objek baru (tempat/label/wilayah) -> langsung ketik namanya (hanya input mouse; dengan sentuhan keyboard tidak dibuka)
+    if (fresh && /^(place|label|zone)$/.test(selection.type) && !touchInput()) {
       const input = $(selection.type === "label" ? "mpInText" : "mpInName");
       setTimeout(() => { if (!$("mpInspector").classList.contains("hidden")) { input.focus(); input.select(); } }, 0);
     }
@@ -558,8 +592,11 @@
   function clearSelection() {
     selection = null; editKey = null;
     if (editor) editor.setSelection(null);
+    sel3d();
     hideInspector();
   }
+  // sorot pin terpilih di 3D (setSelection opsional di map3d.js)
+  function sel3d() { if (view3d && typeof view3d.setSelection === "function") view3d.setSelection(selection); }
   const setSeg = (id, attr, val) => $(id).querySelectorAll("button").forEach((b) => {
     const on = b.dataset[attr] === val;
     b.classList.toggle("is-on", on); b.setAttribute("aria-checked", on ? "true" : "false");
@@ -608,6 +645,10 @@
     $("mpInspector").classList.add("hidden");
     $("mpStage").classList.remove("has-inspector");
   }
+  // field yang tidak digambar: catatan & scene tidak tampil di peta; nama sungai/jalan tidak digambar,
+  // nama wilayah hanya di 2D -> tidak perlu gambar ulang 2D / bangun ulang 3D tiap ketukan
+  const shows2d = (type, field) => field !== "desc" && field !== "scene" && !(field === "name" && (type === "river" || type === "path"));
+  const shows3d = (type, field) => shows2d(type, field) && !(field === "name" && type === "zone");
   // edit dari inspektor: checkpoint undo sekali per sesi (field + objek yang sama), lalu tulis & gambar ulang
   function inspEdit(field, fn, discrete) {
     return (ev) => {
@@ -617,7 +658,7 @@
       if (discrete || editKey !== key) cur.hist.checkpoint();
       editKey = discrete ? null : key;
       fn(o, ev);
-      commit(true);
+      commit(shows2d(selection.type, field), shows3d(selection.type, field));
     };
   }
   function bindInspector() {
@@ -668,16 +709,18 @@
       $("mpInOpenScene").disabled = !o.sceneId;
     }, true));
     $("mpInOpenScene").onclick = () => { const o = findObj(selection); if (o && o.sceneId) ctx.openScene(o.sceneId); };
-    $("mpInDelete").onclick = () => {
-      const o = findObj(selection);
-      if (!o) return;
-      cur.hist.checkpoint();
-      const arr = cur.map[ARR[selection.type]];
-      arr.splice(arr.indexOf(o), 1);
-      clearSelection();
-      commit(true);
-    };
+    $("mpInDelete").onclick = deleteSelected;
     $("mpInspClose").onclick = clearSelection;
+  }
+  // hapus objek terpilih (tombol Hapus inspektor; Delete/Backspace di 3D — di 2D ditangani map2d)
+  function deleteSelected() {
+    const o = findObj(selection);
+    if (!o) return;
+    cur.hist.checkpoint();
+    const arr = cur.map[ARR[selection.type]];
+    arr.splice(arr.indexOf(o), 1);
+    clearSelection();
+    commit(true);
   }
 
   // ---------- undo / redo ----------
@@ -687,7 +730,7 @@
   }
   function undoRedo(redo) {
     if (!cur || !(redo ? cur.hist.redo() : cur.hist.undo())) return;
-    editKey = null;
+    editKey = null; knownIds = null;
     if (editor) editor.refresh();
     commit(false);
     if (mode === "3d") schedule3d(0);
@@ -696,7 +739,9 @@
   }
 
   // ---------- keyboard ----------
-  const isTyping = (t) => !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+  // hanya kolom teks yang dianggap "mengetik"; slider & sakelar layer yang masih fokus tidak memblok shortcut
+  const isTyping = (t) => !!t && (t.isContentEditable || t.tagName === "TEXTAREA" || t.tagName === "SELECT" ||
+    (t.tagName === "INPUT" && !/^(range|checkbox|radio|button|submit|reset|color)$/i.test(t.type)));
   function mapVisible() {
     const tab = $("tabMap"), view = $("editorView");
     return shown && !!cur && !tab.classList.contains("hidden") && !(view && view.classList.contains("hidden"));
@@ -719,10 +764,17 @@
       else if (k === "y") { e.preventDefault(); undoRedo(true); }
       return;
     }
-    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || mode !== "2d") return;
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    // Delete/Backspace = hapus objek terpilih. Di 2D biasanya ditangani map2d, kecuali fokus masih di slider/sakelar
+    // (map2d mengabaikan tombol dari INPUT); di 3D map2d tidak aktif
+    if ((e.key === "Delete" || e.key === "Backspace") && selection && (mode === "3d" || e.target.tagName === "INPUT")) {
+      e.preventDefault(); deleteSelected(); return;
+    }
+    if (mode !== "2d") return;
     if (TOOL_KEYS[k]) { e.preventDefault(); if (prefs.tool !== TOOL_KEYS[k]) setTool(TOOL_KEYS[k]); }
   }
   function onDocPointerDown(e) {
+    lastTouch = e.pointerType !== "mouse";
     if ($("mpLayersPop").classList.contains("hidden")) return;
     if (!e.target.closest || !e.target.closest(".mp-layers")) closeLayers();
   }
@@ -753,10 +805,22 @@
       const a = document.activeElement;
       if (a && a !== document.body && $("tabMap").contains(a) && !$("mp2d").contains(a)) a.blur();
     }, true);
+    // ketukan jari di kanvas 2D/3D: batalkan mouse & klik "kompatibilitas" yang dikirim browser SETELAH touchend.
+    // Tanpa ini klik itu jatuh ke panel yang baru muncul di bawah jari (inspektor/popover): ikon berganti,
+    // keyboard terbuka, bahkan tombol Hapus tertekan. Kanvas sendiri hanya memakai pointer event.
+    const noGhostClick = (e) => { if (e.cancelable) e.preventDefault(); };
+    $("mp2d").addEventListener("touchend", noGhostClick, { passive: false });
+    $("mp3d").addEventListener("touchend", noGhostClick, { passive: false });
     $("mpUndo").onclick = () => undoRedo(false);
     $("mpRedo").onclick = () => undoRedo(true);
     $("mp3dHintText").textContent = isTouch() ? "1 jari memutar · 2 jari geser & zoom" : "Seret untuk memutar · klik kanan untuk menggeser";
 
+    ["mpToolScroll", "mpBiomes"].forEach((id) => $(id).addEventListener("scroll", () => updateFade($(id)), { passive: true }));
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(() => { updateFade($("mpToolScroll")); updateFade($("mpBiomes")); });
+      ro.observe($("mpToolScroll")); ro.observe($("mpBiomes"));
+      new ResizeObserver(updateFitInsets).observe($("mpStage"));
+    }
     buildToolPop();
     bindInspector();
     renderLayers();
