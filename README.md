@@ -1,6 +1,28 @@
-# Novelist Web — v0.9.2
+# Novelist Web — v0.9.3
 
-## Riwayat perubahan terbaru (v0.9.2) — paling baru di atas
+## Riwayat perubahan terbaru (v0.9.3) — paling baru di atas
+
+- **Library komponen Base UI (base-ui.com) terpasang** — `@base-ui/react` 1.8.0 (MIT) dibundel sekali dengan
+  esbuild menjadi `vendor/base-ui-1.8.0.min.js` (tanpa CDN, tanpa build step di aplikasi). Bundel ini memakai
+  React 18 yang sudah ada di `vendor/` (dipakai bersama Timeline, jadi React tetap dimuat sekali saja) dan
+  menghasilkan global `window.BaseUI` berisi 46 komponen tanpa gaya: Dialog, AlertDialog, Popover, Tooltip,
+  Menu, ContextMenu, Select, Combobox, Tabs, Accordion, Switch, Checkbox, Slider, NumberField, Toast, dll.
+  - Ukurannya ±495 KB (±167 KB terkompres), jadi **tidak dimuat di awal** — panggil `ensureBaseUI()` (di `app.js`)
+    saat dibutuhkan:
+    ```js
+    const BaseUI = await ensureBaseUI();
+    const h = React.createElement;
+    ReactDOM.createRoot(el).render(
+      h(BaseUI.Popover.Root, null,
+        h(BaseUI.Popover.Trigger, { className: "btn" }, "Buka"),
+        h(BaseUI.Popover.Portal, null, h(BaseUI.Popover.Positioner, null,
+          h(BaseUI.Popover.Popup, { className: "my-popup" }, "Isi popover")))));
+    ```
+  - Komponen Base UI tidak membawa CSS — gayanya diatur sendiri lewat `className` / atribut `data-*`
+    (mis. `[data-checked]`, `[data-open]`). Dokumentasi: https://base-ui.com/react/overview/quick-start
+  - `loadScriptOnce()` di `app.js` kini benar-benar memuat tiap file sekali (dipakai bersama Timeline, Map & Base UI).
+
+### v0.9.2
 
 - **Library animasi Motion (motion.dev) terpasang** — `vendor/motion-13.4.3.min.js` (build UMD, MIT, tanpa CDN)
   dimuat di `index.html` sebelum `app.js`, jadi tersedia global sebagai `window.Motion` untuk pengembangan
@@ -425,7 +447,7 @@ nama-repo/
 ├── login-logo.webm, login-logo.mp4, login-logo-poster.webp
 ├── timeline.js
 ├── map-core.js, map2d.js, map3d.js, map-ui.js   (fitur Map: data, editor 2D, tampilan 3D, UI tab)
-├── vendor/   (react, react-dom, reactflow, three.js r169 + OrbitControls, motion 13.4.3 + lisensinya)
+├── vendor/   (react, react-dom, reactflow, three.js r169 + OrbitControls, motion 13.4.3, base-ui 1.8.0 + lisensinya)
 ├── config.js
 ├── manifest.json
 ```

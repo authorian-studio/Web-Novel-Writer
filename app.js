@@ -596,17 +596,30 @@ function muteTimelineKeys(mute) { document.body.classList.toggle("nokey", mute);
 
 // ---- TIMELINE: React + React Flow (folder vendor/) + timeline.js baru dimuat saat tab ini pertama kali dibuka ----
 let timelineLibPromise = null;
+// Tiap file hanya dimuat sekali walau diminta beberapa fitur sekaligus (mis. React untuk Timeline & Base UI).
+const scriptPromises = {};
 function loadScriptOnce(src) {
-  return new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = src; s.onload = resolve; s.onerror = () => reject(new Error("Gagal memuat " + src));
-    document.head.appendChild(s);
-  });
+  if (!scriptPromises[src]) {
+    scriptPromises[src] = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src; s.onload = resolve;
+      s.onerror = () => { delete scriptPromises[src]; s.remove(); reject(new Error("Gagal memuat " + src)); };   // boleh dicoba lagi
+      document.head.appendChild(s);
+    });
+  }
+  return scriptPromises[src];
+}
+const loadScriptsInOrder = (list) => list.reduce((chain, src) => chain.then(() => loadScriptOnce(src)), Promise.resolve());
+// React 18 (UMD, vendor/) dipakai bersama oleh Timeline (React Flow) dan Base UI.
+function ensureReact() { return loadScriptsInOrder(["vendor/react-18.3.1.min.js", "vendor/react-dom-18.3.1.min.js"]); }
+// Base UI (base-ui.com): komponen React tanpa gaya (Dialog, Popover, Menu, Select, Tabs, Tooltip, Switch, Slider, Toast, ...).
+// Dimuat hanya saat dibutuhkan:  const BaseUI = await ensureBaseUI();  lalu render dengan React.createElement + ReactDOM.createRoot.
+function ensureBaseUI() {
+  return ensureReact().then(() => loadScriptOnce("vendor/base-ui-1.8.0.min.js")).then(() => window.BaseUI);
 }
 function ensureTimelineLib() {
   if (!timelineLibPromise) {
-    timelineLibPromise = ["vendor/react-18.3.1.min.js", "vendor/react-dom-18.3.1.min.js", "vendor/reactflow-11.11.4.umd.js", "timeline.js"]
-      .reduce((chain, src) => chain.then(() => loadScriptOnce(src)), Promise.resolve());
+    timelineLibPromise = ensureReact().then(() => loadScriptsInOrder(["vendor/reactflow-11.11.4.umd.js", "timeline.js"]));
     timelineLibPromise.catch(() => { timelineLibPromise = null; });   // boleh dicoba lagi
   }
   return timelineLibPromise;
