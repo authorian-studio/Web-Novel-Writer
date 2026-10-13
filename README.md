@@ -1,6 +1,36 @@
-# Novelist Web — v0.9.3
+# Novelist Web — v0.9.4
 
-## Riwayat perubahan terbaru (v0.9.3) — paling baru di atas
+## Riwayat perubahan terbaru (v0.9.4) — paling baru di atas
+
+- **Tailwind CSS v4, Radix UI & shadcn/ui terpasang** (semua tanpa CDN; situs tetap statis tanpa build step).
+  - **Tailwind CSS 4.3.3** → `vendor/tailwind.css` (±81 KB, ±12 KB terkompres), dimuat di `index.html`, dikompilasi dari
+    `tailwind.input.css`. **Tanpa preflight** dan semuanya di dalam `@layer`, jadi `style.css` tetap menang dan tampilan
+    lama tidak berubah. Kelas dipindai dari `components/ui`, `index.html`, `app.js`, `map-ui.js`, `timeline.js` — setelah
+    menambah kelas Tailwind baru jalankan `npm install` (sekali) lalu `npm run build:css`.
+  - **Radix UI 1.6.7** → `vendor/radix-ui-1.6.7.min.js` → `window.RadixUI` (primitive tanpa gaya). Muat dengan
+    `await ensureRadixUI()`.
+  - **shadcn/ui** (registry `shadcn@4.21.0`, gaya new-york) — seperti cara kerja shadcn, **kode sumber komponennya ada di
+    proyek ini**: `components/ui/*.tsx` (45 komponen: Button, Card, Dialog, AlertDialog, Sheet, Select, DropdownMenu,
+    Popover, Tooltip, Tabs, Accordion, Switch, Checkbox, Slider, Table, dll.) + `lib/utils.ts` (`cn()`), konfigurasi di
+    `components.json`. Dikompilasi ke `vendor/shadcn-ui.min.js` → `window.ShadcnUI`; muat dengan `await ensureShadcnUI()`.
+    Gayanya dari `vendor/tailwind.css`; tema gelap/terang otomatis mengikuti tema aplikasi (`body.light`).
+    Variabel tema shadcn memakai awalan `--sh-*` agar tidak bentrok dengan `--border`/`--accent` milik `style.css`.
+    ```js
+    const UI = await ensureShadcnUI();
+    const h = React.createElement;
+    ReactDOM.createRoot(el).render(
+      h(UI.Dialog, null,
+        h(UI.DialogTrigger, { asChild: true }, h(UI.Button, { variant: "outline" }, "Hapus scene")),
+        h(UI.DialogContent, null, h(UI.DialogHeader, null, h(UI.DialogTitle, null, "Yakin?")),
+          h(UI.DialogFooter, null, h(UI.Button, { variant: "destructive" }, "Hapus")))));
+    ```
+  - Semua library React (Base UI, Radix, shadcn) dibangun ulang dengan `npm run build:vendor` (`tools/build-vendor.mjs`,
+    esbuild) dan memakai **satu** React 18 yang sama dari `vendor/`. `npm run build` = vendor + CSS.
+  - Belum termasuk (butuh library tambahan): calendar, chart, carousel, command, drawer, form, input-otp, resizable,
+    sidebar, sonner, toast. Komponen ditulis untuk React 19: di React 18 semuanya berfungsi, hanya `ref` ke komponen
+    shadcn tidak diteruskan.
+
+### v0.9.3
 
 - **Library komponen Base UI (base-ui.com) terpasang** — `@base-ui/react` 1.8.0 (MIT) dibundel sekali dengan
   esbuild menjadi `vendor/base-ui-1.8.0.min.js` (tanpa CDN, tanpa build step di aplikasi). Bundel ini memakai
@@ -447,7 +477,10 @@ nama-repo/
 ├── login-logo.webm, login-logo.mp4, login-logo-poster.webp
 ├── timeline.js
 ├── map-core.js, map2d.js, map3d.js, map-ui.js   (fitur Map: data, editor 2D, tampilan 3D, UI tab)
-├── vendor/   (react, react-dom, reactflow, three.js r169 + OrbitControls, motion 13.4.3, base-ui 1.8.0 + lisensinya)
+├── vendor/   (react, react-dom, reactflow, three.js r169 + OrbitControls, motion 13.4.3, base-ui 1.8.0,
+│              radix-ui 1.6.7, shadcn-ui, tailwind.css + lisensinya)
+├── components/ui/*.tsx, lib/utils.ts, components.json   (kode sumber shadcn/ui)
+├── tailwind.input.css, tools/, package.json   (hanya untuk membangun ulang vendor/: npm run build)
 ├── config.js
 ├── manifest.json
 ```

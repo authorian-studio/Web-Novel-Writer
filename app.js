@@ -617,6 +617,16 @@ function ensureReact() { return loadScriptsInOrder(["vendor/react-18.3.1.min.js"
 function ensureBaseUI() {
   return ensureReact().then(() => loadScriptOnce("vendor/base-ui-1.8.0.min.js")).then(() => window.BaseUI);
 }
+// Radix UI (radix-ui.com): primitive React tanpa gaya -> window.RadixUI (Dialog, Popover, DropdownMenu, Tabs, Slot, ...)
+function ensureRadixUI() {
+  return ensureReact().then(() => loadScriptOnce("vendor/radix-ui-1.6.7.min.js")).then(() => window.RadixUI);
+}
+// shadcn/ui (ui.shadcn.com): komponen siap pakai bergaya Tailwind (kode sumber di components/ui, dibangun oleh
+// tools/build-vendor.mjs) -> window.ShadcnUI (Button, Card, Dialog, Select, Tabs, Tooltip, ..., cn).
+// CSS-nya sudah ada di vendor/tailwind.css. Tema terang/gelap otomatis mengikuti tema aplikasi (body.light).
+function ensureShadcnUI() {
+  return ensureReact().then(() => loadScriptOnce("vendor/shadcn-ui.min.js")).then(() => window.ShadcnUI);
+}
 function ensureTimelineLib() {
   if (!timelineLibPromise) {
     timelineLibPromise = ensureReact().then(() => loadScriptsInOrder(["vendor/reactflow-11.11.4.umd.js", "timeline.js"]));
