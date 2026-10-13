@@ -5,6 +5,8 @@
 // Modul ini hanya mengurus DOM di sekitar kanvas: sidebar daftar peta, header, layer, skala, toolbar alat + popover
 // (bioma, ukuran kuas, ketinggian, ikon tempat, jenis jalan) dan panel inspektor objek terpilih.
 //   kanvas 2D -> NovelMap2D.create(#mp2d)      kanvas 3D -> import('./map3d.js') baru saat pertama kali beralih ke 3D
+// Di 3D alat Kuas, Penghapus & Ketinggian juga bisa dipakai (pilihan bioma/ukuran sama dengan 2D); 3D memperbarui dirinya
+// sendiri saat melukis, jadi perubahan dari 3D hanya ditulis ke project & menandai 2D perlu digambar ulang saat kembali.
 (function () {
   "use strict";
   const C = window.NovelMapCore;
@@ -16,6 +18,7 @@
   // alat -> layer yang otomatis ditampilkan saat alat itu dipilih
   const TOOL_LAYER = { brush: "terrain", eraser: "terrain", elevation: "terrain", river: "rivers", path: "paths", place: "places", zone: "zones", label: "labels" };
   const TOOL_KEYS = { v: "select", b: "brush", e: "eraser", k: "elevation", s: "river", j: "path", t: "place", w: "zone", l: "label" };
+  const TOOLS_3D = { select: 1, brush: 1, eraser: 1, elevation: 1 };   // alat lain khusus 2D
   // perangkat sentuh tanpa mouse (HP/tablet): petunjuk pakai "ketuk", keyboard tidak dibuka otomatis
   const isTouch = () => !!(window.matchMedia && window.matchMedia("(hover: none)").matches);
   const TOOL_HINTS = {
@@ -29,6 +32,15 @@
     zone: "Ketuk titik-titik batas wilayah · ketuk titik pertama atau ketuk dua kali untuk selesai.",
     label: "Ketuk peta untuk menaruh label, lalu ubah teksnya di panel.",
     place: "Pilih ikon, lalu ketuk peta untuk menaruh tempat.",
+  };
+  // petunjuk kamera di 3D: alat lukis memakai tombol kiri / 1 jari, jadi memutar pindah ke kanan / 2 jari
+  const HINT_3D = {
+    paint: "Seret untuk melukis · klik kanan + seret untuk memutar · tombol tengah / Shift + seret untuk menggeser · scroll untuk zoom",
+    view: "Seret untuk memutar · klik kanan untuk menggeser · scroll untuk zoom · klik pin untuk memilih tempat",
+  };
+  const HINT_3D_TOUCH = {
+    paint: "1 jari untuk melukis · 2 jari untuk memutar & zoom (geser peta: alat Pilih)",
+    view: "1 jari memutar · 2 jari geser & zoom · ketuk pin untuk memilih tempat",
   };
   const SCALE_STEPS = [1, 2, 5, 10, 20, 50];   // pilihan panjang garis skala (km)
   const PREFS_KEY = "novelist_map_prefs";
@@ -50,6 +62,7 @@
   const cache = new Map();   // id peta -> { map, hist, ser } (didecode sekali; ser = objek terakhir di project)
   let editor = null;         // editor 2D (NovelMap2D)
   let view3d = null, view3dLoading = null, dirty3d = true, refresh3dTimer = 0;
+  let dirty2d = false;       // data diubah dari 3D: kanvas 2D digambar ulang saat kembali ke 2D
   let mode = "2d";           // "2d" | "3d"
   let shown = false;
   let selection = null;      // { type, id }
@@ -169,6 +182,7 @@
     renderHead();
     ensureEditor();
     editor.setMap(cur.map);
+    dirty2d = false;
     editor.setSelection(null);
     renderLayers();
     updateUndo();
@@ -267,7 +281,10 @@
     clearTimeout(refresh3dTimer);
     $("mpLoading3d").classList.add("hidden");
     if (view3d) view3d.setActive(false);
-    if (editor) { editor.resize(); updateScale(editor.getPxPerCell()); }
+    if (editor) {
+      if (dirty2d) { dirty2d = false; editor.refresh(); }   // hasil lukisan di 3D
+      editor.resize(); updateScale(editor.getPxPerCell());
+    }
   }
   function ensure3D() {
     if (view3d) { activate3d(); return; }
@@ -277,8 +294,12 @@
         .then((mod) => {
           view3d = mod.createMap3D($("mp3d"), {
             onSelect: (s) => { select(s); if (editor) editor.setSelection(selection); },
+            // melukis di 3D: satu checkpoint undo per sapuan; 3D sudah memperbarui dirinya -> tanpa bangun ulang 3D
+            onBeforeChange: () => { if (cur) { cur.hist.checkpoint(); editKey = null; knownIds = null; } },
+            onChange: () => { if (!cur) return; dirty2d = true; commit(false, false); },
           });
           dirty3d = true;
+          push3d();
         })
         .catch((err) => {
           console.warn("Tampilan 3D gagal dimuat:", err);
@@ -293,11 +314,33 @@
   function activate3d() {
     if (!view3d) return;
     if (mode !== "3d" || !shown || !cur) { view3d.setActive(false); return; }
+    update3dInsets();
     if (dirty3d) { view3d.setMap(cur.map); dirty3d = false; }
     sel3d();
     view3d.setActive(true);
     view3d.resize();
   }
+  // 3D: tepi kanvas yang tertutup UI (baris Layers di atas; popover alat + toolbar di bawah) -> pose kamera melukis
+  // dipaskan di sisa layar (setFitInsets opsional di map3d.js; hanya berlaku selama kamera belum digerakkan pengguna)
+  function update3dInsets() {
+    if (!view3d || typeof view3d.setFitInsets !== "function" || mode !== "3d") return;
+    const st = $("mpStage").getBoundingClientRect();
+    if (!st.height) return;
+    let top = st.bottom;
+    [$("mpToolPop"), document.querySelector("#mpStage .mp-toolbar")].forEach((el) => {
+      const r = el && el.getBoundingClientRect();
+      if (r && r.height) top = Math.min(top, r.top);   // popover tersembunyi (display none) = tinggi 0
+    });
+    view3d.setFitInsets({ top: 48, bottom: st.bottom - top + 8 });
+  }
+  // alat & pilihan kuas yang sama dengan 2D (alat khusus 2D = mode lihat di 3D)
+  function push3d() {
+    if (!view3d || typeof view3d.setTool !== "function") return;
+    view3d.setBrush({ biome: prefs.biome, size: prefs.size });
+    view3d.setElevation({ mode: prefs.elevMode, strength: prefs.elevStrength, size: prefs.elevSize });
+    view3d.setTool(prefs.tool);
+  }
+  const effTool = () => (mode === "3d" && !TOOLS_3D[prefs.tool] ? "select" : prefs.tool);
   function schedule3d(ms) {
     clearTimeout(refresh3dTimer);
     refresh3dTimer = setTimeout(() => {
@@ -355,19 +398,29 @@
   // fromToolbar: klik alat yang sedang aktif = buka/tutup popover-nya
   function setTool(t, forceOpen, fromToolbar) {
     if (t !== "select" && !TOOL_LAYER[t]) return;
-    if (prefs.tool === t && fromToolbar && !forceOpen) popOpen = !popOpen;
+    if (mode === "3d" && !TOOLS_3D[t]) {   // sungai, jalan, tempat, wilayah, label: khusus 2D
+      if (fromToolbar && typeof window.toast === "function") window.toast("Alat ini hanya ada di peta 2D. Klik 2D untuk memakainya.");
+      return;
+    }
+    if (effTool() === t && fromToolbar && !forceOpen) popOpen = !popOpen;
     else { popOpen = true; if (prefs.tool !== t) { prefs.tool = t; savePrefs(); } }
     if (editor) editor.setTool(t);
     const lk = TOOL_LAYER[t];
     if (lk && cur && cur.map.layers[lk] === false) setLayer(lk, true);   // alat tidak berguna kalau layernya tersembunyi
     renderTools();
+    push3d();   // setelah popover baru tampil: pose kamera 3D (lihat <-> lukis) memakai ruang layar yang sudah benar
   }
   function renderTools() {
-    const bar = $("mpToolScroll");
+    const bar = $("mpToolScroll"), t = effTool(), is3d = mode === "3d";
     $("mpTools").querySelectorAll(".mp-tool").forEach((b) => {
-      const on = b.dataset.tool === prefs.tool;
+      const on = b.dataset.tool === t, only2d = is3d && !TOOLS_3D[b.dataset.tool];
       b.classList.toggle("is-active", on);
       b.setAttribute("aria-pressed", on ? "true" : "false");
+      // di 3D alat khusus 2D tetap terlihat tapi nonaktif (aria-disabled supaya tooltip tetap muncul)
+      if (!b.dataset.title) b.dataset.title = b.title;
+      b.classList.toggle("is-2d-only", only2d);
+      b.title = only2d ? b.dataset.title.replace(/ \(.\)$/, "") + " — khusus 2D" : b.dataset.title;
+      if (only2d) b.setAttribute("aria-disabled", "true"); else b.removeAttribute("aria-disabled");
       // toolbar bisa digeser mendatar (HP): pastikan alat aktif terlihat utuh (di luar tepi yang memudar)
       if (on && bar.scrollWidth > bar.clientWidth) {
         const l = b.offsetLeft, r = l + b.offsetWidth, m = 30;
@@ -385,19 +438,20 @@
     el.classList.toggle("fade-r", max > 1 && el.scrollLeft < max - 1);
   }
   function renderToolPop() {
-    const pop = $("mpToolPop"), t = prefs.tool;
+    const pop = $("mpToolPop"), t = effTool();
     let any = false;
     pop.querySelectorAll(".mp-pop-sec").forEach((sec) => {
       const on = sec.dataset.tools.split(" ").includes(t);
       sec.classList.toggle("hidden", !on);
       any = any || on;
     });
-    const hint = (isTouch() && TOOL_HINTS_TOUCH[t]) || TOOL_HINTS[t] || "";
+    const h3 = touchInput() ? HINT_3D_TOUCH : HINT_3D;
+    const hint = mode === "3d" ? h3[TOOL_LAYER[t] === "terrain" ? "paint" : "view"] : (isTouch() && TOOL_HINTS_TOUCH[t]) || TOOL_HINTS[t] || "";
     $("mpHint").textContent = hint;
     $("mpHint").classList.toggle("hidden", !hint);
     pop.dataset.tool = t;
     pop.classList.toggle("has-sec", any);   // ada kontrol: lebar popover mengikuti kontrol, petunjuk ikut membungkus
-    pop.classList.toggle("hidden", !(cur && mode === "2d" && popOpen && (any || hint)));
+    pop.classList.toggle("hidden", !(cur && popOpen && (any || hint)));
     // nilai kontrol
     $("mpBiomes").querySelectorAll(".mp-biome").forEach((b) => {
       const on = Number(b.dataset.biome) === prefs.biome;
@@ -419,10 +473,11 @@
     });
     renderSize();
     updateFade($("mpBiomes"));
+    update3dInsets();
   }
   // pratinjau lingkaran ukuran kuas (diameter mengikuti ukuran; warna mengikuti bioma / alat)
   function renderSize() {
-    const t = prefs.tool, size = t === "elevation" ? prefs.elevSize : prefs.size;
+    const t = effTool(), size = t === "elevation" ? prefs.elevSize : prefs.size;
     $("mpSize").value = size;
     $("mpSizeVal").textContent = size + " km";
     const dot = $("mpSizeDot"), d = Math.round(8 + (size - 1) * 2.3);
@@ -538,6 +593,7 @@
       btn.onclick = () => {
         prefs.biome = i; savePrefs();
         if (editor) editor.setBrush({ biome: i });
+        push3d();
         renderToolPop();
       };
       grid.appendChild(btn);
@@ -553,12 +609,13 @@
       icons.appendChild(btn);
     });
     $("mpElevMode").querySelectorAll("button").forEach((b) => {
-      b.onclick = () => { prefs.elevMode = b.dataset.mode; savePrefs(); if (editor) editor.setElevation({ mode: prefs.elevMode }); renderToolPop(); };
+      b.onclick = () => { prefs.elevMode = b.dataset.mode; savePrefs(); if (editor) editor.setElevation({ mode: prefs.elevMode }); push3d(); renderToolPop(); };
     });
     $("mpElevStrength").addEventListener("input", () => {
       prefs.elevStrength = C.clamp(Number($("mpElevStrength").value) || 0.5, 0.05, 1);
       $("mpElevStrengthVal").textContent = Math.round(prefs.elevStrength * 100) + "%";
       if (editor) editor.setElevation({ strength: prefs.elevStrength });
+      push3d();
     });
     $("mpElevStrength").addEventListener("change", savePrefs);
     $("mpPathKind").querySelectorAll("button").forEach((b) => {
@@ -568,6 +625,7 @@
       const v = C.clamp(Math.round(Number($("mpSize").value) || 1), 1, 20);
       if (prefs.tool === "elevation") { prefs.elevSize = v; if (editor) editor.setElevation({ size: v }); }
       else { prefs.size = v; if (editor) editor.setBrush({ size: v }); }
+      push3d();
       renderSize();
     });
     $("mpSize").addEventListener("change", savePrefs);
@@ -731,9 +789,10 @@
   function undoRedo(redo) {
     if (!cur || !(redo ? cur.hist.redo() : cur.hist.undo())) return;
     editKey = null; knownIds = null;
-    if (editor) editor.refresh();
+    if (mode === "3d") dirty2d = true;   // 2D tersembunyi: digambar ulang saat kembali
+    else if (editor) editor.refresh();
     commit(false);
-    if (mode === "3d") schedule3d(0);
+    if (mode === "3d") schedule3d(0);   // 3D hanya memperbarui bagian medan yang berbeda
     if (selection && findObj(selection)) fillInspector();
     else if (selection) clearSelection();
   }
@@ -770,8 +829,10 @@
     if ((e.key === "Delete" || e.key === "Backspace") && selection && (mode === "3d" || e.target.tagName === "INPUT")) {
       e.preventDefault(); deleteSelected(); return;
     }
-    if (mode !== "2d") return;
-    if (TOOL_KEYS[k]) { e.preventDefault(); if (prefs.tool !== TOOL_KEYS[k]) setTool(TOOL_KEYS[k]); }
+    const kt = TOOL_KEYS[k];
+    if (!kt || (mode === "3d" && !TOOLS_3D[kt])) return;   // di 3D hanya V/B/E/K
+    e.preventDefault();
+    if (effTool() !== kt) setTool(kt);
   }
   function onDocPointerDown(e) {
     lastTouch = e.pointerType !== "mouse";
@@ -801,10 +862,10 @@
     $("mpTools").querySelectorAll(".mp-tool").forEach((b) => { b.onclick = () => setTool(b.dataset.tool, false, true); });
     // klik di kanvas: lepas fokus dari kolom/tombol panel (akhiri pengetikan di inspektor, dan Spasi untuk geser peta
     // tidak ikut "menekan" tombol alat yang terakhir diklik)
-    $("mp2d").addEventListener("pointerdown", () => {
+    ["mp2d", "mp3d"].forEach((id) => $(id).addEventListener("pointerdown", () => {
       const a = document.activeElement;
-      if (a && a !== document.body && $("tabMap").contains(a) && !$("mp2d").contains(a)) a.blur();
-    }, true);
+      if (a && a !== document.body && $("tabMap").contains(a) && !$(id).contains(a)) a.blur();
+    }, true));
     // ketukan jari di kanvas 2D/3D: batalkan mouse & klik "kompatibilitas" yang dikirim browser SETELAH touchend.
     // Tanpa ini klik itu jatuh ke panel yang baru muncul di bawah jari (inspektor/popover): ikon berganti,
     // keyboard terbuka, bahkan tombol Hapus tertekan. Kanvas sendiri hanya memakai pointer event.
@@ -813,13 +874,12 @@
     $("mp3d").addEventListener("touchend", noGhostClick, { passive: false });
     $("mpUndo").onclick = () => undoRedo(false);
     $("mpRedo").onclick = () => undoRedo(true);
-    $("mp3dHintText").textContent = isTouch() ? "1 jari memutar · 2 jari geser & zoom" : "Seret untuk memutar · klik kanan untuk menggeser";
 
     ["mpToolScroll", "mpBiomes"].forEach((id) => $(id).addEventListener("scroll", () => updateFade($(id)), { passive: true }));
     if (typeof ResizeObserver !== "undefined") {
       const ro = new ResizeObserver(() => { updateFade($("mpToolScroll")); updateFade($("mpBiomes")); });
       ro.observe($("mpToolScroll")); ro.observe($("mpBiomes"));
-      new ResizeObserver(updateFitInsets).observe($("mpStage"));
+      new ResizeObserver(() => { updateFitInsets(); update3dInsets(); }).observe($("mpStage"));
     }
     buildToolPop();
     bindInspector();

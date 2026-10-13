@@ -1,6 +1,23 @@
-# Novelist Web — v0.9.4
+# Novelist Web — v0.9.5
 
-## Riwayat perubahan terbaru (v0.9.4) — paling baru di atas
+## Riwayat perubahan terbaru (v0.9.5) — paling baru di atas
+
+- **Map 3D: tampilan bergaya ilustrasi seperti vvd + bisa melukis langsung di 3D**
+  - **Pohon baru** (bukan bola-bola kecil lagi): gaya kartun dengan garis tepi gelap & shading bertingkat —
+    pinus berupa tumpukan kerucut yang rapat, pohon rindang bertajuk bulat, rimba seperti palem lebat, rumpun
+    rawa, pinus bersalju di tundra, pohon kecil hijau muda di padang rumput. Hutan kini tertutup rapat.
+  - **Tekstur bioma lebih kaya:** ladang petak warna-warni dengan garis batas & alur bajak, tanah retak berupa
+    lempeng dengan retakan gelap, rawa bergenangan, tundra putih berawan, gurun bergelombang, gunung batu bertebing
+    berlapis dengan kaki berumput; pantai dengan garis tinta, buih putih & cincin air dangkal biru muda.
+  - **Melukis di 3D:** alat **Kuas**, **Penghapus** & **Ketinggian** (juga shortcut B/E/K) kini bisa dipakai
+    langsung di tampilan 3D, lengkap dengan palet bioma & ukuran kuas, lingkaran kuas yang menempel di medan, dan
+    hasil yang langsung terlihat saat menyapu. Kontrol saat alat lukis aktif: seret kiri = melukis, klik kanan +
+    seret = memutar, tombol tengah / Shift + seret = menggeser, scroll = zoom; di HP 1 jari = melukis, 2 jari =
+    putar/zoom. Undo/Redo berfungsi di 3D, dan hasilnya sama persis saat kembali ke 2D. Alat lain (sungai, jalan,
+    tempat, wilayah, label) tetap khusus 2D.
+  - Saat alat lukis aktif, kamera 3D dibuka lebih dekat & miring (seperti referensi vvd).
+
+### v0.9.4
 
 - **Tailwind CSS v4, Radix UI & shadcn/ui terpasang** (semua tanpa CDN; situs tetap statis tanpa build step).
   - **Tailwind CSS 4.3.3** → `vendor/tailwind.css` (±81 KB, ±12 KB terkompres), dimuat di `index.html`, dikompilasi dari
