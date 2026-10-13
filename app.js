@@ -149,6 +149,8 @@ function driveSignOut() {
   accessToken = null;
   projects = [];
   stopBackupInterval();
+  if (window.NovelMap) window.NovelMap.hide();
+  muteTimelineKeys(true);
   el("dashboardView").classList.add("hidden");
   el("editorView").classList.add("hidden");
   el("loginView").classList.remove("hidden");
@@ -171,10 +173,89 @@ function showLoginNotice(msg) {
   loginNoticeTimer = setTimeout(() => n.classList.add("hidden"), 4000);
 }
 
+// ---- BAHASA HALAMAN LOGIN (ID / EN) + footer Help | Terms | Privacy ----
+const LOGIN_LANG_KEY = "novelist_login_lang";
+const LOGIN_I18N = {
+  id: {
+    heading: "Sign In atau Mulai Menulis", tagline: "Tulis novelmu, tersimpan otomatis ke Google Drive-mu sendiri.",
+    google: "Lanjutkan dengan Google", discord: "Lanjutkan dengan Discord", apple: "Lanjutkan dengan Apple", email: "Lanjutkan dengan Email",
+    soon: "Segera", lastUsed: "Terakhir kamu login pakai Google", waiting: "Menunggu login...", loginFailed: "Login gagal: ",
+    note: "Login diperlukan supaya project kamu aman tersimpan & ter-backup otomatis di Google Drive-mu. Tidak ada data yang disimpan di server kami.",
+    soonNotice: (n) => `Login dengan ${n} belum tersedia. Untuk saat ini pakai Google dulu ya — project kamu disimpan di Google Drive-mu.`,
+    help: "Bantuan", terms: "Ketentuan", privacy: "Privasi",
+    termsTitle: "Ketentuan Penggunaan",
+    termsBody: [
+      ["Pemakaian", "Novelist adalah alat bantu menulis novel. Kamu bebas memakainya untuk karya pribadi maupun komersial."],
+      ["Karyamu milikmu", "Semua tulisan, karakter, dan cerita yang kamu buat sepenuhnya milikmu. Kami tidak mengklaim hak apa pun atas karyamu."],
+      ["Penyimpanan", "Project disimpan di Google Drive milikmu. Kamu bertanggung jawab menjaga akses akun Google-mu."],
+      ["Tanpa jaminan", "Aplikasi disediakan apa adanya. Kami berusaha menjaga datamu aman lewat autosave & backup, tapi tetap simpan cadangan untuk karya penting."],
+    ],
+    privacyTitle: "Kebijakan Privasi",
+    privacyBody: [
+      ["Data yang kami simpan", "Tidak ada. Novelist berjalan di browser-mu dan tidak punya server penyimpanan sendiri."],
+      ["Google Drive", "Project disimpan sebagai file di Google Drive-mu sendiri. Akses Drive hanya dipakai untuk membaca & menyimpan file project Novelist."],
+      ["Penyimpanan lokal", "Browser menyimpan beberapa preferensi kecil (misalnya tema, bahasa, dan login terakhir) di perangkatmu."],
+      ["Mencabut akses", "Kamu bisa mencabut akses Novelist kapan saja lewat pengaturan keamanan akun Google-mu."],
+    ],
+  },
+  en: {
+    heading: "Sign In or Start Writing", tagline: "Write your novel, saved automatically to your own Google Drive.",
+    google: "Continue with Google", discord: "Continue with Discord", apple: "Continue with Apple", email: "Continue with Email",
+    soon: "Soon", lastUsed: "You last signed in with Google", waiting: "Waiting for sign-in...", loginFailed: "Sign-in failed: ",
+    note: "Sign-in is required so your projects are safely saved & backed up automatically to your Google Drive. No data is stored on our servers.",
+    soonNotice: (n) => `Signing in with ${n} isn't available yet. Please use Google for now — your projects are stored in your Google Drive.`,
+    help: "Help", terms: "Terms", privacy: "Privacy",
+    termsTitle: "Terms of Use",
+    termsBody: [
+      ["Use", "Novelist is a novel-writing tool. You're free to use it for personal and commercial work."],
+      ["Your work is yours", "All writing, characters, and stories you create belong entirely to you. We claim no rights over your work."],
+      ["Storage", "Projects are stored in your own Google Drive. You're responsible for keeping your Google account secure."],
+      ["No warranty", "The app is provided as is. We try to keep your data safe with autosave & backups, but keep your own copies of important work."],
+    ],
+    privacyTitle: "Privacy Policy",
+    privacyBody: [
+      ["Data we store", "None. Novelist runs in your browser and has no storage server of its own."],
+      ["Google Drive", "Projects are saved as files in your own Google Drive. Drive access is only used to read & save Novelist project files."],
+      ["Local storage", "Your browser keeps a few small preferences (such as theme, language, and last sign-in) on your device."],
+      ["Revoking access", "You can revoke Novelist's access at any time from your Google account's security settings."],
+    ],
+  },
+};
+let loginLang = "id";
+function lt(key) { return LOGIN_I18N[loginLang][key]; }
+function applyLoginLang(lang) {
+  loginLang = LOGIN_I18N[lang] ? lang : "id";
+  try { localStorage.setItem(LOGIN_LANG_KEY, loginLang); } catch (e) { /* abaikan */ }
+  document.querySelectorAll("#loginView [data-i18n]").forEach((n) => { n.textContent = lt(n.dataset.i18n); });
+  el("loginLangLabel").textContent = loginLang.toUpperCase();
+  document.documentElement.lang = loginLang;
+}
+function openLegalModal(kind) {
+  el("legalTitle").textContent = lt(kind + "Title");
+  el("legalBody").innerHTML = lt(kind + "Body").map(([t, d]) => `<div class="support-item"><div class="support-item-title">${escapeHtml(t)}</div><p>${escapeHtml(d)}</p></div>`).join("");
+  el("legalModal").classList.remove("hidden");
+}
+function initLoginFooter() {
+  let saved = null;
+  try { saved = localStorage.getItem(LOGIN_LANG_KEY); } catch (e) { /* abaikan */ }
+  applyLoginLang(saved || "id");
+  el("btnLoginHelp").onclick = () => el("supportModal").classList.remove("hidden");
+  el("btnLoginTerms").onclick = () => openLegalModal("terms");
+  el("btnLoginPrivacy").onclick = () => openLegalModal("privacy");
+  el("btnCloseLegal").onclick = () => el("legalModal").classList.add("hidden");
+  const menu = el("loginLangMenu"), btn = el("btnLoginLang");
+  const setOpen = (open) => { menu.classList.toggle("hidden", !open); btn.setAttribute("aria-expanded", String(open)); };
+  btn.onclick = (e) => { e.stopPropagation(); setOpen(menu.classList.contains("hidden")); };
+  menu.querySelectorAll("button").forEach((b) => b.onclick = () => { applyLoginLang(b.dataset.lang); setOpen(false); });
+  document.addEventListener("click", () => setOpen(false));
+  // logo animasi login: diam di frame pertama bila pengguna memilih "reduce motion"
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { const v = el("loginLogoVideo"); v.removeAttribute("autoplay"); v.pause(); }
+}
+
 // Discord / Apple / Email baru tampilan — project tersimpan di Google Drive, jadi sementara hanya Google yang aktif.
 function handleSoonProvider(provider) {
   const names = { discord: "Discord", apple: "Apple", email: "Email" };
-  showLoginNotice("Login dengan " + (names[provider] || provider) + " belum tersedia. Untuk saat ini pakai Google dulu ya — project kamu disimpan di Google Drive-mu.");
+  showLoginNotice(lt("soonNotice")(names[provider] || provider));
 }
 
 async function handleLogin() {
@@ -183,7 +264,7 @@ async function handleLogin() {
   el("loginError").classList.add("hidden");
   el("loginNotice").classList.add("hidden");
   btn.disabled = true;
-  label.textContent = "Menunggu login...";
+  label.textContent = lt("waiting");
   try {
     await driveSignIn(true);
     try { localStorage.setItem(LAST_LOGIN_KEY, "google"); } catch (e) { /* abaikan */ }
@@ -192,16 +273,55 @@ async function handleLogin() {
     await loadProjectsFromDrive(true);
     startBackupInterval();
   } catch (e) {
-    el("loginError").textContent = "Login gagal: " + (e.error || e.message || e);
+    el("loginError").textContent = lt("loginFailed") + (e.error || e.message || e);
     el("loginError").classList.remove("hidden");
   }
   btn.disabled = false;
-  label.textContent = "Lanjutkan dengan Google";
+  label.textContent = lt("google");
   showLastLoginHint();
 }
 
 // ================= DASHBOARD RENDER =================
+// Judul dashboard dipilih acak tiap kali halaman dimuat/di-refresh (tidak sama dengan yang terakhir tampil).
+const DASH_TITLES = [
+  "Mau menulis apa hari ini?",
+  "Cerita apa yang menunggumu hari ini?",
+  "Siap melanjutkan petualangan?",
+  "Bab berikutnya menantimu.",
+  "Dunia mana yang mau kamu bangun hari ini?",
+  "Satu kalimat dulu, sisanya menyusul.",
+  "Tokoh-tokohmu sudah menunggu.",
+  "Halaman kosong ini milikmu.",
+  "Ayo lanjutkan kisahmu.",
+  "Ide apa yang muncul hari ini?",
+];
+function pickDashTitle() {
+  let last = null;
+  try { last = localStorage.getItem("dashTitleLast"); } catch (e) {}
+  const pool = DASH_TITLES.filter((t) => t !== last);
+  const t = pool[Math.floor(Math.random() * pool.length)];
+  try { localStorage.setItem("dashTitleLast", t); } catch (e) {}
+  el("dashTitle").textContent = t;
+}
+
+// Saat kursor di atas kartu project, sampulnya memudar masuk ke background; memudar keluar saat kursor pergi.
+// Dua lapisan dipakai bergantian supaya pindah dari kartu ke kartu jadi crossfade, bukan kedip.
+let dashCoverFront = "A";
+function showDashCover(p) {
+  const next = dashCoverFront === "A" ? "B" : "A";
+  const layer = el("dashCoverBg" + next);
+  layer.style.backgroundImage = p.cover ? `url("${p.cover}")` : `linear-gradient(135deg, ${p.colorA}, ${p.colorB})`;
+  el("dashCoverBg" + dashCoverFront).classList.remove("is-on");
+  layer.classList.add("is-on");
+  dashCoverFront = next;
+}
+function hideDashCover() {
+  el("dashCoverBgA").classList.remove("is-on");
+  el("dashCoverBgB").classList.remove("is-on");
+}
+
 function renderDashboard() {
+  hideDashCover();
   const grid = el("projectGrid");
   grid.innerHTML = "";
   el("loadingState").classList.add("hidden");
@@ -229,6 +349,8 @@ function renderDashboard() {
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
       </button>`;
     card.addEventListener("click", (e) => { if (!e.target.closest(".card-gear")) openProject(p.id); });
+    card.addEventListener("mouseenter", () => showDashCover(p));
+    card.addEventListener("mouseleave", hideDashCover);
     card.querySelector(".card-gear").addEventListener("click", (e) => { e.stopPropagation(); openCardMenu(p.id, e.currentTarget); });
     grid.appendChild(card);
   });
@@ -366,10 +488,12 @@ function exportProjectToWord(p) {
 
 // ================= PROJECT VIEW (Write / Organize) =================
 function openProject(id) {
+  hideDashCover();
   currentProjectId = id;
   const p = getProject(id);
   el("projectTitle").value = p.title;
-  switchTab("write");
+  fitProjectTitle();
+  applyProjectLook(p);
   expandedFolders = new Set(p.data.scenes.filter((n) => n.type === "folder").map((n) => n.id));
   sceneHistory = []; sceneHistoryIndex = -1;
   renderSceneList();
@@ -384,15 +508,65 @@ function openProject(id) {
   currentOrgItemId = null;
   renderOrganizeDetail();
   markSaved();
+  switchTab("home");
   el("dashboardView").classList.add("hidden");
   el("editorView").classList.remove("hidden");
+  startProjClock();
 }
-function backToLibrary() {
+// ---- SIDEBAR PROJECT (dibuka dari logo kiri atas) ----
+function renderProjSidebarList() {
+  const list = el("projSidebarList");
+  list.innerHTML = "";
+  projects.forEach((p) => {
+    const b = document.createElement("button");
+    b.className = "proj-side-project" + (p.id === currentProjectId ? " is-current" : "");
+    const thumb = p.cover ? `<span class="proj-side-thumb" style="background-image:url('${p.cover}')"></span>`
+      : `<span class="proj-side-thumb" style="background-image:linear-gradient(135deg, ${p.colorA}, ${p.colorB})">${escapeHtml((p.title || "?").charAt(0).toUpperCase())}</span>`;
+    b.innerHTML = `${thumb}<span class="proj-side-title">${escapeHtml(p.id === currentProjectId ? el("projectTitle").value : p.title)}</span>`;
+    b.onclick = () => { closeProjSidebar(); if (p.id !== currentProjectId) switchToProject(p.id); };
+    list.appendChild(b);
+  });
+}
+function projSidebarKeyHandler(e) { if (e.key === "Escape") closeProjSidebar(); }
+function openProjSidebar() {
+  renderProjSidebarList();
+  el("projSidebar").classList.add("is-open");
+  el("projSidebarScrim").classList.add("is-open");
+  el("projSidebar").setAttribute("aria-hidden", "false");
+  el("btnProjSidebar").setAttribute("aria-expanded", "true");
+  document.addEventListener("keydown", projSidebarKeyHandler);
+}
+function closeProjSidebar() {
+  el("projSidebar").classList.remove("is-open");
+  el("projSidebarScrim").classList.remove("is-open");
+  el("projSidebar").setAttribute("aria-hidden", "true");
+  el("btnProjSidebar").setAttribute("aria-expanded", "false");
+  document.removeEventListener("keydown", projSidebarKeyHandler);
+}
+// simpan project yang sedang dibuka (judul + isi) lalu kirim ke Drive
+function saveCurrentProject() {
   flushCurrentEdits();
+  const p = getProject(currentProjectId);
+  if (!p) return Promise.resolve();
+  p.title = el("projectTitle").value; p.data.title = p.title; p.updatedAt = new Date().toISOString();
+  return saveProjectToDriveMain(p);
+}
+function switchToProject(id) {
+  saveCurrentProject();
+  closeSceneDrawer();
+  openProject(id);
+}
+
+function backToLibrary() {
+  closeProjSidebar();
+  flushCurrentEdits();
+  if (window.NovelMap) window.NovelMap.hide();
+  muteTimelineKeys(true);
   const p = getProject(currentProjectId);
   if (p) { p.title = el("projectTitle").value; p.data.title = p.title; p.updatedAt = new Date().toISOString(); }
   saveProjectToDriveMain(p);
   closeSceneDrawer();
+  stopProjClock();
   el("editorView").classList.add("hidden");
   el("dashboardView").classList.remove("hidden");
   renderDashboard();
@@ -400,13 +574,142 @@ function backToLibrary() {
 function flushCurrentEdits() {
   syncSceneFromDetail();
   syncOrganizeFromDetail();
+  if (window.NovelMap) window.NovelMap.flush();
 }
 
 function switchTab(tab) {
+  if (tab === "home") { flushCurrentEdits(); renderProjectHome(); }
   document.querySelectorAll(".rail-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
-  ["write", "organize", "plot", "schedule", "tools"].forEach((t) => el("tab" + capitalize(t)).classList.toggle("hidden", t !== tab));
+  ["home", "write", "organize", "timeline", "map", "plot", "schedule", "tools"].forEach((t) => el("tab" + capitalize(t)).classList.toggle("hidden", t !== tab));
+  el("editorView").dataset.tab = tab;
   updateSceneDrawerVisibility();
+  muteTimelineKeys(tab !== "timeline");
+  if (tab !== "map" && window.NovelMap) window.NovelMap.hide();   // hentikan render loop 3D
+  if (tab === "timeline") openTimelineTab();
+  if (tab === "map") openMapTab();
 }
+
+// React Flow (Timeline) tetap mendengar Delete/Backspace di document walau tabnya tersembunyi, jadi event timeline
+// yang masih terpilih ikut terhapus saat tombol itu dipakai di tab lain (mis. menghapus objek di Map).
+// Kelas "nokey" di <body> membuat React Flow mengabaikan semua tombol selama tab Timeline tidak tampil.
+function muteTimelineKeys(mute) { document.body.classList.toggle("nokey", mute); }
+
+// ---- TIMELINE: React + React Flow (folder vendor/) + timeline.js baru dimuat saat tab ini pertama kali dibuka ----
+let timelineLibPromise = null;
+// Tiap file hanya dimuat sekali walau diminta beberapa fitur sekaligus (mis. React untuk Timeline & Base UI).
+const scriptPromises = {};
+function loadScriptOnce(src) {
+  if (!scriptPromises[src]) {
+    scriptPromises[src] = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src; s.onload = resolve;
+      s.onerror = () => { delete scriptPromises[src]; s.remove(); reject(new Error("Gagal memuat " + src)); };   // boleh dicoba lagi
+      document.head.appendChild(s);
+    });
+  }
+  return scriptPromises[src];
+}
+const loadScriptsInOrder = (list) => list.reduce((chain, src) => chain.then(() => loadScriptOnce(src)), Promise.resolve());
+// React 18 (UMD, vendor/) dipakai bersama oleh Timeline (React Flow) dan Base UI.
+function ensureReact() { return loadScriptsInOrder(["vendor/react-18.3.1.min.js", "vendor/react-dom-18.3.1.min.js"]); }
+// Base UI (base-ui.com): komponen React tanpa gaya (Dialog, Popover, Menu, Select, Tabs, Tooltip, Switch, Slider, Toast, ...).
+// Dimuat hanya saat dibutuhkan:  const BaseUI = await ensureBaseUI();  lalu render dengan React.createElement + ReactDOM.createRoot.
+function ensureBaseUI() {
+  return ensureReact().then(() => loadScriptOnce("vendor/base-ui-1.8.0.min.js")).then(() => window.BaseUI);
+}
+// Radix UI (radix-ui.com): primitive React tanpa gaya -> window.RadixUI (Dialog, Popover, DropdownMenu, Tabs, Slot, ...)
+function ensureRadixUI() {
+  return ensureReact().then(() => loadScriptOnce("vendor/radix-ui-1.6.7.min.js")).then(() => window.RadixUI);
+}
+// shadcn/ui (ui.shadcn.com): komponen siap pakai bergaya Tailwind (kode sumber di components/ui, dibangun oleh
+// tools/build-vendor.mjs) -> window.ShadcnUI (Button, Card, Dialog, Select, Tabs, Tooltip, ..., cn).
+// CSS-nya sudah ada di vendor/tailwind.css. Tema terang/gelap otomatis mengikuti tema aplikasi (body.light).
+function ensureShadcnUI() {
+  return ensureReact().then(() => loadScriptOnce("vendor/shadcn-ui.min.js")).then(() => window.ShadcnUI);
+}
+function ensureTimelineLib() {
+  if (!timelineLibPromise) {
+    timelineLibPromise = ensureReact().then(() => loadScriptsInOrder(["vendor/reactflow-11.11.4.umd.js", "timeline.js"]));
+    timelineLibPromise.catch(() => { timelineLibPromise = null; });   // boleh dicoba lagi
+  }
+  return timelineLibPromise;
+}
+async function openTimelineTab() {
+  try { await ensureTimelineLib(); }
+  catch (e) { el("tlFlow").innerHTML = '<div class="tl-loading">Timeline gagal dimuat. Periksa koneksi lalu buka tab ini lagi.</div>'; return; }
+  if (el("tabTimeline").classList.contains("hidden") || !currentProjectId) return;   // pengguna sudah pindah tab
+  window.NovelTimeline.show({
+    project: getProject(currentProjectId),
+    onChange: markDirtyAndSchedule,
+    getScenes: () => flattenScenes(getProject(currentProjectId).data.scenes),
+    openScene: (id) => { switchTab("write"); selectScene(id); },
+  });
+}
+
+// ---- MAP: map-core.js (data) + map2d.js (editor 2D) + map-ui.js (shell) baru dimuat saat tab ini pertama kali dibuka.
+// map3d.js + three.js (vendor/) di-import oleh map-ui.js hanya saat pengguna beralih ke tampilan 3D.
+let mapLibPromise = null;
+function ensureMapLib() {
+  if (!mapLibPromise) {
+    mapLibPromise = ["map-core.js", "map2d.js", "map-ui.js"]
+      .reduce((chain, src) => chain.then(() => loadScriptOnce(src)), Promise.resolve());
+    mapLibPromise.catch(() => { mapLibPromise = null; });   // boleh dicoba lagi
+  }
+  return mapLibPromise;
+}
+async function openMapTab() {
+  const main = el("tabMap").querySelector(".mp-main");
+  if (!window.NovelMap) { main.dataset.state = "loading"; el("mpStatus").textContent = "Memuat peta…"; }
+  try { await ensureMapLib(); }
+  catch (e) { main.dataset.state = "error"; el("mpStatus").textContent = "Peta gagal dimuat. Periksa koneksi lalu buka tab ini lagi."; return; }
+  if (el("tabMap").classList.contains("hidden") || !currentProjectId) return;   // pengguna sudah pindah tab
+  window.NovelMap.show({
+    project: getProject(currentProjectId),
+    onChange: markDirtyAndSchedule,
+    getScenes: () => flattenScenes(getProject(currentProjectId).data.scenes),
+    openScene: (id) => { switchTab("write"); selectScene(id); },
+  });
+}
+
+// ---- HOME TAB: canvas berisi titik-titik scene ----
+// Background project = cover-nya (di-blur); kalau belum ada cover pakai foto default dashboard.
+function applyProjectLook(p) {
+  const bg = p.cover ? `url("${p.cover}")` : `url("bg-canyon.jpg")`;
+  el("projBgPhoto").style.backgroundImage = bg;
+  el("projChipCover").style.backgroundImage = p.cover ? `url("${p.cover}")` : `linear-gradient(135deg, ${p.colorA}, ${p.colorB})`;
+  el("projChipCover").textContent = p.cover ? "" : (p.title || "?").charAt(0).toUpperCase();
+}
+// lebar input judul di chip mengikuti panjang judulnya
+function fitProjectTitle() { const t = el("projectTitle"); t.style.width = Math.max(4, t.value.length + 1) + "ch"; }
+function flattenScenes(list, out = []) {
+  (list || []).forEach((n) => { if (n.type === "folder") flattenScenes(n.children, out); else out.push(n); });
+  return out;
+}
+function hashUnit(str, salt) {   // angka 0..1 yang tetap untuk id yang sama (posisi node di canvas tidak loncat-loncat)
+  let h = 2166136261 ^ salt;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return ((h >>> 0) % 10000) / 10000;
+}
+function renderProjectHome() {
+  const p = getProject(currentProjectId);
+  if (!p) return;
+  const scenes = flattenScenes(p.data.scenes);
+
+  // canvas: setiap scene = titik bercahaya + label, disambung garis tipis sesuai urutan
+  const canvas = el("homeCanvas");
+  const pts = scenes.map((s, i) => ({ s, x: 0.08 + hashUnit(s.id, 1) * 0.84, y: 0.12 + (scenes.length > 1 ? (i / (scenes.length - 1)) * 0.7 : 0.3) + (hashUnit(s.id, 2) - 0.5) * 0.08 }));
+  const lines = pts.slice(1).map((pt, i) => `<line x1="${pts[i].x * 100}%" y1="${pts[i].y * 100}%" x2="${pt.x * 100}%" y2="${pt.y * 100}%" />`).join("");
+  canvas.innerHTML = `<div class="home-canvas-area"><svg class="home-links" aria-hidden="true">${lines}</svg>` +
+    pts.map((pt) => `<button class="home-node${pt.s.id === currentSceneId ? " is-current" : ""}" data-id="${pt.s.id}" style="left:${pt.x * 100}%;top:${pt.y * 100}%">` +
+      `<span class="home-node-dot ${pt.s.status || "todo"}"></span><span class="home-node-label">${escapeHtml(pt.s.title || "(tanpa judul)")}</span></button>`).join("") + `</div>`;
+  canvas.querySelectorAll(".home-node").forEach((b) => b.onclick = () => { switchTab("write"); selectScene(b.dataset.id); });
+}
+
+// jam kecil di pojok kanan atas (seperti vvd)
+let projClockHandle = null;
+function tickProjClock() { el("projClock").textContent = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }); }
+function startProjClock() { tickProjClock(); stopProjClock(); projClockHandle = setInterval(tickProjClock, 15000); }
+function stopProjClock() { if (projClockHandle) clearInterval(projClockHandle); projClockHandle = null; }
 function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 // ---- WRITE TAB : binder bertingkat (folder/chapter berisi scene), tampil sebagai tree view ----
@@ -1394,22 +1697,51 @@ function initLoginArt() {
 }
 
 // ================= LOGO ANIMASI (rail dashboard) =================
+// Dua mode: IDLE = video diputar sangat pelan (+ "napas" CSS) supaya tidak kaku; AKTIF = saat kursor mendekat, kecepatan
+// naik ke normal dan logo sedikit membesar/bersinar. Perpindahannya di-lerp tiap frame jadi transisinya halus.
 // Video hanya diputar saat terlihat (dashboard tampil & tab aktif) supaya tidak boros baterai; dihentikan bila pengguna
 // memilih "reduce motion" (yang tampil cuma frame pertama / poster).
+const LOGO_IDLE_RATE = 0.3;      // kecepatan video saat idle
+const LOGO_ACTIVE_RATE = 1;      // kecepatan video saat kursor dekat
+const LOGO_NEAR_RADIUS = 170;    // px dari pusat logo: mulai "terbangun"
+const LOGO_FULL_RADIUS = 50;     // px dari pusat logo: mode aktif penuh
 function initRailLogo() {
   const v = el("railLogoVideo");
   if (!v) return;
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  let inView = false;
+  const box = v.parentElement;
+  let inView = false, energy = 0, target = 0, raf = 0;
   const sync = () => { if (inView && !document.hidden) v.play().catch(() => {}); else v.pause(); };
-  new IntersectionObserver((entries) => { inView = entries.some((e) => e.isIntersecting); sync(); }).observe(v);
+  const apply = () => {
+    box.style.setProperty("--logo-energy", energy.toFixed(3));
+    v.playbackRate = LOGO_IDLE_RATE + (LOGO_ACTIVE_RATE - LOGO_IDLE_RATE) * energy;
+  };
+  const tick = () => {
+    energy += (target - energy) * (target > energy ? 0.12 : 0.04);   // bangun agak cepat, kembali idle perlahan
+    if (Math.abs(target - energy) < 0.002) { energy = target; raf = 0; } else raf = requestAnimationFrame(tick);
+    apply();
+  };
+  const setTarget = (t) => { target = t; if (!raf) raf = requestAnimationFrame(tick); };
+  document.addEventListener("pointermove", (e) => {
+    if (!inView || e.pointerType === "touch") return;
+    const r = box.getBoundingClientRect();
+    const d = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+    const t = Math.min(1, Math.max(0, (LOGO_NEAR_RADIUS - d) / (LOGO_NEAR_RADIUS - LOGO_FULL_RADIUS)));
+    setTarget(t * t * (3 - 2 * t));   // smoothstep
+  }, { passive: true });
+  document.documentElement.addEventListener("mouseleave", () => setTarget(0));
+  v.addEventListener("loadedmetadata", apply);
+  apply();
+  new IntersectionObserver((entries) => { inView = entries.some((e) => e.isIntersecting); if (!inView) setTarget(0); sync(); }).observe(v);
   document.addEventListener("visibilitychange", sync);
 }
 
 // ================= EVENT BINDING =================
 window.addEventListener("DOMContentLoaded", () => {
   initLoginArt();
+  initLoginFooter();
   initRailLogo();
+  pickDashTitle();
   el("btnLoginGoogle").onclick = handleLogin;
   document.querySelectorAll("#loginView .btn-oauth.is-soon").forEach((b) => b.onclick = () => handleSoonProvider(b.dataset.provider));
   showLastLoginHint();
@@ -1470,7 +1802,12 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // ---- project view ----
   el("btnBack").onclick = backToLibrary;
-  el("projectTitle").addEventListener("input", markDirtyAndSchedule);
+  el("btnProjSidebar").onclick = () => (el("projSidebar").classList.contains("is-open") ? closeProjSidebar() : openProjSidebar());
+  el("btnProjSidebarClose").onclick = closeProjSidebar;
+  el("projSidebarScrim").onclick = closeProjSidebar;
+  el("btnSideTheme").onclick = () => document.body.classList.toggle("light");
+  el("btnSideSave").onclick = async () => { closeProjSidebar(); await saveCurrentProject(); toast("Tersimpan ke Drive ✅"); };
+  el("projectTitle").addEventListener("input", () => { fitProjectTitle(); markDirtyAndSchedule(); });
   el("btnPreview").onclick = openPreview;
   el("btnClosePreview").onclick = () => el("previewModal").classList.add("hidden");
 
@@ -1478,7 +1815,7 @@ window.addEventListener("DOMContentLoaded", () => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const menu = el("projectMenu");
-    menu.style.top = rect.bottom + 6 + "px"; menu.style.right = (window.innerWidth - rect.right) + "px"; menu.style.left = "auto";
+    menu.style.top = rect.bottom + 6 + "px"; menu.style.left = Math.max(8, rect.right - 210) + "px"; menu.style.right = "auto";
     menu.classList.remove("hidden");
   };
   document.querySelectorAll("#projectMenu button").forEach((btn) => btn.onclick = async () => {
@@ -1492,6 +1829,7 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   document.querySelectorAll(".rail-btn").forEach((btn) => btn.onclick = () => switchTab(btn.dataset.tab));
+  el("btnProjectTheme").onclick = () => document.body.classList.toggle("light");
 
   // Write tab
   el("btnAddScene").onclick = () => openAddSceneModal(null);

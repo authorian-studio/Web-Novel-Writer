@@ -1,0 +1,109 @@
+/* ================= TAILWIND CSS v4 untuk Novelist =================
+   Hasil kompilasi: ../vendor/tailwind.css (dimuat di index.html). Bangun ulang setelah menambah kelas Tailwind baru:
+     cd tools && npm install && npm run build:css
+   Catatan penting supaya tampilan lama tidak berubah:
+   - TANPA preflight (reset CSS bawaan Tailwind) — hanya theme + utilities, semuanya di dalam @layer, sehingga
+     style.css (tanpa layer) selalu menang bila ada aturan yang bentrok.
+   - Sumber kelas dipindai secara eksplisit (bukan otomatis) agar file besar di vendor/ tidak ikut dipindai.
+     Tambahkan @source baru bila memakai Tailwind di file lain.
+   - Variabel tema shadcn/ui memakai awalan --sh-* (bukan --border/--accent/... milik style.css).
+   - Varian dark: mengikuti tema aplikasi (gelap default; body.light = terang). */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@import "tw-animate-css";
+@import "./shadcn-tailwind.css";
+
+@source "../components/ui/**/*.tsx";
+@source "../index.html";
+@source "../app.js";
+@source "../map-ui.js";
+@source "../timeline.js";
+
+@custom-variant dark (&:is(body:not(.light) *));
+
+@theme inline {
+  --font-sans: "Inter", -apple-system, "Segoe UI", sans-serif;
+  --radius-sm: calc(var(--sh-radius) * 0.6);
+  --radius-md: calc(var(--sh-radius) * 0.8);
+  --radius-lg: var(--sh-radius);
+  --radius-xl: calc(var(--sh-radius) * 1.4);
+  --color-background: var(--sh-background);
+  --color-foreground: var(--sh-foreground);
+  --color-card: var(--sh-card);
+  --color-card-foreground: var(--sh-card-foreground);
+  --color-popover: var(--sh-popover);
+  --color-popover-foreground: var(--sh-popover-foreground);
+  --color-primary: var(--sh-primary);
+  --color-primary-foreground: var(--sh-primary-foreground);
+  --color-secondary: var(--sh-secondary);
+  --color-secondary-foreground: var(--sh-secondary-foreground);
+  --color-muted: var(--sh-muted);
+  --color-muted-foreground: var(--sh-muted-foreground);
+  --color-accent: var(--sh-accent);
+  --color-accent-foreground: var(--sh-accent-foreground);
+  --color-destructive: var(--sh-destructive);
+  --color-destructive-foreground: var(--sh-destructive-foreground);
+  --color-border: var(--sh-border);
+  --color-input: var(--sh-input);
+  --color-ring: var(--sh-ring);
+}
+
+@layer base {
+  /* tema shadcn/ui (neutral, new-york-v4) — gelap sebagai bawaan seperti aplikasi */
+  :root {
+    --sh-radius: 0.625rem;
+    --sh-background: oklch(0.145 0 0);
+    --sh-foreground: oklch(0.985 0 0);
+    --sh-card: oklch(0.205 0 0);
+    --sh-card-foreground: oklch(0.985 0 0);
+    --sh-popover: oklch(0.205 0 0);
+    --sh-popover-foreground: oklch(0.985 0 0);
+    --sh-primary: oklch(0.922 0 0);
+    --sh-primary-foreground: oklch(0.205 0 0);
+    --sh-secondary: oklch(0.269 0 0);
+    --sh-secondary-foreground: oklch(0.985 0 0);
+    --sh-muted: oklch(0.269 0 0);
+    --sh-muted-foreground: oklch(0.708 0 0);
+    --sh-accent: oklch(0.371 0 0);
+    --sh-accent-foreground: oklch(0.985 0 0);
+    --sh-destructive: oklch(0.704 0.191 22.216);
+    --sh-destructive-foreground: oklch(0.58 0.22 27);
+    --sh-border: oklch(1 0 0 / 10%);
+    --sh-input: oklch(1 0 0 / 15%);
+    --sh-ring: oklch(0.556 0 0);
+  }
+  body.light {
+    --sh-background: oklch(1 0 0);
+    --sh-foreground: oklch(0% 0 0);
+    --sh-card: oklch(1 0 0);
+    --sh-card-foreground: oklch(0% 0 0);
+    --sh-popover: oklch(1 0 0);
+    --sh-popover-foreground: oklch(0% 0 0);
+    --sh-primary: oklch(0% 0 0);
+    --sh-primary-foreground: oklch(0.985 0 0);
+    --sh-secondary: oklch(0.97 0 0);
+    --sh-secondary-foreground: oklch(0.205 0 0);
+    --sh-muted: oklch(0.97 0 0);
+    --sh-muted-foreground: oklch(0.556 0 0);
+    --sh-accent: oklch(0.97 0 0);
+    --sh-accent-foreground: oklch(0.205 0 0);
+    --sh-destructive: oklch(0.577 0.245 27.325);
+    --sh-destructive-foreground: oklch(0.97 0.01 17);
+    --sh-border: oklch(0.922 0 0);
+    --sh-input: oklch(0.922 0 0);
+    --sh-ring: oklch(0.708 0 0);
+  }
+  /* pengganti preflight, HANYA untuk elemen shadcn/ui (semuanya punya atribut data-slot) */
+  [data-slot], [data-slot]::before, [data-slot]::after,
+  [data-slot] *, [data-slot] *::before, [data-slot] *::after {
+    box-sizing: border-box;
+    border: 0 solid var(--color-border);
+    outline-color: color-mix(in oklab, var(--color-ring) 50%, transparent);
+  }
+  [data-slot] { margin: 0; padding: 0; }
+  [data-slot]:is(button, input, select, textarea) {
+    font: inherit; letter-spacing: inherit; color: inherit; background-color: transparent; border-radius: 0;
+  }
+  [data-slot] :is(img, svg, video, canvas) { display: block; vertical-align: middle; }
+}
