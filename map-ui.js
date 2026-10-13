@@ -45,16 +45,17 @@
   const SCALE_STEPS = [1, 2, 5, 10, 20, 50];   // pilihan panjang garis skala (km)
   const PREFS_KEY = "novelist_map_prefs";
 
-  // ikon tempat (SVG garis, 24x24) — dipakai di popover alat Tempat & inspektor
+  // ikon tempat (Tabler Icons, sprite #ti-*) — dipakai di popover alat Tempat & inspektor.
+  // Penanda di kanvas peta tetap digambar sendiri oleh map2d.js / map3d.js.
   const PLACE_SVG = {
-    city: '<path d="M3 21h18M5 21V11l4-2.5V21M9 21V4h6v17M15 21v-9l4 2v7"/><path d="M11.5 8h1M11.5 12h1M11.5 16h1"/>',
-    village: '<path d="m3 11 9-7 9 7"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/>',
-    castle: '<path d="M4 21V6h3v3h3V6h4v3h3V6h3v15Z"/><path d="M10 21v-4a2 2 0 0 1 4 0v4"/>',
-    port: '<circle cx="12" cy="5" r="2"/><path d="M12 7v14M8 11h8"/><path d="M4 13a8 8 0 0 0 16 0"/>',
-    temple: '<path d="m3 9 9-5 9 5"/><path d="M4 9h16M6 9v9M10 9v9M14 9v9M18 9v9M3 21h18M4 18h16"/>',
-    ruin: '<path d="M3 21h18M6 21V9.5l2.5-1.2V21M11 21v-7.5l2.5.8V21M16 21V6.5l2.5 1V21"/>',
-    camp: '<path d="M2 20h20M4 20 12 5l8 15"/><path d="m12 20-3-5h6Z"/>',
-    landmark: '<path d="M6 21V4"/><path d="M6 4h11l-2 4 2 4H6"/>',
+    city: "#ti-buildings",
+    village: "#ti-home",
+    castle: "#ti-building-castle",
+    port: "#ti-anchor",
+    temple: "#ti-building-bank",
+    ruin: "#ti-building-arch",
+    camp: "#ti-tent",
+    landmark: "#ti-flag",
   };
 
   let ctx = null;            // { project, onChange, getScenes, openScene }
@@ -147,7 +148,7 @@
     items.forEach((m) => {
       const b = document.createElement("button");
       b.className = "mp-item" + (cur && m.id === cur.map.id ? " is-current" : "");
-      b.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20Z"/><path d="M9 4v13.5M15 6.5V20"/></svg><span></span>';
+      b.innerHTML = '<svg class="ti" width="14" height="14" aria-hidden="true" focusable="false"><use href="#ti-map"></use></svg><span></span>';
       b.querySelector("span").textContent = m.title || "(tanpa nama)";
       b.onclick = () => { if (!cur || cur.map.id !== m.id) openMap(m.id); };
       list.appendChild(b);
@@ -580,7 +581,7 @@
     }
     return cv.toDataURL("image/png");
   }
-  const placeIconSvg = (key, size) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PLACE_SVG[key] || PLACE_SVG.landmark}</svg>`;
+  const placeIconSvg = (key, size) => `<svg class="ti" width="${size}" height="${size}" aria-hidden="true" focusable="false"><use href="${PLACE_SVG[key] || PLACE_SVG.landmark}"></use></svg>`;
   function buildToolPop() {
     const grid = $("mpBiomes");
     C.BIOMES.forEach((b, i) => {

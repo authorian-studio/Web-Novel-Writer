@@ -3,12 +3,14 @@
   "private": true,
   "description": "Novelist — situsnya statis (tanpa build). Folder tools/ ini hanya untuk membangun ulang file di ../vendor/: cd tools && npm install && npm run build. (Sengaja tidak di root repo supaya hosting statis — Cloudflare Workers — tidak menganggap situs ini proyek Node.)",
   "scripts": {
-    "build": "npm run build:vendor && npm run build:css",
+    "build": "npm run build:vendor && npm run build:icons && npm run build:css",
     "build:vendor": "node build-vendor.mjs",
+    "build:icons": "node build-icons.mjs",
     "build:css": "tailwindcss -i tailwind.input.css -o ../vendor/tailwind.css --minify"
   },
   "devDependencies": {
     "@base-ui/react": "1.8.0",
+    "@tabler/icons": "3.48.0",
     "@tailwindcss/cli": "4.3.3",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",

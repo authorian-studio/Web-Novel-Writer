@@ -122,10 +122,23 @@ function timeAgo(iso) {
   if (diff < 86400) return Math.floor(diff / 3600) + " jam lalu";
   return Math.floor(diff / 86400) + " hari lalu";
 }
-function toast(msg) {
+// Ikon Tabler berukuran tetap (atribut width/height seperti SVG inline lama), mis. tiPx(tiIcon("trash"), 12).
+// Nama ikon tetap ditulis lengkap di dalam tiIcon("...") supaya terdeteksi tools/build-icons.mjs
+// (jangan menulis string lain di dalam tiIcon(...) — build menganggap semua string di situ nama ikon).
+function tiPx(svg, px) { return svg.replace("<svg ", `<svg width="${px}" height="${px}" `); }
+// toast(pesan, ikon?) — ikon = markup ikon Tabler, mis. toast("Tersimpan", tiIcon("circle-check")).
+// Ikon peringatan/gagal (alert-triangle, cloud-x, circle-x) otomatis berwarna merah, lainnya warna aksen.
+function toast(msg, icon) {
   const t = document.createElement("div");
-  t.textContent = msg;
-  t.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg-panel);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:8px;box-shadow:var(--shadow);z-index:500;font-size:13px;animation:fadeIn .2s ease;";
+  t.className = "app-toast";
+  if (icon) {
+    t.innerHTML = tiPx(icon, 16);
+    if (/#ti-(alert-triangle|cloud-x|circle-x)"/.test(icon)) t.classList.add("is-danger");
+  }
+  const text = document.createElement("span");
+  text.textContent = msg;   // teks selalu lewat textContent (aman dari HTML di judul project / pesan error)
+  t.appendChild(text);
+  t.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;max-width:calc(100vw - 32px);background:var(--bg-panel);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:8px;box-shadow:var(--shadow);z-index:500;font-size:13px;animation:fadeIn .2s ease;";
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 2600);
 }
@@ -148,12 +161,15 @@ function driveSignOut() {
   if (accessToken && google.accounts?.oauth2?.revoke) google.accounts.oauth2.revoke(accessToken, () => {});
   accessToken = null;
   projects = [];
+  // ID folder Drive milik akun ini — dibuang supaya login dengan akun Google lain tidak memakai folder akun sebelumnya
+  mainFolderIdCache = backupFolderIdCache = trashFolderIdCache = null;
   stopBackupInterval();
   if (window.NovelMap) window.NovelMap.hide();
   muteTimelineKeys(true);
   el("dashboardView").classList.add("hidden");
   el("editorView").classList.add("hidden");
   el("loginView").classList.remove("hidden");
+  resetAccountState();   // info akun di memori dibuang, halaman akun ditutup
 }
 
 const LAST_LOGIN_KEY = "novelist_last_login";
@@ -183,6 +199,15 @@ const LOGIN_I18N = {
     note: "Login diperlukan supaya project kamu aman tersimpan & ter-backup otomatis di Google Drive-mu. Tidak ada data yang disimpan di server kami.",
     soonNotice: (n) => `Login dengan ${n} belum tersedia. Untuk saat ini pakai Google dulu ya — project kamu disimpan di Google Drive-mu.`,
     help: "Bantuan", terms: "Ketentuan", privacy: "Privasi",
+    // tombol ganti gambar halftone (kiri-bawah)
+    artChange: "Ganti gambar", artUpload: "Unggah gambar…", artReset: "Kembalikan gambar bawaan",
+    artHint: "Atau seret gambar ke area ilustrasi", artDrop: "Lepaskan untuk mengganti gambar",
+    artNotImage: "File itu bukan gambar. Pilih file JPG, PNG, WebP, atau GIF.",
+    artTooBig: "Gambarnya terlalu besar (maksimal 20 MB).",
+    artFailed: "Gambar tidak bisa dibuka. Coba file lain (JPG, PNG, atau WebP).",
+    artChanged: "Gambar login diganti — tersimpan di perangkat ini.",
+    artChangedTemp: "Gambar diganti, tapi browser menolak menyimpannya — akan kembali ke gambar bawaan saat halaman dimuat ulang.",
+    artRestored: "Gambar bawaan dikembalikan.",
     termsTitle: "Ketentuan Penggunaan",
     termsBody: [
       ["Pemakaian", "Novelist adalah alat bantu menulis novel. Kamu bebas memakainya untuk karya pribadi maupun komersial."],
@@ -194,7 +219,7 @@ const LOGIN_I18N = {
     privacyBody: [
       ["Data yang kami simpan", "Tidak ada. Novelist berjalan di browser-mu dan tidak punya server penyimpanan sendiri."],
       ["Google Drive", "Project disimpan sebagai file di Google Drive-mu sendiri. Akses Drive hanya dipakai untuk membaca & menyimpan file project Novelist."],
-      ["Penyimpanan lokal", "Browser menyimpan beberapa preferensi kecil (misalnya tema, bahasa, dan login terakhir) di perangkatmu."],
+      ["Penyimpanan lokal", "Browser menyimpan beberapa preferensi kecil (misalnya tema, bahasa, login terakhir, dan gambar halaman login pilihanmu) di perangkatmu."],
       ["Mencabut akses", "Kamu bisa mencabut akses Novelist kapan saja lewat pengaturan keamanan akun Google-mu."],
     ],
   },
@@ -205,6 +230,14 @@ const LOGIN_I18N = {
     note: "Sign-in is required so your projects are safely saved & backed up automatically to your Google Drive. No data is stored on our servers.",
     soonNotice: (n) => `Signing in with ${n} isn't available yet. Please use Google for now — your projects are stored in your Google Drive.`,
     help: "Help", terms: "Terms", privacy: "Privacy",
+    artChange: "Change image", artUpload: "Upload image…", artReset: "Restore default image",
+    artHint: "Or drag an image onto the artwork", artDrop: "Drop to change the image",
+    artNotImage: "That file isn't an image. Choose a JPG, PNG, WebP, or GIF file.",
+    artTooBig: "That image is too large (20 MB max).",
+    artFailed: "Couldn't open that image. Try another file (JPG, PNG, or WebP).",
+    artChanged: "Login image changed — saved on this device.",
+    artChangedTemp: "Image changed, but your browser blocked saving it — it will go back to the default when the page reloads.",
+    artRestored: "Default image restored.",
     termsTitle: "Terms of Use",
     termsBody: [
       ["Use", "Novelist is a novel-writing tool. You're free to use it for personal and commercial work."],
@@ -216,7 +249,7 @@ const LOGIN_I18N = {
     privacyBody: [
       ["Data we store", "None. Novelist runs in your browser and has no storage server of its own."],
       ["Google Drive", "Projects are saved as files in your own Google Drive. Drive access is only used to read & save Novelist project files."],
-      ["Local storage", "Your browser keeps a few small preferences (such as theme, language, and last sign-in) on your device."],
+      ["Local storage", "Your browser keeps a few small preferences (such as theme, language, last sign-in, and your chosen login-page image) on your device."],
       ["Revoking access", "You can revoke Novelist's access at any time from your Google account's security settings."],
     ],
   },
@@ -267,6 +300,7 @@ async function handleLogin() {
   label.textContent = lt("waiting");
   try {
     await driveSignIn(true);
+    loadAccountInfo(true);   // nama & foto akun untuk rail (tidak ditunggu; gagal = placeholder)
     try { localStorage.setItem(LAST_LOGIN_KEY, "google"); } catch (e) { /* abaikan */ }
     el("loginView").classList.add("hidden");
     el("dashboardView").classList.remove("hidden");
@@ -345,15 +379,14 @@ function renderDashboard() {
         <div class="card-title">${escapeHtml(p.title)}</div>
         <div class="card-meta">${p.driveFileId ? '<span class="drive-dot"></span> Tersinkron' : "Belum disinkron"} · ${timeAgo(p.updatedAt)}</div>
       </div>
-      <button class="card-gear" title="Opsi" aria-label="Opsi project">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
-      </button>`;
+      <button class="card-gear" title="Opsi" aria-label="Opsi project">${tiPx(tiIcon("dots"), 18)}</button>`;
     card.addEventListener("click", (e) => { if (!e.target.closest(".card-gear")) openProject(p.id); });
     card.addEventListener("mouseenter", () => showDashCover(p));
     card.addEventListener("mouseleave", hideDashCover);
     card.querySelector(".card-gear").addEventListener("click", (e) => { e.stopPropagation(); openCardMenu(p.id, e.currentTarget); });
     grid.appendChild(card);
   });
+  renderAccountView();   // jumlah project di halaman akun (kalau sedang terbuka)
 }
 
 // ================= ADD / EDIT PROJECT MODAL =================
@@ -403,6 +436,7 @@ function openCardMenu(id, anchorEl) {
 }
 function closeAllDropdowns() {
   ["cardMenu", "settingsMenu", "projectMenu", "sceneMenu"].forEach((id) => el(id).classList.add("hidden"));
+  el("btnSettings").setAttribute("aria-expanded", "false");
 }
 async function handleCardMenuAction(action) {
   const p = getProject(activeCardMenuProjectId);
@@ -421,7 +455,7 @@ async function handleCardMenuAction(action) {
   }
   if (action === "clearCover") { p.cover = null; renderDashboard(); await saveProjectToDriveMain(p); }
   if (action === "backupWord") exportProjectToWord(p);
-  if (action === "sendCloud") { await saveProjectToDriveMain(p); toast("Tersimpan ke Google Drive ✅"); }
+  if (action === "sendCloud") { await saveProjectToDriveMain(p); toast("Tersimpan ke Google Drive", tiIcon("cloud-check")); }
   if (action === "delete") {
     if (!confirm(`Pindahkan project "${p.title}" ke Trash? Kamu masih bisa memulihkannya nanti dari Cloud Library.`)) return;
     p._deleted = true; // guard: kalau ada autosave lain yang masih berjalan untuk project ini, dia tidak akan menghidupkannya lagi
@@ -433,13 +467,13 @@ async function handleCardMenuAction(action) {
       } catch (e) {
         console.error(e);
         p._deleted = false;
-        toast("Gagal memindahkan ke Trash: " + e.message);
+        toast("Gagal memindahkan ke Trash: " + e.message, tiIcon("alert-triangle"));
         return; // jangan hapus dari daftar lokal kalau gagal — supaya tidak dikira sudah terhapus padahal masih ada di Drive
       }
     }
     projects = projects.filter((x) => x.id !== p.id);
     renderDashboard();
-    toast("Project dipindahkan ke Trash 🗑");
+    toast("Project dipindahkan ke Trash", tiIcon("trash"));
   }
 }
 
@@ -483,11 +517,12 @@ function exportProjectToWord(p) {
   const a = document.createElement("a");
   a.href = urlObj; a.download = (p.title || "novel").replace(/[\\/:*?"<>|]/g, "_") + ".doc"; a.click();
   URL.revokeObjectURL(urlObj);
-  toast("File Word berhasil diunduh 📄");
+  toast("File Word berhasil diunduh", tiIcon("file-download"));
 }
 
 // ================= PROJECT VIEW (Write / Organize) =================
 function openProject(id) {
+  closeAccountView();
   hideDashCover();
   currentProjectId = id;
   const p = getProject(id);
@@ -721,14 +756,17 @@ let pendingSceneParentId = null;
 let pendingSceneType = "scene";
 let currentZoom = 100;
 
+// ikon tree binder (Tabler, ukuran sama dengan SVG lama)
 const TREE_ICONS = {
-  caret: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>`,
-  folder: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6Z"/></svg>`,
-  file: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
-  plus: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>`,
-  pen: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z"/></svg>`,
-  copy: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
-  trash: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`,
+  caret: tiPx(tiIcon("chevron-right"), 13),
+  folder: tiPx(tiIcon("folder"), 14),
+  folderOpen: tiPx(tiIcon("folder-open"), 14),
+  file: tiPx(tiIcon("file-text"), 14),
+  plus: tiPx(tiIcon("plus"), 13),
+  focus: tiPx(tiIcon("focus-centered"), 12),
+  copy: tiPx(tiIcon("copy"), 12),
+  trash: tiPx(tiIcon("trash"), 12),
+  grip: tiPx(tiIcon("grip-vertical"), 12),
 };
 function countWordsFromHtml(html) {
   if (!html) return 0;
@@ -764,9 +802,9 @@ function buildTreeNode(node) {
   row.className = "tree-row" + (node.id === currentSceneId ? " active" : "");
   row.draggable = true;
   row.innerHTML = `
-    <span class="tree-drag-handle" title="Seret untuk pindahkan">⠿</span>
+    <span class="tree-drag-handle" title="Seret untuk pindahkan">${TREE_ICONS.grip}</span>
     <span class="tree-caret ${isFolder ? (isOpen ? "open" : "") : "leaf"}">${isFolder ? TREE_ICONS.caret : ""}</span>
-    <span class="tree-icon">${isFolder ? TREE_ICONS.folder : TREE_ICONS.file}</span>
+    <span class="tree-icon">${isFolder ? (isOpen ? TREE_ICONS.folderOpen : TREE_ICONS.folder) : TREE_ICONS.file}</span>
     ${!isFolder ? `<span class="tree-status-dot ${node.status}"></span>` : ""}
     <span class="tree-label">${escapeHtml(node.title || "(tanpa judul)")}</span>
     <span class="tree-meta">${metaText}</span>
@@ -774,7 +812,7 @@ function buildTreeNode(node) {
       ${isFolder
         ? `<button class="tree-action-btn" data-action="addChild" title="Tambah scene di dalam folder ini">${TREE_ICONS.plus}</button>
            <button class="tree-action-btn tree-action-danger" data-action="delete" title="Hapus folder & seluruh isinya">${TREE_ICONS.trash}</button>`
-        : `<button class="tree-action-btn" data-action="focus" title="Mode fokus (tanpa gangguan)">${TREE_ICONS.pen}</button>
+        : `<button class="tree-action-btn" data-action="focus" title="Mode fokus (tanpa gangguan)">${TREE_ICONS.focus}</button>
            <button class="tree-action-btn" data-action="duplicate" title="Duplikat scene">${TREE_ICONS.copy}</button>
            <button class="tree-action-btn tree-action-danger" data-action="delete" title="Hapus scene">${TREE_ICONS.trash}</button>`}
     </div>`;
@@ -839,8 +877,8 @@ function startRenameNode(node, labelEl) {
     const newTitle = input.value.trim() || originalTitle || "Tanpa Judul";
     node.title = newTitle;
     if (node.id === currentSceneId) {
-      const bp = document.querySelector(".breadcrumb-path");
-      if (bp) bp.textContent = "📄 " + newTitle;
+      const bp = document.querySelector(".breadcrumb-title");
+      if (bp) bp.textContent = newTitle;
       const tf = el("sceneTitleField");
       if (tf) tf.value = newTitle;
     }
@@ -915,7 +953,7 @@ function renderSceneDetail() {
   col.innerHTML = `
     <div class="obsidian-pane">
       <div class="breadcrumb-bar">
-        <span class="breadcrumb-path">📄 ${escapeHtml(s.title || "(tanpa judul)")}</span>
+        <span class="breadcrumb-path">${tiPx(tiIcon("file-text"), 15)}<span class="breadcrumb-title">${escapeHtml(s.title || "(tanpa judul)")}</span></span>
       </div>
       <div id="sceneEditor" class="obsidian-editor" contenteditable="true" spellcheck="false" style="font-size:${16 * currentZoom / 100}px">${s.content || ""}</div>
     </div>
@@ -923,7 +961,7 @@ function renderSceneDetail() {
     <div class="obsidian-statusbar">
       <span id="sceneWordCount" class="stats-pill">0 kata</span>
       <div class="zoom-control">
-        <span>🔍</span>
+        <span class="zoom-ic" title="Perbesar / perkecil tulisan">${tiPx(tiIcon("zoom-in"), 15)}</span>
         <input type="range" id="zoomSlider" min="70" max="160" value="${currentZoom}" />
         <span id="zoomLabel">${currentZoom}%</span>
       </div>
@@ -953,7 +991,7 @@ function renderSceneDrawerBody(s) {
   if (!body) return;
   body.innerHTML = `
     <div class="drawer-section">
-      <div class="drawer-section-label">👤 Main Information</div>
+      <div class="drawer-section-label">${tiPx(tiIcon("info-circle"), 14)}Main Information</div>
       <label class="field-label">Title</label>
       <input id="sceneTitleField" class="field-input" value="${escapeHtml(s.title)}" />
       <label class="field-label">Synopsis</label>
@@ -966,7 +1004,7 @@ function renderSceneDrawerBody(s) {
     </div>
 
     <div class="drawer-section">
-      <div class="drawer-section-label">🪶 Formatting</div>
+      <div class="drawer-section-label">${tiPx(tiIcon("typography"), 14)}Formatting</div>
       <div class="drawer-toolbar-selects">
         <select id="fmtFont" title="Font">
           <option value="Georgia">Georgia</option>
@@ -984,32 +1022,32 @@ function renderSceneDrawerBody(s) {
         </select>
       </div>
       <div class="drawer-toolbar-row">
-        <button data-cmd="bold" title="Bold"><b>B</b></button>
-        <button data-cmd="italic" title="Italic"><i>I</i></button>
-        <button data-cmd="underline" title="Underline"><u>U</u></button>
+        <button data-cmd="bold" title="Bold" aria-label="Bold">${tiPx(tiIcon("bold"), 16)}</button>
+        <button data-cmd="italic" title="Italic" aria-label="Italic">${tiPx(tiIcon("italic"), 16)}</button>
+        <button data-cmd="underline" title="Underline" aria-label="Underline">${tiPx(tiIcon("underline"), 16)}</button>
         <span class="toolbar-sep"></span>
-        <button data-cmd="justifyLeft" title="Rata kiri">⯇</button>
-        <button data-cmd="justifyCenter" title="Rata tengah">☰</button>
-        <button data-cmd="justifyRight" title="Rata kanan">⯈</button>
+        <button data-cmd="justifyLeft" title="Rata kiri" aria-label="Rata kiri">${tiPx(tiIcon("align-left"), 16)}</button>
+        <button data-cmd="justifyCenter" title="Rata tengah" aria-label="Rata tengah">${tiPx(tiIcon("align-center"), 16)}</button>
+        <button data-cmd="justifyRight" title="Rata kanan" aria-label="Rata kanan">${tiPx(tiIcon("align-right"), 16)}</button>
         <span class="toolbar-sep"></span>
-        <button data-cmd="insertUnorderedList" title="Bullet list">• ≡</button>
-        <button data-cmd="insertOrderedList" title="Numbered list">1. ≡</button>
+        <button data-cmd="insertUnorderedList" title="Bullet list" aria-label="Bullet list">${tiPx(tiIcon("list"), 16)}</button>
+        <button data-cmd="insertOrderedList" title="Numbered list" aria-label="Numbered list">${tiPx(tiIcon("list-numbers"), 16)}</button>
         <input type="color" id="fmtColor" title="Warna teks" value="#e7e5e0" />
       </div>
     </div>
 
     <div class="drawer-section">
-      <div class="drawer-section-label">⚙️ Scene Actions</div>
+      <div class="drawer-section-label">${tiPx(tiIcon("settings"), 14)}Scene Actions</div>
       <div class="drawer-action-row">
-        <button id="sceneDuplicateBtn" class="drawer-action-btn">📄 Duplikat Scene</button>
-        <button id="sceneDeleteBtn" class="drawer-action-btn drawer-action-danger">🗑️ Hapus Scene</button>
+        <button id="sceneDuplicateBtn" class="drawer-action-btn">${tiPx(tiIcon("copy"), 16)}Duplikat Scene</button>
+        <button id="sceneDeleteBtn" class="drawer-action-btn drawer-action-danger">${tiPx(tiIcon("trash"), 16)}Hapus Scene</button>
       </div>
     </div>`;
 
   el("sceneTitleField").addEventListener("input", () => {
     s.title = el("sceneTitleField").value;
-    const bp = document.querySelector(".breadcrumb-path");
-    if (bp) bp.textContent = "📄 " + (s.title || "(tanpa judul)");
+    const bp = document.querySelector(".breadcrumb-title");
+    if (bp) bp.textContent = s.title || "(tanpa judul)";
     renderSceneList();
     markDirtyAndSchedule();
   });
@@ -1144,7 +1182,7 @@ function duplicateScene(id) {
   copy.title = info.node.title + " (copy)";
   info.array.splice(info.index + 1, 0, copy);
   renderSceneList();
-  toast((copy.type === "folder" ? "Chapter" : "Scene") + " diduplikat 📄");
+  toast((copy.type === "folder" ? "Chapter" : "Scene") + " diduplikat", tiIcon("copy"));
   markDirtyAndSchedule();
 }
 function deleteSceneNode(id) {
@@ -1225,10 +1263,10 @@ function renderOrganizeList() {
     card.draggable = true;
     card.innerHTML = `
       <div class="scene-card-top">
-        <span class="drag-handle" title="Seret untuk pindahkan urutan">⠿</span>
+        <span class="drag-handle" title="Seret untuk pindahkan urutan">${TREE_ICONS.grip}</span>
         <div class="scene-card-title">${escapeHtml(item.title)}</div>
         <div class="scene-card-icons">
-          <button class="scene-icon-btn scene-icon-danger" data-action="delete" title="Hapus">🗑</button>
+          <button class="scene-icon-btn scene-icon-danger" data-action="delete" title="Hapus" aria-label="Hapus">${tiPx(tiIcon("trash"), 14)}</button>
         </div>
       </div>`;
     card.addEventListener("click", (e) => {
@@ -1301,7 +1339,7 @@ function saveNewOrganizeItem() {
 function previewNodesToHtml(list) {
   let html = "";
   (list || []).forEach((n) => {
-    if (n.type === "folder") { html += `<h2>📁 ${escapeHtml(n.title)}</h2>`; html += previewNodesToHtml(n.children); }
+    if (n.type === "folder") { html += `<h2 class="preview-chapter">${tiIcon("folder")}${escapeHtml(n.title)}</h2>`; html += previewNodesToHtml(n.children); }
     else html += `<h3>${escapeHtml(n.title)}</h3>${n.content || "<p><i>(kosong)</i></p>"}`;
   });
   return html;
@@ -1317,7 +1355,11 @@ function openPreview() {
 
 // ================= SAVE STATUS =================
 function markDirty() { hasUnsyncedChanges = true; dirtySinceLastBackup = true; if (!firstDirtyAt) firstDirtyAt = Date.now(); el("saveStatus").textContent = "Menyimpan..."; }
-function markSaved(label) { hasUnsyncedChanges = false; firstDirtyAt = null; el("saveStatus").textContent = label || "Tersimpan"; }
+// icon (opsional) = markup ikon Tabler di depan label status, mis. markSaved("Gagal sinkron", tiIcon("alert-triangle"))
+function markSaved(label, icon) {
+  hasUnsyncedChanges = false; firstDirtyAt = null;
+  el("saveStatus").innerHTML = (icon ? tiPx(icon, 13) : "") + escapeHtml(label || "Tersimpan");
+}
 async function doAutosaveFlush() {
   clearTimeout(saveDebounceTimer);
   firstDirtyAt = null;
@@ -1409,7 +1451,7 @@ async function saveProjectToDriveMain(p) {
     updateSyncIndicator(true);
     if (!el("dashboardView").classList.contains("hidden")) renderDashboard();
   } catch (e) {
-    markSaved("Gagal sinkron ⚠");
+    markSaved("Gagal sinkron", tiIcon("alert-triangle"));
     updateSyncIndicator(false);
     console.error(e);
   }
@@ -1425,7 +1467,7 @@ async function backupProjectNow(p, silent = false) {
     const payload = { ...p.data, cover: p.cover || null };
     await driveUpload(fileName, JSON.stringify(payload), null, folderId);
     await pruneOldBackups(p, folderId);
-    if (!silent) toast("Backup tersimpan 🗄");
+    if (!silent) toast("Backup tersimpan", tiIcon("history"));
     dirtySinceLastBackup = false;
   } catch (e) { console.error("Backup gagal", e); }
 }
@@ -1468,7 +1510,7 @@ async function openBackupHistory() {
         p.cover = restored.cover || null;
         el("backupModal").classList.add("hidden");
         openProject(p.id);
-        toast("Project dipulihkan dari backup ✅");
+        toast("Project dipulihkan dari backup", tiIcon("restore"));
       };
       el("backupList").appendChild(row);
     });
@@ -1500,7 +1542,7 @@ async function loadProjectsFromDrive(isInitialLogin = false) {
   } catch (e) {
     console.error(e);
     updateSyncIndicator(false);
-    if (isInitialLogin) toast("Gagal memuat project dari Drive: " + e.message);
+    if (isInitialLogin) toast("Gagal memuat project dari Drive: " + e.message, tiIcon("alert-triangle"));
   }
   renderDashboard();
 }
@@ -1510,6 +1552,7 @@ function formatDateTime(iso) {
   return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) + " " + d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 }
 function openCloudLibrary() {
+  closeAccountView();   // kembali dari Cloud Library = daftar project
   el("dashboardView").classList.add("hidden");
   el("editorView").classList.add("hidden");
   el("cloudLibraryView").classList.remove("hidden");
@@ -1547,14 +1590,16 @@ function renderSendToCloudList() {
       ${cloudAvatarHtml(p.title, p.cover, p.colorA, p.colorB)}
       <div class="cloud-row-title">${escapeHtml(p.title)}</div>
       <div class="cloud-row-meta">${p.driveFileId ? "Terkirim " + timeAgo(p.updatedAt) : "Belum pernah dikirim"}</div>
-      <button class="cloud-action-btn" title="Kirim ke Cloud">⬆</button>`;
+      <button class="cloud-action-btn" title="Kirim ke Cloud" aria-label="Kirim ke Cloud">${tiPx(tiIcon("cloud-upload"), 20)}</button>`;
     row.querySelector(".cloud-action-btn").onclick = async (e) => {
       e.stopPropagation();
       const btn = e.currentTarget;
-      btn.textContent = "…";
+      btn.innerHTML = tiPx(tiIcon("loader-2"), 20);   // berputar (CSS .cloud-action-btn.is-busy)
+      btn.classList.add("is-busy");
       if (currentProjectId === p.id) flushCurrentEdits();
       await saveProjectToDriveMain(p);
-      btn.textContent = "✓";
+      btn.classList.remove("is-busy");
+      btn.innerHTML = tiPx(tiIcon("check"), 20);
       setTimeout(() => renderSendToCloudList(), 900);
     };
     panel.appendChild(row);
@@ -1576,11 +1621,11 @@ async function renderReceiveFromCloudList() {
         ${cloudAvatarHtml(f.name, localMatch?.cover, localMatch?.colorA, localMatch?.colorB)}
         <div class="cloud-row-title">${escapeHtml(f.name.replace(/\.novj$/, ""))}</div>
         <div class="cloud-row-meta">${formatDateTime(f.modifiedTime)}</div>
-        <button class="cloud-action-btn" title="Ambil dari Cloud">⬇</button>`;
+        <button class="cloud-action-btn" title="Ambil dari Cloud" aria-label="Ambil dari Cloud">${tiPx(tiIcon("cloud-download"), 20)}</button>`;
       row.onclick = () => pullFromCloud(f);
       panel.appendChild(row);
     });
-  } catch (e) { panel.innerHTML = '<p class="cloud-empty">Gagal memuat daftar: ' + e.message + "</p>"; }
+  } catch (e) { panel.innerHTML = '<p class="cloud-empty">Gagal memuat daftar: ' + escapeHtml(e.message) + "</p>"; }
 }
 async function pullFromCloud(f) {
   try {
@@ -1595,7 +1640,7 @@ async function pullFromCloud(f) {
       p = { id: "proj-" + f.id, title: data.title || f.name.replace(/\.novj$/, ""), description: "", template: "standard", cover: data.cover || null, colorA: colorPair[0], colorB: colorPair[1], driveFileId: f.id, updatedAt: f.modifiedTime, data };
       projects.unshift(p);
     }
-    toast('Project "' + p.title + '" diambil dari Cloud ✅');
+    toast('Project "' + p.title + '" diambil dari Cloud', tiIcon("cloud-download"));
     el("cloudLibraryView").classList.add("hidden");
     openProject(p.id);
   } catch (e) { alert("Gagal mengambil dari Drive: " + e.message); }
@@ -1618,14 +1663,14 @@ async function renderTrashList() {
         <div class="cloud-row-title">${escapeHtml(f.name.replace(/\.novj$/, ""))}</div>
         <div class="cloud-row-meta">Dihapus ${timeAgo(f.modifiedTime)}</div>
         <div class="cloud-row-actions">
-          <button class="cloud-action-btn" data-act="restore" title="Pulihkan project">⟲</button>
-          <button class="cloud-action-btn cloud-action-danger" data-act="wipe" title="Hapus permanen">🗑</button>
+          <button class="cloud-action-btn" data-act="restore" title="Pulihkan project" aria-label="Pulihkan project">${tiPx(tiIcon("restore"), 20)}</button>
+          <button class="cloud-action-btn cloud-action-danger" data-act="wipe" title="Hapus permanen" aria-label="Hapus permanen">${tiPx(tiIcon("trash-x"), 20)}</button>
         </div>`;
       row.querySelector('[data-act="restore"]').onclick = (e) => { e.stopPropagation(); restoreFromTrash(f); };
       row.querySelector('[data-act="wipe"]').onclick = (e) => { e.stopPropagation(); permanentlyDeleteFromTrash(f); };
       panel.appendChild(row);
     });
-  } catch (e) { panel.innerHTML = '<p class="cloud-empty">Gagal memuat Trash: ' + e.message + "</p>"; }
+  } catch (e) { panel.innerHTML = '<p class="cloud-empty">Gagal memuat Trash: ' + escapeHtml(e.message) + "</p>"; }
 }
 async function restoreFromTrash(f) {
   try {
@@ -1638,23 +1683,413 @@ async function restoreFromTrash(f) {
     const colorPair = COLOR_PAIRS[Math.floor(Math.random() * COLOR_PAIRS.length)];
     const p = { id: "proj-" + f.id, title: data.title || f.name.replace(/\.novj$/, ""), description: "", template: "standard", cover: data.cover || null, colorA: colorPair[0], colorB: colorPair[1], driveFileId: f.id, updatedAt: new Date().toISOString(), data };
     if (!projects.some((x) => x.driveFileId === f.id)) projects.unshift(p);
-    toast('Project "' + p.title + '" dipulihkan ✅');
+    toast('Project "' + p.title + '" dipulihkan', tiIcon("restore"));
     renderTrashList();
-  } catch (e) { toast("Gagal memulihkan: " + e.message); }
+  } catch (e) { toast("Gagal memulihkan: " + e.message, tiIcon("alert-triangle")); }
 }
 async function permanentlyDeleteFromTrash(f) {
   if (!confirm(`Hapus permanen "${f.name.replace(/\.novj$/, "")}"? Tindakan ini tidak bisa dibatalkan.`)) return;
   try {
     await driveDelete(f.id);
-    toast("Dihapus permanen dari Trash ✅");
+    toast("Dihapus permanen dari Trash", tiIcon("trash-x"));
     renderTrashList();
-  } catch (e) { toast("Gagal menghapus permanen: " + e.message); }
+  } catch (e) { toast("Gagal menghapus permanen: " + e.message, tiIcon("alert-triangle")); }
 }
 
 function updateSyncIndicator(ok) {
   const ind = el("syncIndicator");
-  ind.textContent = ok ? "☁ Tersinkron" : "☁ Gagal sinkron";
+  ind.innerHTML = ok ? `${tiPx(tiIcon("cloud-check"), 14)}<span>Tersinkron</span>` : `${tiPx(tiIcon("cloud-x"), 14)}<span>Gagal sinkron</span>`;
   ind.style.color = ok ? "var(--success)" : "var(--danger)";
+}
+
+// ================= AKUN (Pengaturan Akun) =================
+// Info akun dibaca dari Drive API about.get (jalan dengan scope drive.file): nama, email, foto, permissionId & kuota Drive.
+// Preferensi profil (username, nama tampilan, foto unggahan) disimpan LOKAL di browser per akun Google
+// (localStorage "novelist_profile_<permissionId>") — Novelist tidak punya server, jadi profil ini tidak ikut ke perangkat lain.
+// Semua kegagalan jatuh ke placeholder supaya dashboard tidak pernah ikut rusak.
+const ACCOUNT_REFRESH_MS = 5 * 60000;          // data akun disegarkan saat halaman akun dibuka bila lebih tua dari ini
+const PROFILE_KEY_PREFIX = "novelist_profile_";
+const FIRST_SEEN_KEY_PREFIX = "novelist_first_seen_";
+const THEME_KEY = "novelist_theme";
+const USERNAME_RE = /^[a-z0-9_.]{3,24}$/;
+let accountInfo = null;          // { user: {displayName, emailAddress, photoLink, permissionId}, quota: {limit, usage} | null, memberSince, fetchedAt }
+let accountStatus = "idle";      // idle | loading | ok | error
+let accountFetchPromise = null;
+let accountGen = 0;              // naik tiap logout: hasil fetch lama dibuang
+let accountViewOpen = false;
+let accountPendingAvatar;        // modal profil: undefined = tidak diubah, null = kembali ke foto Google, string = data URL baru
+let avatarPickTarget = "direct"; // "direct" = klik avatar besar (langsung disimpan), "modal" = tombol unggah di modal profil
+
+function loadAccountInfo(force = false) {
+  if (!accessToken) return Promise.resolve(accountInfo);
+  if (!force && accountInfo && Date.now() - accountInfo.fetchedAt < ACCOUNT_REFRESH_MS) return Promise.resolve(accountInfo);
+  if (accountFetchPromise) return accountFetchPromise;
+  const gen = accountGen;
+  if (!accountInfo) { accountStatus = "loading"; renderAccountAll(); }
+  const run = (async () => {
+    try {
+      const res = await driveFetch(`${DRIVE_API}/about?fields=user(displayName,emailAddress,photoLink,permissionId),storageQuota(limit,usage)`);
+      const about = await res.json();
+      if (gen !== accountGen) return null;
+      const user = about.user || {};
+      let memberSince = accountInfo && accountInfo.user.permissionId === user.permissionId ? accountInfo.memberSince : null;
+      if (!memberSince) memberSince = await fetchMemberSince().catch(() => null);
+      if (gen !== accountGen) return null;
+      accountInfo = { user, quota: about.storageQuota || null, memberSince, fetchedAt: Date.now() };
+      accountStatus = "ok";
+      rememberFirstSeen();
+    } catch (e) {
+      console.warn("Info akun gagal dimuat:", e);
+      if (gen === accountGen) accountStatus = accountInfo ? "ok" : "error";
+    } finally {
+      if (accountFetchPromise === run) accountFetchPromise = null;
+    }
+    if (gen === accountGen) renderAccountAll();
+    return accountInfo;
+  })();
+  accountFetchPromise = run;
+  return run;
+}
+// "Member sejak" = tanggal folder utama Novelist dibuat di Drive. Folder TIDAK dibuat dari sini (hanya dibaca),
+// supaya tidak balapan dengan getOrCreateFolder() milik loadProjectsFromDrive saat login.
+async function fetchMemberSince() {
+  if (mainFolderIdCache) {
+    const f = await (await driveFetch(`${DRIVE_API}/files/${mainFolderIdCache}?fields=createdTime`)).json();
+    return f.createdTime || null;
+  }
+  const q = encodeURIComponent(`mimeType='application/vnd.google-apps.folder' and name='${DRIVE_FOLDER_NAME}' and trashed=false`);
+  const data = await (await driveFetch(`${DRIVE_API}/files?q=${q}&fields=files(id,createdTime)&orderBy=createdTime&pageSize=1`)).json();
+  return (data.files && data.files[0] && data.files[0].createdTime) || null;
+}
+function resetAccountState() {
+  accountGen++;
+  accountInfo = null; accountStatus = "idle"; accountFetchPromise = null;
+  closeAccountView();
+  renderAccountRail();
+}
+
+// ---- preferensi lokal per akun ----
+function accountStoreKey(prefix) { return prefix + ((accountInfo && accountInfo.user.permissionId) || "local"); }
+function rememberFirstSeen() {
+  try { const k = accountStoreKey(FIRST_SEEN_KEY_PREFIX); if (!localStorage.getItem(k)) localStorage.setItem(k, new Date().toISOString()); } catch (e) { /* storage diblokir */ }
+}
+function readFirstSeen() { try { return localStorage.getItem(accountStoreKey(FIRST_SEEN_KEY_PREFIX)); } catch (e) { return null; } }
+function loadProfilePrefs() {
+  let p = null;
+  try { p = JSON.parse(localStorage.getItem(accountStoreKey(PROFILE_KEY_PREFIX)) || "null"); } catch (e) { p = null; }
+  if (!p || typeof p !== "object") p = {};
+  return {
+    username: typeof p.username === "string" && USERNAME_RE.test(p.username) ? p.username : null,
+    displayName: typeof p.displayName === "string" && p.displayName.trim() ? p.displayName.trim().slice(0, 40) : null,
+    avatar: typeof p.avatar === "string" && p.avatar.startsWith("data:image/") ? p.avatar : null,
+  };
+}
+function saveProfilePrefs(patch) {
+  const next = { ...loadProfilePrefs(), ...patch };
+  Object.keys(next).forEach((k) => { if (next[k] == null || next[k] === "") delete next[k]; });
+  try { localStorage.setItem(accountStoreKey(PROFILE_KEY_PREFIX), JSON.stringify(next)); return true; }
+  catch (e) { toast("Gagal menyimpan: penyimpanan browser penuh atau diblokir", tiIcon("alert-triangle")); return false; }
+}
+
+// ---- nilai turunan (Google + override lokal) ----
+function accountEmail() { return (accountInfo && accountInfo.user.emailAddress) || ""; }
+function accountDisplayName() { return loadProfilePrefs().displayName || (accountInfo && accountInfo.user.displayName) || accountEmail().split("@")[0] || "Penulis"; }
+function defaultUsername() {
+  const base = (accountEmail().split("@")[0] || (accountInfo && accountInfo.user.displayName) || "").toLowerCase().replace(/[^a-z0-9_.]/g, "").slice(0, 24);
+  return base.length >= 3 ? base : "penulis";
+}
+function accountUsername() { return loadProfilePrefs().username || defaultUsername(); }
+function googlePhotoUrl() {
+  const link = accountInfo && accountInfo.user.photoLink;
+  if (!link) return null;
+  return link.replace(/=s\d+(-c)?$/, "=s256-c");   // foto Google default 64px -> minta 256px supaya tajam di avatar besar
+}
+function accountAvatarSrc() { return loadProfilePrefs().avatar || googlePhotoUrl(); }
+function formatBytes(n) {
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let v = Number(n) || 0, i = 0;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return v.toLocaleString("id-ID", { maximumFractionDigits: i === 0 || v >= 100 ? 0 : 1 }) + " " + units[i];
+}
+
+// ---- render ----
+// avatar bulat: huruf awal di atas lingkaran aksen; foto (Google / unggahan) menimpanya setelah berhasil dimuat
+function paintAvatar(box, src, name) {
+  if (!box) return;
+  const initial = Array.from((name || "").trim())[0];
+  const key = (src || "") + "|" + (initial || "");
+  if (box.dataset.key === key) return;   // tidak berubah: jangan muat ulang gambarnya
+  box.dataset.key = key;
+  box.classList.remove("has-img");
+  box.innerHTML = `<span class="acc-initial">${initial ? escapeHtml(initial.toUpperCase()) : tiIcon("user")}</span>`;
+  if (!src) return;
+  const img = document.createElement("img");
+  img.alt = ""; img.draggable = false; img.decoding = "async"; img.referrerPolicy = "no-referrer";
+  img.onload = () => box.classList.add("has-img");
+  img.onerror = () => { img.remove(); box.classList.remove("has-img"); };
+  img.src = src;
+  box.appendChild(img);
+}
+function renderAccountRail() {
+  const name = accountInfo ? accountDisplayName() : "";
+  paintAvatar(el("railAvatar"), accountInfo ? accountAvatarSrc() : null, name);
+  el("btnRailAccount").setAttribute("aria-label", name ? `Pengaturan Akun (${name})` : "Pengaturan Akun");
+}
+function renderAccountView() {
+  if (!accountViewOpen) return;
+  const u = (accountInfo && accountInfo.user) || {};
+  const failed = !accountInfo && accountStatus === "error";
+  const name = accountInfo ? accountDisplayName() : failed ? "Akun Google" : "Memuat akun…";
+  el("accName").textContent = name;
+  el("accEmail").textContent = u.emailAddress || (failed ? "Info akun belum bisa dimuat — coba buka lagi nanti." : "");
+  const since = accountInfo ? accountInfo.memberSince || readFirstSeen() : null;
+  const sinceDate = since ? new Date(since) : null;
+  el("accSince").textContent = sinceDate && !isNaN(sinceDate) ? "Member sejak " + sinceDate.toLocaleDateString("id-ID", { month: "long", year: "numeric" }) : "";
+  paintAvatar(el("accAvatar"), accountInfo ? accountAvatarSrc() : null, accountInfo ? name : "");
+  el("accUsername").textContent = "@" + accountUsername();
+  el("accEmailValue").textContent = u.emailAddress || "—";
+  el("accEmailValue").title = u.emailAddress || "";
+  el("accGoogleSub").textContent = u.emailAddress || "Terhubung";
+  el("accProjectCount").textContent = projects.length + " project";
+  renderAccountStorage(failed);
+  syncAccountThemeSeg();
+}
+function renderAccountStorage(failed) {
+  const q = accountInfo && accountInfo.quota;
+  const text = el("accStorageText"), wrap = el("accStorageBarWrap"), bar = el("accStorageBar");
+  wrap.classList.remove("is-empty", "is-unlimited", "is-full");
+  wrap.removeAttribute("aria-valuenow");
+  if (!q) {
+    text.textContent = failed || accountInfo ? "Tidak tersedia" : "Memuat…";
+    wrap.classList.add("is-empty");
+  } else {
+    const usage = Number(q.usage) || 0, limit = Number(q.limit) || 0;
+    if (limit > 0) {
+      const pct = Math.min(100, (usage / limit) * 100);
+      text.textContent = `${formatBytes(usage)} dari ${formatBytes(limit)}`;
+      bar.style.width = (usage > 0 ? Math.max(pct, 1.5) : 0) + "%";
+      wrap.classList.toggle("is-full", pct >= 90);
+      wrap.setAttribute("aria-valuenow", String(Math.round(pct)));
+    } else {   // tanpa limit (mis. akun Workspace tertentu): tampilkan pemakaian saja
+      text.textContent = `${formatBytes(usage)} terpakai · tanpa batas`;
+      wrap.classList.add("is-unlimited");
+    }
+  }
+  el("accStorageNote").innerHTML = `Semua project tersimpan di Google Drive-mu sendiri: folder <b>${escapeHtml(DRIVE_FOLDER_NAME)}</b>, backup otomatis di <b>${escapeHtml(DRIVE_BACKUP_FOLDER_NAME)}</b>, dan project yang dihapus di <b>${escapeHtml(DRIVE_TRASH_FOLDER_NAME)}</b>. Tidak ada yang disimpan di server kami.`;
+}
+function renderAccountAll() { renderAccountRail(); renderAccountView(); }
+function syncAccountThemeSeg() {
+  const light = document.body.classList.contains("light");
+  el("accThemeSeg").querySelectorAll("button").forEach((b) => {
+    const on = (b.dataset.theme === "light") === light;
+    b.classList.toggle("is-on", on);
+    b.setAttribute("aria-checked", String(on));
+  });
+}
+
+// ---- buka / tutup halaman akun ----
+function setRailPage(page) {
+  [["btnRailProjects", "projects"], ["btnRailAccount", "account"]].forEach(([id, p]) => {
+    const b = el(id);
+    b.classList.toggle("is-active", p === page);
+    if (p === page) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  });
+}
+function openAccountView() {
+  closeAllDropdowns();
+  hideDashCover();
+  const view = el("accountView");
+  const wasOpen = accountViewOpen;
+  accountViewOpen = true;
+  el("dashboardView").classList.add("is-account");
+  view.classList.remove("hidden");
+  setRailPage("account");
+  renderAccountView();
+  loadAccountInfo();   // segarkan bila data sudah lebih tua dari ACCOUNT_REFRESH_MS
+  if (wasOpen) return;
+  view.scrollTop = 0;
+  document.addEventListener("keydown", accountKeyHandler);
+  view.focus({ preventScroll: true });
+  animateAccountIn();
+}
+function closeAccountView() {
+  if (!accountViewOpen) return;
+  accountViewOpen = false;
+  closeAccountModals();
+  el("dashboardView").classList.remove("is-account");
+  el("accountView").classList.add("hidden");
+  setRailPage("projects");
+  document.removeEventListener("keydown", accountKeyHandler);
+}
+function accountKeyHandler(e) {
+  if (e.key !== "Escape" || e.defaultPrevented) return;   // defaultPrevented: Esc sudah dipakai menutup menu gear
+  const openModals = [...document.querySelectorAll(".modal:not(.hidden)")];
+  if (openModals.length) { if (openModals.some((m) => m.classList.contains("acc-modal"))) closeAccountModals(); return; }
+  if (!el("settingsMenu").classList.contains("hidden") || el("dashboardView").classList.contains("hidden")) return;
+  closeAccountView();
+  el("btnRailProjects").focus();
+}
+function animateAccountIn() {
+  const M = window.Motion;
+  if (!M || !M.animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  try {
+    M.animate(el("accountView").querySelectorAll(".acc-anim"), { opacity: [0, 1], y: [10, 0] },
+      { duration: 0.36, delay: M.stagger ? M.stagger(0.035) : 0, ease: [0.2, 0.8, 0.2, 1] });
+  } catch (e) { /* animasi hanya hiasan */ }
+}
+
+// ---- modal username & profil ----
+function closeAccountModals() {
+  el("accUsernameModal").classList.add("hidden");
+  el("accProfileModal").classList.add("hidden");
+}
+function usernameError(v) {
+  if (v.length < 3) return "Minimal 3 karakter.";
+  if (v.length > 24) return "Maksimal 24 karakter.";
+  if (!USERNAME_RE.test(v)) return "Hanya huruf kecil, angka, titik (.) dan garis bawah (_).";
+  return null;
+}
+function showUsernameMsg(err) {
+  const msg = el("accUsernameMsg");
+  msg.textContent = err || "3–24 karakter: huruf kecil, angka, titik (.) atau garis bawah (_).";
+  msg.classList.toggle("is-error", !!err);
+  el("accUsernameInput").classList.toggle("is-invalid", !!err);
+  el("accUsernameInput").setAttribute("aria-invalid", String(!!err));
+}
+function openUsernameModal() {
+  const input = el("accUsernameInput");
+  input.value = accountUsername();
+  showUsernameMsg(null);
+  el("accUsernameModal").classList.remove("hidden");
+  input.focus(); input.select();
+}
+function saveUsernameModal() {
+  const v = el("accUsernameInput").value.trim().toLowerCase();
+  const err = usernameError(v);
+  if (err) { showUsernameMsg(err); el("accUsernameInput").focus(); return; }
+  if (!saveProfilePrefs({ username: v })) return;
+  closeAccountModals();
+  renderAccountAll();
+  toast("Username disimpan: @" + v, tiIcon("circle-check"));
+}
+function profileModalAvatarSrc() {
+  if (accountPendingAvatar === undefined) return accountAvatarSrc();
+  return accountPendingAvatar || googlePhotoUrl();
+}
+function paintProfileModalAvatar() {
+  const name = el("accPfName").value.trim() || (accountInfo && accountInfo.user.displayName) || accountDisplayName();
+  paintAvatar(el("accPfAvatar"), profileModalAvatarSrc(), name);
+  const usingCustom = accountPendingAvatar === undefined ? !!loadProfilePrefs().avatar : !!accountPendingAvatar;
+  el("accPfGoogle").disabled = !usingCustom;
+}
+function openProfileModal() {
+  accountPendingAvatar = undefined;
+  const input = el("accPfName");
+  input.value = loadProfilePrefs().displayName || "";
+  input.placeholder = (accountInfo && accountInfo.user.displayName) || "Nama tampilan";
+  paintProfileModalAvatar();
+  el("accProfileModal").classList.remove("hidden");
+  input.focus();
+}
+function saveProfileModal() {
+  const name = el("accPfName").value.trim().slice(0, 40);
+  const googleName = accountInfo && accountInfo.user.displayName;
+  const patch = { displayName: name && name !== googleName ? name : null };
+  if (accountPendingAvatar !== undefined) patch.avatar = accountPendingAvatar;
+  if (!saveProfilePrefs(patch)) return;
+  closeAccountModals();
+  renderAccountAll();
+  toast("Profil disimpan", tiIcon("circle-check"));
+}
+// gambar apa pun -> potong persegi di tengah -> 256x256 JPEG (data URL kecil, muat di localStorage)
+function imageFileToSquare(file, size = 256) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\//.test(file.type)) { reject(new Error("File yang dipilih bukan gambar")); return; }
+    if (file.size > 25 * 1024 * 1024) { reject(new Error("Gambar terlalu besar (maks. 25 MB)")); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const s = Math.min(img.naturalWidth, img.naturalHeight);
+        const c = document.createElement("canvas");
+        c.width = c.height = size;
+        const ctx = c.getContext("2d");
+        ctx.fillStyle = "#1d1d22";   // latar untuk gambar transparan (JPEG tidak punya alpha)
+        ctx.fillRect(0, 0, size, size);
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, size, size);
+        resolve(c.toDataURL("image/jpeg", 0.88));
+      } catch (e) { reject(new Error("Gambar tidak bisa diproses")); }
+      finally { URL.revokeObjectURL(url); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Gambar tidak bisa dibaca")); };
+    img.src = url;
+  });
+}
+function pickAvatar(target) {
+  avatarPickTarget = target;
+  const input = el("accAvatarInput");
+  input.value = "";
+  input.click();
+}
+async function onAvatarPicked(e) {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    const dataUrl = await imageFileToSquare(file, 256);
+    if (avatarPickTarget === "modal") { accountPendingAvatar = dataUrl; paintProfileModalAvatar(); }
+    else if (saveProfilePrefs({ avatar: dataUrl })) { renderAccountAll(); toast("Foto profil diperbarui", tiIcon("circle-check")); }
+  } catch (err) { toast(err.message || "Gambar tidak bisa dipakai", tiIcon("alert-triangle")); }
+}
+
+function initAccount() {
+  // tema terakhir disimpan di browser; observer menjaga semua tombol tema (rail, menu, sidebar, halaman akun) tetap sinkron
+  try { if (localStorage.getItem(THEME_KEY) === "light") document.body.classList.add("light"); } catch (e) { /* abaikan */ }
+  let lastLight = document.body.classList.contains("light");
+  new MutationObserver(() => {
+    const light = document.body.classList.contains("light");
+    if (light === lastLight) return;
+    lastLight = light;
+    try { localStorage.setItem(THEME_KEY, light ? "light" : "dark"); } catch (e) { /* abaikan */ }
+    syncAccountThemeSeg();
+  }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  syncAccountThemeSeg();
+  renderAccountRail();
+
+  el("btnRailProjects").onclick = () => closeAccountView();
+  el("btnRailAccount").onclick = () => openAccountView();
+  el("menuAccountSettings").onclick = () => openAccountView();
+  el("menuHelp").onclick = () => el("supportModal").classList.remove("hidden");
+  el("btnSideAccount").onclick = () => { backToLibrary(); openAccountView(); };
+  el("accAvatarBtn").onclick = () => pickAvatar("direct");
+  el("accRowUsername").onclick = openUsernameModal;
+  el("accRowProfile").onclick = openProfileModal;
+  el("accThemeSeg").querySelectorAll("button").forEach((b) => b.onclick = () => document.body.classList.toggle("light", b.dataset.theme === "light"));
+  el("accGoogleDisconnect").onclick = () => { if (confirm("Putuskan Google dari Novelist? Kamu akan keluar dan perlu login lagi untuk membuka project-mu.")) driveSignOut(); };
+  el("accLogout").onclick = () => { if (confirm("Keluar dari akun Google?")) driveSignOut(); };
+
+  const uInput = el("accUsernameInput");
+  uInput.addEventListener("input", () => {
+    const lower = uInput.value.toLowerCase().replace(/\s/g, "");
+    if (lower !== uInput.value) { const pos = uInput.selectionStart; uInput.value = lower; uInput.setSelectionRange(pos, pos); }
+    showUsernameMsg(lower.length >= 3 ? usernameError(lower) : null);   // terlalu pendek baru ditegur saat Simpan
+  });
+  uInput.addEventListener("keydown", (e) => { if (e.key === "Enter") saveUsernameModal(); });
+  el("accUsernameCancel").onclick = closeAccountModals;
+  el("accUsernameSave").onclick = saveUsernameModal;
+  el("accPfName").addEventListener("input", paintProfileModalAvatar);
+  el("accPfName").addEventListener("keydown", (e) => { if (e.key === "Enter") saveProfileModal(); });
+  el("accPfUpload").onclick = () => pickAvatar("modal");
+  el("accPfGoogle").onclick = () => { accountPendingAvatar = null; paintProfileModalAvatar(); };
+  el("accPfCancel").onclick = closeAccountModals;
+  el("accPfSave").onclick = saveProfileModal;
+  el("accAvatarInput").addEventListener("change", onAvatarPicked);
+  document.querySelectorAll(".acc-modal").forEach((m) => m.addEventListener("click", (e) => { if (e.target === m) closeAccountModals(); }));
+  // Esc menutup menu gear (di halaman mana pun)
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !el("settingsMenu").classList.contains("hidden")) { e.preventDefault(); closeAllDropdowns(); el("btnSettings").focus(); }
+  });
 }
 
 // ================= LOGIN ART (kolom kiri halaman login) =================
@@ -1662,6 +2097,7 @@ function updateSyncIndicator(ok) {
 // Gambar = ilustrasi karakter dengan background transparan (dibuang dari JPG asli). Dimuat dari login-art-data.js (data URI,
 // berfungsi bahkan saat halaman dibuka dari file://); kalau file itu tidak ada, dipakai login-art.webp (butuh http/https).
 // transparent: true + gambar ber-alpha -> dot halftone hanya menutupi karakternya, dot-grid #loginView tetap terlihat di sekelilingnya.
+// Pengguna bisa mengganti gambarnya sendiri (tombol kiri-bawah #btnLoginArt) — lihat "Gambar pilihan pengguna" di bawah.
 const LOGIN_ART_OPTIONS = {
   src: window.LOGIN_ART_DATA || "login-art.webp",
   transparent: true,
@@ -1677,19 +2113,238 @@ const LOGIN_ART_OPTIONS = {
   brightness: -0.22        // kembalikan ke default (contrast 1.1, brightness 0) kalau mau lebih terang
 };
 
-function initLoginArt() {
+// ---- Gambar pilihan pengguna (tombol kiri-bawah / seret-lepas ke kolom kiri) ----
+// Disimpan HANYA di perangkat ini (halaman login tampil sebelum login, jadi bukan di Drive): IndexedDB "novelist"/"kv",
+// localStorage sebagai cadangan bila datanya kecil. Disimpan sebagai data URI karena WebGL tidak boleh membaca file lokal
+// di file:// (lihat login-art-data.js) — data URI selalu boleh.
+const LOGIN_ART_CUSTOM_KEY = "loginArtCustom";          // key di IndexedDB novelist/kv
+const LOGIN_ART_CUSTOM_LS_KEY = "novelist_login_art";   // cadangan localStorage
+const LOGIN_ART_MAX_BYTES = 20 * 1024 * 1024;           // batas ukuran file masukan
+const LOGIN_ART_MAX_SIDE = 1600;                        // sisi terpanjang setelah diperkecil (cukup tajam untuk kolom kiri)
+const LOGIN_ART_LS_MAX_CHARS = 1500000;                 // localStorage cuma ~5 MB per situs -> hanya gambar kecil
+// Gambar pengguna biasanya foto biasa: tone netral (default React Bits) cocok untuk foto apa pun, termasuk PNG ber-alpha.
+// Setelan contrast 1.5 / brightness -0.22 di atas khusus untuk karakter bawaan yang serba terang.
+const LOGIN_ART_CUSTOM_TONE = { contrast: 1.1, brightness: 0 };
+
+let loginArt = null;          // instance HalftoneReveal yang aktif (null = belum dibuat / layar sempit)
+let loginArtCustom = null;    // { src, alpha, w, h, at } gambar pilihan pengguna; null = karakter bawaan
+let loginArtTouched = false;  // pengguna sudah ganti/reset sebelum gambar tersimpan selesai dibaca -> abaikan hasil bacaan
+let loginArtBusy = false;
+
+function loginArtOptions() {
+  if (!loginArtCustom) return LOGIN_ART_OPTIONS;
+  return Object.assign({}, LOGIN_ART_OPTIONS, LOGIN_ART_CUSTOM_TONE, { src: loginArtCustom.src });
+}
+// Browser tanpa WebGL2 (atau hardware acceleration mati): gambarnya ditampilkan apa adanya supaya kolom kiri tidak kosong.
+function loginArtFallbackBg(src) { return 'center / contain no-repeat url("' + src + '")'; }
+
+// Terapkan gambar aktif ke HalftoneReveal yang sedang jalan. update() sanggup mengganti src + tone tanpa bikin ulang konteks WebGL.
+function applyLoginArt() {
   const host = el("loginArt");
-  if (!host || !window.HalftoneReveal) return;
+  if (!host || !loginArt) return;   // belum dibuat -> sync() di initLoginArt memakai loginArtOptions() saat membuatnya
+  const opts = loginArtOptions();
+  if (loginArt.supported) loginArt.update(opts);
+  else host.style.background = loginArtFallbackBg(opts.src);
+}
+
+// IndexedDB kecil key-value ("novelist" / store "kv"). Bisa gagal (mode privat, storage diblokir) -> pemanggil wajib siap.
+function loginArtKv(mode, run) {
+  return new Promise((resolve, reject) => {
+    let req;
+    try { req = window.indexedDB.open("novelist"); } catch (e) { reject(e); return; }   // tanpa nomor versi: tetap jalan kalau fitur lain menaikkan versinya
+    req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains("kv")) req.result.createObjectStore("kv"); };
+    req.onerror = () => reject(req.error || new Error("IndexedDB gagal dibuka"));
+    req.onblocked = () => reject(new Error("IndexedDB terblokir"));
+    req.onsuccess = () => {
+      const db = req.result;
+      try {
+        const tx = db.transaction("kv", mode);
+        const r = run(tx.objectStore("kv"));
+        tx.oncomplete = () => { db.close(); resolve(r ? r.result : undefined); };
+        tx.onerror = tx.onabort = () => { db.close(); reject(tx.error || new Error("IndexedDB gagal")); };
+      } catch (e) { db.close(); reject(e); }
+    };
+  });
+}
+
+// hanya data URI gambar base64 (aman ditempel ke url("...") CSS fallback)
+function isLoginArtRecord(rec) {
+  return !!rec && typeof rec.src === "string" && /^data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/]+=*$/i.test(rec.src);
+}
+function loginArtDecodes(src) {
+  const img = new Image();
+  img.src = src;
+  return img.decode().then(() => img.naturalWidth > 0, () => false);
+}
+
+async function loadLoginArtCustom() {
+  let rec = null;
+  try { rec = await loginArtKv("readonly", (s) => s.get(LOGIN_ART_CUSTOM_KEY)); } catch (e) { rec = null; }
+  if (!isLoginArtRecord(rec)) {
+    rec = null;
+    try { const raw = localStorage.getItem(LOGIN_ART_CUSTOM_LS_KEY); if (raw) rec = JSON.parse(raw); } catch (e) { rec = null; }
+  }
+  if (!isLoginArtRecord(rec)) return null;
+  // data rusak -> buang supaya kolom kiri tidak kosong terus
+  if (!(await loginArtDecodes(rec.src))) { clearLoginArtCustom(); return null; }
+  return rec;
+}
+async function saveLoginArtCustom(rec) {
+  let ok = false;
+  try { await loginArtKv("readwrite", (s) => s.put(rec, LOGIN_ART_CUSTOM_KEY)); ok = true; } catch (e) { /* lanjut ke localStorage */ }
+  try {
+    if (ok || rec.src.length > LOGIN_ART_LS_MAX_CHARS) localStorage.removeItem(LOGIN_ART_CUSTOM_LS_KEY);
+    else { localStorage.setItem(LOGIN_ART_CUSTOM_LS_KEY, JSON.stringify(rec)); ok = true; }
+  } catch (e) { /* penuh / diblokir */ }
+  // gagal total: jangan sampai gambar LAMA yang tersimpan muncul lagi setelah reload
+  if (!ok) try { await loginArtKv("readwrite", (s) => s.delete(LOGIN_ART_CUSTOM_KEY)); } catch (e) { /* abaikan */ }
+  return ok;
+}
+async function clearLoginArtCustom() {
+  try { await loginArtKv("readwrite", (s) => s.delete(LOGIN_ART_CUSTOM_KEY)); } catch (e) { /* abaikan */ }
+  try { localStorage.removeItem(LOGIN_ART_CUSTOM_LS_KEY); } catch (e) { /* abaikan */ }
+}
+
+// File -> data URI kecil: decode, perkecil (sisi terpanjang <= LOGIN_ART_MAX_SIDE), encode WebP (alpha tetap ada di Chromium).
+// Browser yang tidak bisa encode WebP (Safari) otomatis dapat PNG (bila ada alpha) atau JPEG (foto biasa, lebih kecil).
+async function prepareLoginArtImage(file) {
+  let source = null, url = null;
+  try {
+    if (window.createImageBitmap) { try { source = await createImageBitmap(file); } catch (e) { source = null; } }
+    if (!source) {   // mis. SVG / browser lama: lewat <img>
+      url = URL.createObjectURL(file);
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      source = img;
+    }
+    const w0 = source.naturalWidth || source.width, h0 = source.naturalHeight || source.height;
+    if (!w0 || !h0) throw new Error("ukuran gambar 0");
+    const scale = Math.min(1, LOGIN_ART_MAX_SIDE / Math.max(w0, h0));
+    const w = Math.max(1, Math.round(w0 * scale)), h = Math.max(1, Math.round(h0 * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(source, 0, 0, w, h);
+    const px = ctx.getImageData(0, 0, w, h).data;
+    let alpha = false;
+    for (let i = 3; i < px.length; i += 4) if (px[i] < 250) { alpha = true; break; }
+    let src = canvas.toDataURL("image/webp", 0.92);
+    if (!src.startsWith("data:image/webp")) src = alpha ? canvas.toDataURL("image/png") : canvas.toDataURL("image/jpeg", 0.9);
+    return { src, alpha, w, h, at: Date.now() };
+  } finally {
+    if (source && source.close) source.close();   // ImageBitmap
+    if (url) URL.revokeObjectURL(url);
+  }
+}
+
+function syncLoginArtMenu() {
+  const reset = el("btnLoginArtReset");
+  if (reset) reset.classList.toggle("hidden", !loginArtCustom);
+}
+
+// Ganti gambar halftone dengan file pilihan pengguna (dari tombol unggah atau seret-lepas).
+async function changeLoginArt(file) {
+  if (loginArtBusy || !file) return;
+  // file.type kadang kosong (mis. .webp di sistem lama) -> cek ekstensinya
+  const isImage = /^image\//i.test(file.type || "") || (!file.type && /\.(png|jpe?g|webp|gif|bmp|avif|svg)$/i.test(file.name || ""));
+  if (!isImage) { showLoginNotice(lt("artNotImage")); return; }
+  if (file.size > LOGIN_ART_MAX_BYTES) { showLoginNotice(lt("artTooBig")); return; }
+  const ctl = el("loginArtCtl");
+  loginArtBusy = true;
+  ctl.classList.add("is-busy");
+  try {
+    let rec = null;
+    try { rec = await prepareLoginArtImage(file); } catch (e) { rec = null; console.warn("[login art] gambar gagal diproses:", e); }
+    if (!rec || !isLoginArtRecord(rec) || !(await loginArtDecodes(rec.src))) { showLoginNotice(lt("artFailed")); return; }
+    loginArtTouched = true;
+    loginArtCustom = rec;
+    applyLoginArt();
+    syncLoginArtMenu();
+    showLoginNotice(lt((await saveLoginArtCustom(rec)) ? "artChanged" : "artChangedTemp"));
+  } finally {
+    loginArtBusy = false;
+    ctl.classList.remove("is-busy");
+  }
+}
+
+async function resetLoginArt() {
+  loginArtTouched = true;
+  loginArtCustom = null;
+  applyLoginArt();
+  syncLoginArtMenu();
+  showLoginNotice(lt("artRestored"));
+  await clearLoginArtCustom();
+}
+
+// Tombol kiri-bawah + menu kecil (unggah / kembalikan bawaan) + seret-lepas file gambar ke kolom kiri.
+function initLoginArtPicker() {
+  const ctl = el("loginArtCtl"), btn = el("btnLoginArt"), menu = el("loginArtMenu"), input = el("loginArtInput"), host = el("loginArt");
+  if (!ctl || !btn || !menu || !input || !host) return;
+  const items = () => [...menu.querySelectorAll("button")].filter((b) => !b.classList.contains("hidden"));
+  const setOpen = (open) => { menu.classList.toggle("hidden", !open); btn.setAttribute("aria-expanded", String(open)); };
+  btn.onclick = (e) => {
+    const open = menu.classList.contains("hidden");
+    setOpen(open);
+    if (open && e.detail === 0) items()[0].focus();   // dibuka lewat keyboard -> fokus ke item pertama
+  };
+  el("btnLoginArtUpload").onclick = () => { setOpen(false); input.value = ""; input.click(); };
+  el("btnLoginArtReset").onclick = () => { setOpen(false); btn.focus(); resetLoginArt(); };
+  input.onchange = () => { const f = input.files && input.files[0]; input.value = ""; if (f) changeLoginArt(f); };
+  document.addEventListener("pointerdown", (e) => { if (!ctl.contains(e.target)) setOpen(false); });
+  ctl.addEventListener("keydown", (e) => {
+    if (menu.classList.contains("hidden")) return;
+    if (e.key === "Escape") { e.preventDefault(); setOpen(false); btn.focus(); return; }
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const list = items(), i = list.indexOf(document.activeElement);
+    list[(i + (e.key === "ArrowDown" ? 1 : list.length - 1)) % list.length].focus();
+  });
+
+  // seret-lepas: sorotan .is-drop selama file diseret di atas kolom kiri (counter karena dragenter/leave ikut anak elemen)
+  const hasFiles = (e) => !!e.dataTransfer && [...(e.dataTransfer.types || [])].includes("Files");
+  let depth = 0;
+  host.addEventListener("dragenter", (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth++; host.classList.add("is-drop"); });
+  host.addEventListener("dragover", (e) => { if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+  host.addEventListener("dragleave", (e) => { if (!hasFiles(e)) return; depth = Math.max(0, depth - 1); if (!depth) host.classList.remove("is-drop"); });
+  host.addEventListener("drop", (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    depth = 0; host.classList.remove("is-drop");
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) changeLoginArt(f);
+  });
+  // file yang dilepas di luar kolom kiri: jangan sampai browser membuka file itu & meninggalkan halaman login
+  const login = el("loginView");
+  login.addEventListener("dragover", (e) => { if (hasFiles(e) && !host.contains(e.target)) { e.preventDefault(); e.dataTransfer.dropEffect = "none"; } });
+  login.addEventListener("drop", (e) => { if (hasFiles(e) && !host.contains(e.target)) e.preventDefault(); });
+}
+
+async function initLoginArt() {
+  const host = el("loginArt");
+  if (!host || !window.HalftoneReveal) { const ctl = el("loginArtCtl"); if (ctl) ctl.hidden = true; return; }
+  initLoginArtPicker();
+  // Baca gambar tersimpan dulu (maks ~700 ms) supaya karakter bawaan tidak sempat berkedip sebelum diganti.
+  // Kalau lebih lambat dari itu, art dibuat dengan gambar bawaan lalu diganti begitu gambar tersimpan siap.
+  let started = false;
+  const saved = loadLoginArtCustom().then((rec) => {
+    if (!rec || loginArtTouched) return;
+    loginArtCustom = rec;
+    syncLoginArtMenu();
+    if (started) applyLoginArt();
+  }, () => {});
+  await Promise.race([saved, new Promise((r) => setTimeout(r, 700))]);
+  started = true;
   // Hanya jalan saat kolom kiri terlihat (>900px) — di HP kolomnya disembunyikan, jadi WebGL tidak dibuat sama sekali.
   const wide = window.matchMedia("(min-width: 901px)");
-  let art = null;
   const sync = () => {
-    if (wide.matches && !art) {
-      art = window.HalftoneReveal.create(host, LOGIN_ART_OPTIONS);
-      // Browser tanpa WebGL2 (atau hardware acceleration mati): tampilkan gambar karakternya apa adanya supaya kolom kiri tidak kosong.
-      if (!art.supported) host.style.background = 'center / contain no-repeat url("' + LOGIN_ART_OPTIONS.src + '")';
-    } else if (!wide.matches && art) {
-      art.destroy(); art = null; host.style.background = "";
+    if (wide.matches && !loginArt) {
+      const opts = loginArtOptions();
+      loginArt = window.HalftoneReveal.create(host, opts);
+      if (!loginArt.supported) host.style.background = loginArtFallbackBg(opts.src);
+    } else if (!wide.matches && loginArt) {
+      loginArt.destroy(); loginArt = null; host.style.background = "";
     }
   };
   sync();
@@ -1756,22 +2411,24 @@ window.addEventListener("DOMContentLoaded", () => {
 
   el("btnSettings").onclick = (e) => {
     e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
+    const btn = e.currentTarget;
     const menu = el("settingsMenu");
+    const willOpen = menu.classList.contains("hidden");
+    closeAllDropdowns();
+    if (!willOpen) return;
+    // menu muncul tepat di atas tombol gear, rata kiri dengan rail (ala vvd); di bar bawah HP juga di atas tombol
+    const rect = btn.getBoundingClientRect();
     menu.style.top = "auto"; menu.style.right = "auto";
-    if (window.innerWidth <= 700) {   // bar bawah: menu muncul di atas tombol
-      menu.style.bottom = (window.innerHeight - rect.top + 8) + "px";
-      menu.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 230)) + "px";
-    } else {                          // rail kiri: menu muncul di sebelah kanan tombol, sejajar bagian bawahnya
-      menu.style.bottom = Math.max(8, window.innerHeight - rect.bottom) + "px";
-      menu.style.left = (rect.right + 10) + "px";
-    }
-    menu.classList.toggle("hidden");
+    menu.style.bottom = (window.innerHeight - rect.top + 8) + "px";
+    menu.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 222)) + "px";
+    menu.classList.remove("hidden");
+    btn.setAttribute("aria-expanded", "true");
   };
   document.addEventListener("click", closeAllDropdowns);
   el("menuThemeToggle").onclick = () => document.body.classList.toggle("light");
   el("menuCloudLibrary").onclick = openCloudLibrary;
   el("menuDriveLogout").onclick = () => { if (confirm("Logout dari Google?")) driveSignOut(); };
+  initAccount();   // rail Project/Akun, menu Pengaturan Akun & Bantuan, halaman akun + modalnya
 
   // ---- Ikon aksi di rail kiri dashboard ----
   el("btnQuickTheme").addEventListener("click", () => document.body.classList.toggle("light"));
@@ -1806,7 +2463,7 @@ window.addEventListener("DOMContentLoaded", () => {
   el("btnProjSidebarClose").onclick = closeProjSidebar;
   el("projSidebarScrim").onclick = closeProjSidebar;
   el("btnSideTheme").onclick = () => document.body.classList.toggle("light");
-  el("btnSideSave").onclick = async () => { closeProjSidebar(); await saveCurrentProject(); toast("Tersimpan ke Drive ✅"); };
+  el("btnSideSave").onclick = async () => { closeProjSidebar(); await saveCurrentProject(); toast("Tersimpan ke Drive", tiIcon("cloud-check")); };
   el("projectTitle").addEventListener("input", () => { fitProjectTitle(); markDirtyAndSchedule(); });
   el("btnPreview").onclick = openPreview;
   el("btnClosePreview").onclick = () => el("previewModal").classList.add("hidden");
@@ -1822,7 +2479,7 @@ window.addEventListener("DOMContentLoaded", () => {
     closeAllDropdowns();
     const p = getProject(currentProjectId);
     const action = btn.dataset.action;
-    if (action === "sendCloud") { flushCurrentEdits(); await saveProjectToDriveMain(p); toast("Tersimpan ke Drive ✅"); }
+    if (action === "sendCloud") { flushCurrentEdits(); await saveProjectToDriveMain(p); toast("Tersimpan ke Drive", tiIcon("cloud-check")); }
     if (action === "backupNow") { flushCurrentEdits(); await backupProjectNow(p); }
     if (action === "history") openBackupHistory();
     if (action === "exportWord") { flushCurrentEdits(); exportProjectToWord(p); }
