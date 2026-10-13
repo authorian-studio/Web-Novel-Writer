@@ -17,12 +17,31 @@
 <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+<!-- Tabler Icons (tabler.io/icons): menyisipkan sprite <symbol id="ti-..."> ke awal body; harus dimuat sebelum markup ikon dipakai JS -->
+<script src="vendor/tabler-icons.js"></script>
 <div id="app">
 
   <!-- ============ LOGIN GATE ============ -->
   <section id="loginView" class="view">
     <!-- Kolom kiri: HalftoneReveal (halftone-reveal.js) diisi lewat initLoginArt() di app.js. Disembunyikan di layar sempit. -->
-    <aside id="loginArt" class="login-art" aria-hidden="true"></aside>
+    <aside id="loginArt" class="login-art" aria-hidden="true">
+      <!-- sorotan saat file gambar diseret ke kolom ini (lihat initLoginArtPicker) -->
+      <div class="login-art-drop"><svg class="ti" width="30" height="30" aria-hidden="true"><use href="#ti-photo-down"></use></svg><span data-i18n="artDrop">Lepaskan untuk mengganti gambar</span></div>
+    </aside>
+    <!-- Tombol kiri-bawah: ganti gambar halftone dengan gambar pilihan pengguna (disimpan di perangkat ini saja). Hanya tampil >900px. -->
+    <div id="loginArtCtl" class="login-art-ctl">
+      <button id="btnLoginArt" class="login-art-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="loginArtMenu">
+        <svg class="ti login-art-btn-icon" width="18" height="18" aria-hidden="true"><use href="#ti-photo-edit"></use></svg>
+        <svg class="ti login-art-btn-spin" width="18" height="18" aria-hidden="true"><use href="#ti-loader-2"></use></svg>
+        <span class="login-art-tip" data-i18n="artChange">Ganti gambar</span>
+      </button>
+      <div id="loginArtMenu" class="login-lang-menu login-art-menu hidden" role="menu">
+        <button id="btnLoginArtUpload" type="button" role="menuitem"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-upload"></use></svg><span data-i18n="artUpload">Unggah gambar…</span></button>
+        <button id="btnLoginArtReset" type="button" role="menuitem" class="hidden"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-restore"></use></svg><span data-i18n="artReset">Kembalikan gambar bawaan</span></button>
+        <p class="login-art-menu-hint" aria-hidden="true" data-i18n="artHint">Atau seret gambar ke area ilustrasi</p>
+      </div>
+      <input id="loginArtInput" type="file" accept="image/*" hidden />
+    </div>
     <!-- Kolom kanan: form login -->
     <div class="login-panel">
     <div class="login-box">
@@ -41,26 +60,26 @@
       <div class="login-options">
         <div class="login-option-wrap">
           <button id="btnLoginGoogle" class="btn-oauth btn-oauth-primary" data-provider="google">
-            <svg class="oauth-icon" viewBox="0 0 488 512" aria-hidden="true"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"/></svg>
+            <svg class="ti oauth-icon" width="18" height="18" aria-hidden="true"><use href="#ti-brand-google-filled"></use></svg>
             <span class="btn-label" data-i18n="google">Lanjutkan dengan Google</span>
           </button>
           <p id="lastLoginHint" class="login-last-used hidden" data-i18n="lastUsed">Terakhir kamu login pakai Google</p>
         </div>
 
         <button class="btn-oauth is-soon" data-provider="discord" aria-disabled="true">
-          <svg class="oauth-icon" viewBox="0 0 640 512" aria-hidden="true"><path fill="currentColor" d="M524.531,69.836a1.5,1.5,0,0,0-.764-.7A485.065,485.065,0,0,0,404.081,32.03a1.816,1.816,0,0,0-1.923.91,337.461,337.461,0,0,0-14.9,30.6,447.848,447.848,0,0,0-134.426,0,309.541,309.541,0,0,0-15.135-30.6,1.89,1.89,0,0,0-1.924-.91A483.689,483.689,0,0,0,116.085,69.137a1.712,1.712,0,0,0-.788.676C39.068,183.651,18.186,294.69,28.43,404.354a2.016,2.016,0,0,0,.765,1.375A487.666,487.666,0,0,0,176.02,479.918a1.9,1.9,0,0,0,2.063-.676A348.2,348.2,0,0,0,208.12,430.4a1.86,1.86,0,0,0-1.019-2.588,321.173,321.173,0,0,1-45.868-21.853,1.885,1.885,0,0,1-.185-3.126c3.082-2.309,6.166-4.711,9.109-7.137a1.819,1.819,0,0,1,1.9-.256c96.229,43.917,200.41,43.917,295.5,0a1.812,1.812,0,0,1,1.924.233c2.944,2.426,6.027,4.851,9.132,7.16a1.884,1.884,0,0,1-.162,3.126,301.407,301.407,0,0,1-45.89,21.83,1.875,1.875,0,0,0-1,2.611,391.055,391.055,0,0,0,30.014,48.815,1.864,1.864,0,0,0,2.063.7A486.048,486.048,0,0,0,610.7,405.729a1.882,1.882,0,0,0,.765-1.352C623.729,277.594,590.933,167.465,524.531,69.836ZM222.491,337.58c-28.972,0-52.844-26.587-52.844-59.239S193.056,219.1,222.491,219.1c29.665,0,53.306,26.82,52.843,59.239C275.334,310.993,251.924,337.58,222.491,337.58Zm195.38,0c-28.971,0-52.843-26.587-52.843-59.239S388.437,219.1,417.871,219.1c29.667,0,53.307,26.82,52.844,59.239C470.715,310.993,447.538,337.58,417.871,337.58Z"/></svg>
+          <svg class="ti oauth-icon" width="18" height="18" aria-hidden="true"><use href="#ti-brand-discord-filled"></use></svg>
           <span class="btn-label" data-i18n="discord">Lanjutkan dengan Discord</span>
           <span class="soon-tag" data-i18n="soon">Segera</span>
         </button>
 
         <button class="btn-oauth is-soon" data-provider="apple" aria-disabled="true">
-          <svg class="oauth-icon" viewBox="0 0 384 512" aria-hidden="true"><path fill="currentColor" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
+          <svg class="ti oauth-icon" width="18" height="18" aria-hidden="true"><use href="#ti-brand-apple-filled"></use></svg>
           <span class="btn-label" data-i18n="apple">Lanjutkan dengan Apple</span>
           <span class="soon-tag" data-i18n="soon">Segera</span>
         </button>
 
         <button class="btn-oauth is-soon" data-provider="email" aria-disabled="true">
-          <svg class="oauth-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          <svg class="ti oauth-icon" width="18" height="18" aria-hidden="true"><use href="#ti-mail"></use></svg>
           <span class="btn-label" data-i18n="email">Lanjutkan dengan Email</span>
           <span class="soon-tag" data-i18n="soon">Segera</span>
         </button>
@@ -80,7 +99,7 @@
       <span class="login-foot-sep">|</span>
       <div class="login-lang">
         <button id="btnLoginLang" class="login-foot-link" aria-haspopup="true" aria-expanded="false"><span id="loginLangLabel">ID</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          <svg class="ti" width="12" height="12" aria-hidden="true"><use href="#ti-chevron-down"></use></svg>
         </button>
         <div id="loginLangMenu" class="login-lang-menu hidden" role="menu">
           <button data-lang="id" role="menuitem">Bahasa Indonesia</button>
@@ -105,22 +124,33 @@
     <!-- Rail ikon di kiri -->
     <nav class="dash-rail" aria-label="Menu utama">
       <div class="dash-rail-top">
+        <!-- halaman: daftar project (default) & Pengaturan Akun — yang aktif diberi kelas is-active -->
+        <button class="dash-rail-btn is-active" id="btnRailProjects" aria-label="Project" aria-current="page">
+          <svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-layout-grid"></use></svg>
+          <span class="rail-tip">Project</span>
+        </button>
+        <button class="dash-rail-btn rail-avatar-btn" id="btnRailAccount" aria-label="Pengaturan Akun">
+          <span class="acc-avatar rail-avatar" id="railAvatar"><span class="acc-initial">?</span></span>
+          <span class="rail-tip">Pengaturan Akun</span>
+        </button>
+        <span class="dash-rail-sep" aria-hidden="true"></span>
         <button class="dash-rail-btn" id="btnQuickCloud" aria-label="Cloud Library">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-cloud"></use></svg>
           <span class="rail-tip">Cloud Library</span>
         </button>
         <button class="dash-rail-btn" id="btnQuickTheme" aria-label="Ganti Tema">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          <svg class="ti ic-dark-only" width="20" height="20" aria-hidden="true"><use href="#ti-moon"></use></svg>
+          <svg class="ti ic-light-only" width="20" height="20" aria-hidden="true"><use href="#ti-sun"></use></svg>
           <span class="rail-tip">Ganti Tema</span>
         </button>
       </div>
       <div class="dash-rail-bottom">
-        <button class="dash-rail-btn" id="btnQuickLogout" aria-label="Logout Google">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          <span class="rail-tip">Logout</span>
+        <button class="dash-rail-btn" id="btnQuickLogout" aria-label="Keluar">
+          <svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-logout"></use></svg>
+          <span class="rail-tip">Keluar</span>
         </button>
-        <button class="dash-rail-btn" id="btnSettings" aria-label="Pengaturan">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        <button class="dash-rail-btn" id="btnSettings" aria-label="Pengaturan" aria-haspopup="menu" aria-expanded="false" aria-controls="settingsMenu">
+          <svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-settings"></use></svg>
           <span class="rail-tip">Pengaturan</span>
         </button>
       </div>
@@ -134,13 +164,13 @@
       </video>
     </div>
 
-    <span id="syncIndicator" class="sync-indicator">☁ Tersinkron</span>
+    <span id="syncIndicator" class="sync-indicator"><svg class="ti" width="14" height="14" aria-hidden="true"><use href="#ti-cloud-check"></use></svg><span>Tersinkron</span></span>
 
     <div id="dashBody">
       <div class="dash-center">
         <h1 class="dash-title" id="dashTitle">Mau menulis apa hari ini?</h1>
         <button id="btnAddProject" class="dash-new hidden">
-          <span class="dash-new-icon">+</span>
+          <svg class="ti dash-new-icon" width="16" height="16" aria-hidden="true"><use href="#ti-plus"></use></svg>
           <span>Project Baru</span>
         </button>
         <div id="loadingState" class="empty-state hidden">
@@ -149,26 +179,134 @@
         </div>
       <div id="emptyState" class="empty-state hidden">
         <div class="empty-media">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>
+          <svg class="ti" width="24" height="24" aria-hidden="true"><use href="#ti-folder-open"></use></svg>
         </div>
         <div class="empty-title">Belum ada apa-apa di sini</div>
         <div class="empty-desc">Belum ada project yang dibuat. Mulai dengan <a href="#" id="emptyStateLink">membuat project pertamamu</a>.</div>
-        <button id="emptyStateBtn" class="empty-btn"><span>+</span> Project Baru</button>
+        <button id="emptyStateBtn" class="empty-btn"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-plus"></use></svg>Project Baru</button>
       </div>
       </div>
       <!-- rak project: kartu sampul buku (portrait) di kiri atas, di samping rail -->
       <div id="projectGrid" class="dash-shelf"></div>
     </div>
 
-    <button id="btnSupport" class="help-fab" title="Support" aria-label="Support">?</button>
+    <!-- Halaman Pengaturan Akun (di dalam dashboard: rail, background & logo tetap; judul, rak project & status sinkron
+         disembunyikan lewat #dashboardView.is-account). Diisi oleh bagian AKUN di app.js. -->
+    <div id="accountView" class="acc-view hidden" role="region" aria-labelledby="accName" tabindex="-1">
+      <div class="acc-inner">
+        <header class="acc-head acc-anim">
+          <button id="accAvatarBtn" class="acc-avatar-btn" title="Ganti foto profil" aria-label="Ganti foto profil">
+            <span class="acc-avatar acc-avatar-lg" id="accAvatar"><span class="acc-initial">?</span></span>
+            <span class="acc-avatar-edit" aria-hidden="true"><svg class="ti" width="15" height="15"><use href="#ti-camera"></use></svg></span>
+          </button>
+          <h1 id="accName" class="acc-name">Memuat akun…</h1>
+          <div id="accEmail" class="acc-email"></div>
+          <div id="accSince" class="acc-since"></div>
+        </header>
+
+        <section class="acc-section acc-anim" aria-labelledby="accLblProfile">
+          <h2 id="accLblProfile" class="acc-section-label">Profil</h2>
+          <div class="acc-card">
+            <button id="accRowUsername" class="acc-row">
+              <span class="acc-row-label">Username</span>
+              <span id="accUsername" class="acc-row-value">@…</span>
+              <svg class="ti acc-chev" width="16" height="16" aria-hidden="true"><use href="#ti-chevron-right"></use></svg>
+            </button>
+            <button id="accRowProfile" class="acc-row">
+              <span class="acc-row-text"><span class="acc-row-label">Edit profil publik</span><span class="acc-row-sub">Nama tampilan &amp; foto profil</span></span>
+              <svg class="ti acc-chev" width="16" height="16" aria-hidden="true"><use href="#ti-chevron-right"></use></svg>
+            </button>
+            <div class="acc-row is-static">
+              <span class="acc-row-text"><span class="acc-row-label" id="accLblTheme">Tema tampilan</span><span class="acc-row-sub">Dashboard &amp; editor project</span></span>
+              <div id="accThemeSeg" class="acc-seg" role="radiogroup" aria-labelledby="accLblTheme">
+                <button role="radio" data-theme="dark" aria-checked="true"><svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-moon"></use></svg>Gelap</button>
+                <button role="radio" data-theme="light" aria-checked="false"><svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-sun"></use></svg>Terang</button>
+              </div>
+            </div>
+            <div class="acc-row is-static">
+              <span class="acc-row-label">Email</span>
+              <span id="accEmailValue" class="acc-row-value is-plain">—</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="acc-section acc-anim" aria-labelledby="accLblMethods">
+          <h2 id="accLblMethods" class="acc-section-label">Metode masuk</h2>
+          <div class="acc-card">
+            <div class="acc-row is-static">
+              <svg class="ti acc-method-ic" width="18" height="18" aria-hidden="true"><use href="#ti-mail"></use></svg>
+              <span class="acc-row-text"><span class="acc-row-label">Email &amp; Password</span><span class="acc-row-sub">Belum diatur</span></span>
+              <span class="acc-soon">Segera</span>
+              <button class="acc-pill" disabled aria-disabled="true" title="Segera hadir">Atur</button>
+            </div>
+            <div class="acc-row is-static">
+              <svg class="ti acc-method-ic" width="18" height="18" aria-hidden="true"><use href="#ti-brand-apple"></use></svg>
+              <span class="acc-row-text"><span class="acc-row-label">Apple</span></span>
+              <span class="acc-soon">Segera</span>
+              <button class="acc-pill" disabled aria-disabled="true" title="Segera hadir">Hubungkan</button>
+            </div>
+            <div class="acc-row is-static">
+              <svg class="ti acc-method-ic" width="18" height="18" aria-hidden="true"><use href="#ti-brand-google"></use></svg>
+              <span class="acc-row-text"><span class="acc-row-label">Google</span><span id="accGoogleSub" class="acc-row-sub">Terhubung</span></span>
+              <button id="accGoogleDisconnect" class="acc-pill">Putuskan</button>
+            </div>
+            <div class="acc-row is-static">
+              <svg class="ti acc-method-ic" width="18" height="18" aria-hidden="true"><use href="#ti-brand-discord"></use></svg>
+              <span class="acc-row-text"><span class="acc-row-label">Discord</span></span>
+              <span class="acc-soon">Segera</span>
+              <button class="acc-pill" disabled aria-disabled="true" title="Segera hadir">Hubungkan</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="acc-section acc-anim" aria-labelledby="accLblStorage">
+          <h2 id="accLblStorage" class="acc-section-label">Penyimpanan</h2>
+          <div class="acc-card">
+            <div class="acc-row is-static acc-storage">
+              <div class="acc-storage-top">
+                <svg class="ti acc-method-ic" width="18" height="18" aria-hidden="true"><use href="#ti-brand-google-drive"></use></svg>
+                <span class="acc-row-label">Google Drive</span>
+                <span id="accStorageText" class="acc-row-value is-plain">Memuat…</span>
+              </div>
+              <div class="acc-bar" id="accStorageBarWrap" role="progressbar" aria-label="Pemakaian Google Drive" aria-valuemin="0" aria-valuemax="100"><span id="accStorageBar"></span></div>
+            </div>
+            <div class="acc-row is-static">
+              <span class="acc-row-label">Project</span>
+              <span id="accProjectCount" class="acc-row-value is-plain">0</span>
+            </div>
+            <div class="acc-row is-static acc-storage-note">
+              <p id="accStorageNote" class="acc-note"></p>
+              <a class="acc-link" href="https://drive.google.com/drive/my-drive" target="_blank" rel="noopener">Buka Google Drive<svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-external-link"></use></svg></a>
+            </div>
+          </div>
+        </section>
+
+        <section class="acc-section acc-anim" aria-labelledby="accLblPlan">
+          <h2 id="accLblPlan" class="acc-section-label">Paket</h2>
+          <div class="acc-card">
+            <div class="acc-row is-static">
+              <svg class="ti acc-method-ic acc-plan-ic" width="18" height="18" aria-hidden="true"><use href="#ti-sparkles"></use></svg>
+              <span class="acc-row-text"><span class="acc-row-label">Gratis — semua fitur terbuka</span><span class="acc-row-sub">Tanpa langganan &amp; tanpa batas project</span></span>
+              <span class="acc-badge">Aktif</span>
+            </div>
+          </div>
+        </section>
+
+        <div class="acc-foot acc-anim">
+          <button id="accLogout" class="acc-logout"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-logout"></use></svg>Keluar dari akun</button>
+        </div>
+      </div>
+    </div>
+
+    <button id="btnSupport" class="help-fab" title="Support" aria-label="Support"><svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-question-mark"></use></svg></button>
   </section>
 
   <!-- ============ CLOUD LIBRARY VIEW ============ -->
   <section id="cloudLibraryView" class="view hidden">
     <div id="cloudTopbar">
-      <button id="btnCloudBack" class="icon-btn" title="Kembali">←</button>
+      <button id="btnCloudBack" class="icon-btn" title="Kembali" aria-label="Kembali"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-arrow-left"></use></svg></button>
       <div class="cloud-title">Cloud library</div>
-      <button id="btnCloudMenu" class="icon-btn" title="Menu">⋮</button>
+      <button id="btnCloudMenu" class="icon-btn" title="Menu" aria-label="Menu"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-dots-vertical"></use></svg></button>
     </div>
     <div class="cloud-tabs">
       <button id="tabSendToCloud" class="cloud-tab active">SEND TO CLOUD</button>
@@ -196,23 +334,28 @@
         <img src="icon-192.png" alt="" draggable="false" class="proj-sidebar-logo" />
         <span class="proj-sidebar-brand">Novelist</span>
         <button id="btnProjSidebarClose" class="proj-sidebar-close" title="Tutup sidebar" aria-label="Tutup sidebar">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          <svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-layout-sidebar-left-collapse"></use></svg>
         </button>
       </div>
       <button id="btnBack" class="proj-side-item">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-layout-dashboard"></use></svg>
         <span>Keluar ke Dashboard</span>
       </button>
       <div class="proj-side-label">Project</div>
       <div id="projSidebarList" class="proj-side-list"></div>
       <div class="proj-side-bottom">
         <button id="btnSideSave" class="proj-side-item">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.78A6 6 0 1 0 6 16.9"/><path d="M12 12v9"/><path d="m8 16 4-4 4 4"/></svg>
+          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-cloud-upload"></use></svg>
           <span>Simpan ke Drive</span>
         </button>
         <button id="btnSideTheme" class="proj-side-item">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          <svg class="ti ic-dark-only" width="17" height="17" aria-hidden="true"><use href="#ti-moon"></use></svg>
+          <svg class="ti ic-light-only" width="17" height="17" aria-hidden="true"><use href="#ti-sun"></use></svg>
           <span>Ganti Tema</span>
+        </button>
+        <button id="btnSideAccount" class="proj-side-item">
+          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-user-circle"></use></svg>
+          <span>Pengaturan Akun</span>
         </button>
       </div>
     </aside>
@@ -220,40 +363,40 @@
     <header id="projectTopbar">
       <button id="btnProjSidebar" class="proj-logo-btn" title="Buka sidebar" aria-label="Buka sidebar" aria-controls="projSidebar" aria-expanded="false">
         <img src="icon-192.png" alt="" draggable="false" />
-        <svg class="proj-logo-back" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18"/></svg>
+        <svg class="ti proj-logo-back" width="18" height="18" aria-hidden="true"><use href="#ti-layout-sidebar-left-expand"></use></svg>
       </button>
       <div class="proj-chip">
         <span class="proj-chip-cover" id="projChipCover"></span>
         <input id="projectTitle" value="Novel Tanpa Judul" aria-label="Judul project" />
         <button id="btnProjectMenu" class="proj-chip-caret" title="Menu project" aria-label="Menu project">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          <svg class="ti" width="14" height="14" aria-hidden="true"><use href="#ti-chevron-down"></use></svg>
         </button>
       </div>
       <nav id="railNav" aria-label="Bagian project">
         <button data-tab="home" class="rail-btn active" title="Home" aria-label="Home">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18M3 12h18"/></svg>
+          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-home"></use></svg>
         </button>
         <button data-tab="write" class="rail-btn" title="Write" aria-label="Write">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-pencil"></use></svg>
         </button>
         <button data-tab="organize" class="rail-btn" title="Organize" aria-label="Organize">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6Z"/></svg>
+          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-folders"></use></svg>
         </button>
         <button data-tab="plot" class="rail-btn" title="Plot" aria-label="Plot">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-git-branch"></use></svg>
         </button>
         <button data-tab="schedule" class="rail-btn" title="Schedule" aria-label="Schedule">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-calendar-time"></use></svg>
         </button>
         <button data-tab="tools" class="rail-btn" title="Tools" aria-label="Tools">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg>
+          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-tool"></use></svg>
         </button>
         <button data-tab="timeline" class="rail-btn rail-btn-wide" title="Timeline" aria-label="Timeline">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><circle cx="7" cy="12" r="2"/><circle cx="16" cy="12" r="2"/><path d="M7 10V5M16 14v5"/></svg>
+          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-timeline"></use></svg>
           <span>Timeline</span>
         </button>
         <button data-tab="map" class="rail-btn rail-btn-wide" title="Map" aria-label="Map">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20Z"/><path d="M9 4v13.5M15 6.5V20"/></svg>
+          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-map"></use></svg>
           <span>Map</span>
         </button>
       </nav>
@@ -265,11 +408,12 @@
     <!-- tombol mengambang kanan (ala vvd): preview manuskrip & ganti tema -->
     <div class="proj-float-tools">
       <button id="btnPreview" class="proj-float-btn" title="Preview Manuskrip" aria-label="Preview Manuskrip">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-eye"></use></svg>
       </button>
       <span class="proj-float-sep"></span>
       <button id="btnProjectTheme" class="proj-float-btn" title="Ganti Tema" aria-label="Ganti Tema">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        <svg class="ti ic-dark-only" width="18" height="18" aria-hidden="true"><use href="#ti-moon"></use></svg>
+        <svg class="ti ic-light-only" width="18" height="18" aria-hidden="true"><use href="#ti-sun"></use></svg>
       </button>
     </div>
     <span id="saveStatus" class="save-status">Tersimpan</span>
@@ -287,7 +431,7 @@
             <div class="scenes-header">
               <span>SCENES</span>
               <div class="scenes-header-actions">
-                <button id="btnAddScene" class="mini-icon-btn" title="Tambah scene">+</button>
+                <button id="btnAddScene" class="mini-icon-btn" title="Tambah scene" aria-label="Tambah scene"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-plus"></use></svg></button>
               </div>
             </div>
             <div id="sceneList" class="scenes-list"></div>
@@ -299,7 +443,7 @@
 
           <!-- ============ SCENE OPTIONS DRAWER TOGGLE ============ -->
           <button id="sceneDrawerToggle" class="scene-drawer-toggle hidden" title="Edit info scene" aria-label="Buka panel edit scene" aria-expanded="false">
-            <svg class="drawer-toggle-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+            <svg class="ti drawer-toggle-icon" width="14" height="14" aria-hidden="true"><use href="#ti-chevron-right"></use></svg>
           </button>
 
           <div id="sceneDrawerScrim" class="scene-drawer-scrim hidden"></div>
@@ -311,7 +455,7 @@
                 <p class="drawer-desc">Info &amp; format tulisan scene ini</p>
               </div>
               <button id="sceneDrawerClose" class="drawer-close-btn" aria-label="Tutup panel" title="Tutup">
-                <svg width="13" height="13" viewBox="0 0 256 256" fill="none" aria-hidden="true"><line x1="200" y1="56" x2="56" y2="200" stroke="currentColor" stroke-width="16" stroke-linecap="round"/><line x1="200" y1="200" x2="56" y2="56" stroke="currentColor" stroke-width="16" stroke-linecap="round"/></svg>
+                <svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-x"></use></svg>
               </button>
             </header>
             <div class="drawer-body" id="sceneDrawerBody"></div>
@@ -322,14 +466,14 @@
         <div id="tabOrganize" class="tab-panel hidden">
           <div class="scenes-col">
             <div class="organize-subtabs">
-              <button class="org-subtab active" data-cat="characters">🧑 Karakter</button>
-              <button class="org-subtab" data-cat="locations">📍 Lokasi</button>
-              <button class="org-subtab" data-cat="notes">🗒 Catatan</button>
+              <button class="org-subtab active" data-cat="characters"><svg class="ti" width="14" height="14" aria-hidden="true"><use href="#ti-user"></use></svg>Karakter</button>
+              <button class="org-subtab" data-cat="locations"><svg class="ti" width="14" height="14" aria-hidden="true"><use href="#ti-map-pin"></use></svg>Lokasi</button>
+              <button class="org-subtab" data-cat="notes"><svg class="ti" width="14" height="14" aria-hidden="true"><use href="#ti-notes"></use></svg>Catatan</button>
             </div>
             <div class="scenes-header">
               <span id="organizeCatLabel">KARAKTER</span>
               <div class="scenes-header-actions">
-                <button id="btnAddOrganizeItem" class="mini-icon-btn" title="Tambah">+</button>
+                <button id="btnAddOrganizeItem" class="mini-icon-btn" title="Tambah" aria-label="Tambah"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-plus"></use></svg></button>
               </div>
             </div>
             <div id="organizeList" class="scenes-list"></div>
@@ -344,10 +488,10 @@
           <aside class="tl-side">
             <div class="tl-side-top">
               <label class="tl-search">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+                <svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-search"></use></svg>
                 <input id="tlSearch" type="search" placeholder="Cari timeline" aria-label="Cari timeline" />
               </label>
-              <button id="tlNew" class="mini-icon-btn" title="Timeline baru" aria-label="Timeline baru">+</button>
+              <button id="tlNew" class="mini-icon-btn" title="Timeline baru" aria-label="Timeline baru"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-plus"></use></svg></button>
             </div>
             <div id="tlList" class="tl-list"></div>
           </aside>
@@ -356,30 +500,30 @@
               <input id="tlTitle" class="tl-title" aria-label="Nama timeline" />
 <span id="tlRangeText" class="tl-range-text" title="Garis waktu memanjang otomatis mengikuti event"></span>
               <button id="tlDelete" class="tl-head-btn" title="Hapus timeline ini" aria-label="Hapus timeline ini">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                <svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-trash"></use></svg>
               </button>
             </header>
             <div id="tlFlow" class="tl-flow"><div class="tl-loading">Memuat timeline…</div></div>
             <div class="tl-empty-state">
               <p>Belum ada timeline di project ini.</p>
-              <button id="tlCreateFirst" class="tl-btn">+ Buat timeline</button>
+              <button id="tlCreateFirst" class="tl-btn"><svg class="ti" width="14" height="14" aria-hidden="true"><use href="#ti-plus"></use></svg>Buat timeline</button>
             </div>
             <!-- toolbar bawah (ala vvd): mode pilih / geser, tambah event, rapikan tampilan -->
             <div class="tl-toolbar" role="toolbar" aria-label="Alat timeline">
               <button id="tlModeSelect" class="tl-tool" title="Pilih (seret untuk memilih beberapa)" aria-label="Mode pilih">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m4 4 7.07 17 2.51-7.39L21 11.07Z"/></svg>
+                <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-pointer"></use></svg>
               </button>
               <button id="tlModePan" class="tl-tool is-active" title="Geser kanvas" aria-label="Mode geser">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+                <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-hand-stop"></use></svg>
               </button>
               <span class="tl-tool-sep"></span>
               <button id="tlAddEvent" class="tl-tool tl-tool-text" title="Tambah event">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                <svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-plus"></use></svg>
                 <span>Event</span>
               </button>
               <span class="tl-tool-sep"></span>
               <button id="tlFit" class="tl-tool" title="Tampilkan semua" aria-label="Tampilkan semua">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-maximize"></use></svg>
               </button>
             </div>
             <!-- panel edit event (muncul saat event dipilih) -->
@@ -387,7 +531,7 @@
               <div class="tl-editor-head">
                 <span>Event</span>
                 <button id="tlEditorClose" class="tl-head-btn" title="Tutup" aria-label="Tutup">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                  <svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-x"></use></svg>
                 </button>
               </div>
               <label class="tl-field"><span>Judul</span><input id="tlEvTitle" /></label>
@@ -414,10 +558,10 @@
           <aside class="mp-side">
             <div class="mp-side-top">
               <label class="mp-search">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+                <svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-search"></use></svg>
                 <input id="mpSearch" type="search" placeholder="Cari peta" aria-label="Cari peta" />
               </label>
-              <button id="mpNew" class="mini-icon-btn" title="Peta baru" aria-label="Peta baru">+</button>
+              <button id="mpNew" class="mini-icon-btn" title="Peta baru" aria-label="Peta baru"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-plus"></use></svg></button>
             </div>
             <div id="mpList" class="mp-list"></div>
           </aside>
@@ -426,7 +570,7 @@
               <input id="mpTitle" class="mp-title" aria-label="Nama peta" maxlength="80" />
               <span id="mpInfo" class="mp-info" title="1 kotak = 1 km">128 × 128 km</span>
               <button id="mpDelete" class="mp-head-btn" title="Hapus peta ini" aria-label="Hapus peta ini">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                <svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-trash"></use></svg>
               </button>
             </header>
             <div id="mpStage" class="mp-stage">
@@ -437,7 +581,7 @@
               <!-- kiri atas: layer -->
               <div class="mp-layers">
                 <button id="mpLayersBtn" class="mp-chip" aria-expanded="false" aria-controls="mpLayersPop">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 4.5-9 4.5-9-4.5Z"/><path d="m3 12 9 4.5 9-4.5"/><path d="m3 16.5 9 4.5 9-4.5"/></svg>
+                  <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-stack-2"></use></svg>
                   <span>Layers</span>
                 </button>
                 <div id="mpLayersPop" class="mp-layers-pop hidden" role="group" aria-label="Tampilkan layer"></div>
@@ -448,13 +592,13 @@
                 <button id="mpViewToggle" class="mp-ctrl-btn mp-ctrl-mode" title="Lihat sebagai 3D" aria-label="Lihat sebagai 3D">3D</button>
                 <span class="mp-ctrl-sep"></span>
                 <button id="mpZoomIn" class="mp-ctrl-btn" title="Perbesar" aria-label="Perbesar">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3M11 8v6M8 11h6"/></svg>
+                  <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-zoom-in"></use></svg>
                 </button>
                 <button id="mpZoomOut" class="mp-ctrl-btn" title="Perkecil" aria-label="Perkecil">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3M8 11h6"/></svg>
+                  <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-zoom-out"></use></svg>
                 </button>
                 <button id="mpFit" class="mp-ctrl-btn" title="Tampilkan seluruh peta" aria-label="Tampilkan seluruh peta">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                  <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-maximize"></use></svg>
                 </button>
               </div>
 
@@ -467,10 +611,10 @@
                 <div class="mp-pop-sec mp-elev-sec" data-tools="elevation">
                   <div id="mpElevMode" class="mp-seg" role="radiogroup" aria-label="Arah ketinggian">
                     <button data-mode="raise" role="radio">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>Naik
+                      <svg class="ti" width="14" height="14" aria-hidden="true"><use href="#ti-chevron-up"></use></svg>Naik
                     </button>
                     <button data-mode="lower" role="radio">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>Turun
+                      <svg class="ti" width="14" height="14" aria-hidden="true"><use href="#ti-chevron-down"></use></svg>Turun
                     </button>
                   </div>
                   <label class="mp-slider"><span>Kekuatan</span><input id="mpElevStrength" type="range" min="0.05" max="1" step="0.05" /><b id="mpElevStrengthVal">50%</b></label>
@@ -494,39 +638,39 @@
                 <div id="mpToolScroll" class="mp-toolbar-scroll mp-fade-x">
                   <div id="mpTools" class="mp-tools">
                     <button class="mp-tool" data-tool="select" title="Pilih &amp; pindahkan (V)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m4 4 7.07 17 2.51-7.39L21 11.07Z"/></svg><span>Pilih</span>
+                      <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-pointer"></use></svg><span>Pilih</span>
                     </button>
                     <button class="mp-tool" data-tool="brush" title="Kuas bioma (B)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m18.4 2.6-8.9 8.9 3 3 8.9-8.9a2.12 2.12 0 0 0-3-3Z"/><path d="M9.5 11.5c-2.5 0-4 1.5-4 3.6 0 1.7-1.2 2.9-3 3.4 1.6 1.6 3.4 2.5 5.5 2.5 3.4 0 4.5-2.2 4.5-4.5"/></svg><span>Kuas</span>
+                      <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-brush"></use></svg><span>Kuas</span>
                     </button>
                     <button class="mp-tool" data-tool="eraser" title="Penghapus — jadikan laut (E)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3a2.4 2.4 0 0 1 0-3.4l9.6-9.6a2.4 2.4 0 0 1 3.4 0l5.6 5.6a2.4 2.4 0 0 1 0 3.4L13 21"/><path d="M22 21H7M5 11l9 9"/></svg><span>Penghapus</span>
+                      <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-eraser"></use></svg><span>Penghapus</span>
                     </button>
                     <button class="mp-tool" data-tool="elevation" title="Naikkan / turunkan medan (K)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m8 4 4 7 3-3 7 12H2Z"/></svg><span>Ketinggian</span>
+                      <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-mountain"></use></svg><span>Ketinggian</span>
                     </button>
                     <button class="mp-tool" data-tool="river" title="Gambar sungai (S)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/><path d="M2 12c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/><path d="M2 17c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/></svg><span>Sungai</span>
+                      <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-ripple"></use></svg><span>Sungai</span>
                     </button>
                     <button class="mp-tool" data-tool="path" title="Gambar jalan (J)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19h8a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7h8"/></svg><span>Jalan</span>
+                      <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-route"></use></svg><span>Jalan</span>
                     </button>
                     <button class="mp-tool" data-tool="place" title="Tambah tempat (T)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg><span>Tempat</span>
+                      <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-map-pin"></use></svg><span>Tempat</span>
                     </button>
                     <button class="mp-tool" data-tool="zone" title="Gambar wilayah (W)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7.5 11 4l8 3.5 1 8-6.5 5L5 17Z" stroke-dasharray="3 2.4"/><circle cx="5" cy="7.5" r="1.4" fill="currentColor"/><circle cx="19" cy="7.5" r="1.4" fill="currentColor"/><circle cx="13.5" cy="20.5" r="1.4" fill="currentColor"/></svg><span>Wilayah</span>
+                      <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-polygon"></use></svg><span>Wilayah</span>
                     </button>
                     <button class="mp-tool" data-tool="label" title="Tambah label (L)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg><span>Label</span>
+                      <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-letter-t"></use></svg><span>Label</span>
                     </button>
                   </div>
                   <span class="mp-tool-sep"></span>
                   <button id="mpUndo" class="mp-tool" title="Urungkan (Ctrl+Z)" aria-label="Urungkan" disabled>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span>Undo</span>
+                    <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-arrow-back-up"></use></svg><span>Undo</span>
                   </button>
                   <button id="mpRedo" class="mp-tool" title="Ulangi (Ctrl+Shift+Z)" aria-label="Ulangi" disabled>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg><span>Redo</span>
+                    <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-arrow-forward-up"></use></svg><span>Redo</span>
                   </button>
                 </div>
               </div>
@@ -536,7 +680,7 @@
                 <div class="mp-insp-head">
                   <span id="mpInspType">Tempat</span>
                   <button id="mpInspClose" class="mp-head-btn" title="Tutup" aria-label="Tutup">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                    <svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-x"></use></svg>
                   </button>
                 </div>
                 <label class="mp-field" data-for="place zone river path"><span>Nama</span><input id="mpInName" maxlength="80" /></label>
@@ -569,17 +713,17 @@
             </div>
             <div id="mpStatus" class="mp-status">Memuat peta…</div>
             <div class="mp-empty-state">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20Z"/><path d="M9 4v13.5M15 6.5V20"/></svg>
+              <svg class="ti" width="40" height="40" aria-hidden="true"><use href="#ti-map"></use></svg>
               <p>Belum ada peta di project ini.</p>
               <span>Lukis benua, pulau, hutan &amp; pegunungan dunia novelmu, lalu lihat sebagai diorama 3D.</span>
-              <button id="mpCreateFirst" class="mp-btn">+ Buat peta</button>
+              <button id="mpCreateFirst" class="mp-btn"><svg class="ti" width="14" height="14" aria-hidden="true"><use href="#ti-plus"></use></svg>Buat peta</button>
             </div>
           </section>
         </div>
 
-        <div id="tabPlot" class="tab-panel hidden placeholder-panel">🧩 Fitur Plot akan segera hadir.</div>
-        <div id="tabSchedule" class="tab-panel hidden placeholder-panel">⏱️ Fitur Schedule akan segera hadir.</div>
-        <div id="tabTools" class="tab-panel hidden placeholder-panel">🛠️ Fitur Tools akan segera hadir.</div>
+        <div id="tabPlot" class="tab-panel hidden placeholder-panel"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-git-branch"></use></svg>Fitur Plot akan segera hadir.</div>
+        <div id="tabSchedule" class="tab-panel hidden placeholder-panel"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-calendar-time"></use></svg>Fitur Schedule akan segera hadir.</div>
+        <div id="tabTools" class="tab-panel hidden placeholder-panel"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-tool"></use></svg>Fitur Tools akan segera hadir.</div>
       </div>
     </div>
   </section>
@@ -590,52 +734,56 @@
   <div class="focus-topbar">
     <input id="focusTitle" class="focus-title" />
     <div class="focus-toolbar">
-      <button data-cmd="bold" title="Bold"><b>B</b></button>
-      <button data-cmd="italic" title="Italic"><i>I</i></button>
-      <button data-cmd="underline" title="Underline"><u>U</u></button>
+      <button data-cmd="bold" title="Bold" aria-label="Bold"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-bold"></use></svg></button>
+      <button data-cmd="italic" title="Italic" aria-label="Italic"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-italic"></use></svg></button>
+      <button data-cmd="underline" title="Underline" aria-label="Underline"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-underline"></use></svg></button>
       <span class="toolbar-sep"></span>
-      <button data-cmd="justifyLeft" title="Rata kiri">⯇</button>
-      <button data-cmd="justifyCenter" title="Rata tengah">☰</button>
-      <button data-cmd="justifyRight" title="Rata kanan">⯈</button>
+      <button data-cmd="justifyLeft" title="Rata kiri" aria-label="Rata kiri"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-align-left"></use></svg></button>
+      <button data-cmd="justifyCenter" title="Rata tengah" aria-label="Rata tengah"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-align-center"></use></svg></button>
+      <button data-cmd="justifyRight" title="Rata kanan" aria-label="Rata kanan"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-align-right"></use></svg></button>
       <span class="toolbar-sep"></span>
       <input type="color" id="focusColor" title="Warna teks" value="#e7e5e0" />
     </div>
     <div id="focusStats" class="focus-stats">0 kata · 0 karakter · 0 kalimat · 0 paragraf</div>
-    <button id="btnExitFocus" class="icon-btn" title="Keluar dari mode fokus">✕</button>
+    <button id="btnExitFocus" class="icon-btn" title="Keluar dari mode fokus" aria-label="Keluar dari mode fokus"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-x"></use></svg></button>
   </div>
   <div id="focusEditor" class="focus-editor" contenteditable="true" spellcheck="false"></div>
 </div>
 
 <!-- ============ DROPDOWNS ============ -->
-<div id="settingsMenu" class="dropdown hidden">
-  <button id="menuThemeToggle">🌙 Ganti Tema</button>
-  <button id="menuCloudLibrary">☁ Cloud Library</button>
-  <button id="menuDriveLogout">🚪 Logout Google</button>
+<!-- menu gear di bawah rail dashboard (panel kaca ala vvd) -->
+<div id="settingsMenu" class="dropdown settings-menu hidden" role="menu" aria-label="Pengaturan">
+  <button id="menuAccountSettings" role="menuitem"><svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-user-circle"></use></svg><span>Pengaturan Akun</span></button>
+  <button id="menuThemeToggle" role="menuitem"><svg class="ti ic-dark-only" width="18" height="18" aria-hidden="true"><use href="#ti-moon"></use></svg><svg class="ti ic-light-only" width="18" height="18" aria-hidden="true"><use href="#ti-sun"></use></svg><span>Ganti Tema</span></button>
+  <button id="menuCloudLibrary" role="menuitem"><svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-cloud"></use></svg><span>Cloud Library</span></button>
+  <button id="menuHelp" role="menuitem"><svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-help-circle"></use></svg><span>Bantuan &amp; Panduan</span></button>
+  <div class="settings-menu-sep" role="separator"></div>
+  <button id="menuDriveLogout" role="menuitem"><svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-logout"></use></svg><span>Keluar</span></button>
 </div>
 
 <div id="cloudMenu" class="dropdown hidden">
-  <button id="menuCloudRefresh">🔄 Refresh</button>
+  <button id="menuCloudRefresh"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-refresh"></use></svg>Refresh</button>
 </div>
 
 <div id="cardMenu" class="dropdown hidden">
-  <button data-action="edit">✏️ Edit Info</button>
-  <button data-action="setCover">🖼️ Pasang Cover</button>
-  <button data-action="clearCover">🧹 Hapus Cover</button>
-  <button data-action="backupWord">📄 Backup ke Word</button>
-  <button data-action="sendCloud">☁️ Send to Cloud</button>
-  <button data-action="delete" class="danger">🗑️ Delete</button>
+  <button data-action="edit"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-pencil"></use></svg>Edit Info</button>
+  <button data-action="setCover"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-photo-plus"></use></svg>Pasang Cover</button>
+  <button data-action="clearCover"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-photo-x"></use></svg>Hapus Cover</button>
+  <button data-action="backupWord"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-file-word"></use></svg>Backup ke Word</button>
+  <button data-action="sendCloud"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-cloud-upload"></use></svg>Send to Cloud</button>
+  <button data-action="delete" class="danger"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-trash"></use></svg>Delete</button>
 </div>
 
 <div id="projectMenu" class="dropdown hidden">
-  <button data-action="sendCloud">☁ Simpan ke Drive Sekarang</button>
-  <button data-action="backupNow">🗄 Backup Sekarang</button>
-  <button data-action="history">🕘 Riwayat Backup</button>
-  <button data-action="exportWord">📄 Export ke Word</button>
+  <button data-action="sendCloud"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-cloud-upload"></use></svg>Simpan ke Drive Sekarang</button>
+  <button data-action="backupNow"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-archive"></use></svg>Backup Sekarang</button>
+  <button data-action="history"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-history"></use></svg>Riwayat Backup</button>
+  <button data-action="exportWord"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-file-word"></use></svg>Export ke Word</button>
 </div>
 
 <div id="sceneMenu" class="dropdown hidden">
-  <button data-action="duplicate">📄 Duplikat Scene</button>
-  <button data-action="delete" class="danger">🗑️ Hapus Scene</button>
+  <button data-action="duplicate"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-copy"></use></svg>Duplikat Scene</button>
+  <button data-action="delete" class="danger"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-trash"></use></svg>Hapus Scene</button>
 </div>
 
 <!-- ============ ADD PROJECT MODAL ============ -->
@@ -670,31 +818,31 @@
     <h3>Panduan Penggunaan Novelist</h3>
     <div class="support-list">
       <div class="support-item">
-        <div class="support-item-title">✍️ Write</div>
+        <div class="support-item-title"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-pencil"></use></svg>Write</div>
         <p>Tulis isi cerita per scene. Setiap scene punya judul, synopsis, dan status (Todo/Draft/Done).</p>
       </div>
       <div class="support-item">
-        <div class="support-item-title">🧩 Plot</div>
+        <div class="support-item-title"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-git-branch"></use></svg>Plot</div>
         <p>Susun alur besar cerita — babak, konflik, dan poin plot penting di luar isi tulisan scene.</p>
       </div>
       <div class="support-item">
-        <div class="support-item-title">🗂️ Organize</div>
+        <div class="support-item-title"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-folders"></use></svg>Organize</div>
         <p>Simpan referensi pendukung: karakter, lokasi, atau catatan lain yang berkaitan dengan novelmu.</p>
       </div>
       <div class="support-item">
-        <div class="support-item-title">🗓️ Schedule</div>
+        <div class="support-item-title"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-calendar-time"></use></svg>Schedule</div>
         <p>Rencanakan target/jadwal menulis supaya progres novel tetap terpantau.</p>
       </div>
       <div class="support-item">
-        <div class="support-item-title">☁️ Cloud Library</div>
+        <div class="support-item-title"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-cloud"></use></svg>Cloud Library</div>
         <p>Kirim project ke Google Drive-mu (Send to Cloud), ambil project dari Drive di perangkat lain (Receive from Cloud), atau pulihkan project yang terhapus lewat tab Trash.</p>
       </div>
       <div class="support-item">
-        <div class="support-item-title">💾 Autosave</div>
+        <div class="support-item-title"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-device-floppy"></use></svg>Autosave</div>
         <p>Perubahan otomatis tersimpan ke Google Drive-mu beberapa detik setelah berhenti mengetik — tidak perlu klik simpan manual.</p>
       </div>
       <div class="support-item">
-        <div class="support-item-title">🗑️ Delete &amp; Trash</div>
+        <div class="support-item-title"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-trash"></use></svg>Delete &amp; Trash</div>
         <p>Project yang dihapus tidak langsung hilang — dipindah dulu ke tab Trash di Cloud Library, dan bisa dipulihkan kapan saja.</p>
       </div>
     </div>
@@ -720,8 +868,8 @@
   <div class="modal-box">
     <h3 id="sceneModalTitle">Add item</h3>
     <div class="type-toggle">
-      <button type="button" class="type-toggle-btn active" data-type="scene">📄 Scene</button>
-      <button type="button" class="type-toggle-btn" data-type="folder">📁 Chapter (folder)</button>
+      <button type="button" class="type-toggle-btn active" data-type="scene"><svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-file-text"></use></svg>Scene</button>
+      <button type="button" class="type-toggle-btn" data-type="folder"><svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-folder"></use></svg>Chapter (folder)</button>
     </div>
     <label class="field-label">Title</label>
     <input id="sceneFieldTitle" class="field-input" autofocus />
@@ -750,7 +898,7 @@
 <!-- ============ BACKUP HISTORY MODAL ============ -->
 <div id="backupModal" class="modal hidden">
   <div class="modal-box">
-    <h3>🕘 Riwayat Backup</h3>
+    <h3 class="modal-title-ic"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-history"></use></svg>Riwayat Backup</h3>
     <p class="field-hint">Backup otomatis tersimpan terpisah di folder Drive "Novelist Web Backups". Klik salah satu untuk memulihkan.</p>
     <div id="backupList" class="backup-list"></div>
     <div class="modal-buttons">
@@ -769,6 +917,46 @@
     </div>
   </div>
 </div>
+
+<!-- ============ AKUN: UBAH USERNAME ============ -->
+<div id="accUsernameModal" class="modal acc-modal hidden" role="dialog" aria-modal="true" aria-labelledby="accUsernameTitle">
+  <div class="modal-box">
+    <h3 id="accUsernameTitle">Ubah username</h3>
+    <label class="field-label" for="accUsernameInput">Username</label>
+    <div class="acc-at-field">
+      <span aria-hidden="true">@</span>
+      <input id="accUsernameInput" class="field-input" maxlength="24" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="accUsernameMsg" />
+    </div>
+    <p id="accUsernameMsg" class="acc-field-msg">3–24 karakter: huruf kecil, angka, titik (.) atau garis bawah (_).</p>
+    <div class="modal-buttons">
+      <button id="accUsernameCancel" class="btn-secondary">Batal</button>
+      <button id="accUsernameSave" class="btn-primary">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ AKUN: EDIT PROFIL PUBLIK ============ -->
+<div id="accProfileModal" class="modal acc-modal hidden" role="dialog" aria-modal="true" aria-labelledby="accProfileTitle">
+  <div class="modal-box">
+    <h3 id="accProfileTitle">Edit profil publik</h3>
+    <div class="acc-pf-photo">
+      <span class="acc-avatar acc-avatar-md" id="accPfAvatar"><span class="acc-initial">?</span></span>
+      <div class="acc-pf-actions">
+        <button id="accPfUpload" class="btn-secondary acc-btn-sm"><svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-upload"></use></svg>Unggah foto</button>
+        <button id="accPfGoogle" class="btn-secondary acc-btn-sm"><svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-brand-google"></use></svg>Pakai foto Google</button>
+      </div>
+    </div>
+    <p class="acc-field-msg">Foto dipotong persegi &amp; diperkecil ke 256×256, disimpan di browser ini.</p>
+    <label class="field-label" for="accPfName">Nama tampilan</label>
+    <input id="accPfName" class="field-input" maxlength="40" autocomplete="nickname" />
+    <p class="acc-field-msg">Kosongkan untuk memakai nama akun Google-mu.</p>
+    <div class="modal-buttons">
+      <button id="accPfCancel" class="btn-secondary">Batal</button>
+      <button id="accPfSave" class="btn-primary">Simpan</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="accAvatarInput" accept="image/*" hidden />
 
 <input type="file" id="coverInputHidden" accept="image/*" style="display:none" />
 

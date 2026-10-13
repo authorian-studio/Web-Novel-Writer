@@ -1,6 +1,34 @@
-# Novelist Web — v0.9.6
+# Novelist Web — v0.9.7
 
-## Riwayat perubahan terbaru (v0.9.6) — paling baru di atas
+## Riwayat perubahan terbaru (v0.9.7) — paling baru di atas
+
+- **Semua ikon diganti ke Tabler Icons** ([tabler.io/icons](https://tabler.io/icons), MIT) — ikon lama (SVG gaya lama,
+  emoji, dan karakter seperti `+ ← ⋮ × ☁ 🗑 📄`) diganti ikon garis yang modern dan sesuai fungsinya, di semua
+  halaman: login (logo Google/Discord/Apple), dashboard, menu, tab project (Home, Write, Organize, Plot, Schedule,
+  Tools, Timeline, Map), pohon scene, panel Scene Settings & tombol format teks, Cloud Library, toast/notifikasi,
+  status sinkron, Timeline, dan editor Map (termasuk ikon jenis tempat: kota, desa, kastel, pelabuhan, dll.).
+  - Hanya ikon yang dipakai yang disimpan: `vendor/tabler-icons.js` (sprite ±104 ikon, ±27 KB, tanpa CDN).
+  - Cara pakai di kode: HTML `<svg class="ti"><use href="#ti-home"></use></svg>`, JS `tiIcon("home")`.
+    Setelah menambah ikon baru jalankan `cd tools && npm run build:icons` (`tools/build-icons.mjs` memindai kode dan
+    gagal bila ada nama ikon yang tidak ada di Tabler).
+- **Jendela Pengaturan Akun (setelah login)**, mirip referensi vvd:
+  - Menu gear di kiri bawah dirombak: **Pengaturan Akun**, Ganti Tema, Cloud Library, Bantuan & Panduan, Keluar.
+  - Rail kiri dashboard punya tombol **Project** (grid) dan **avatar akun** (foto profil Google).
+  - Halaman akun: foto profil (bisa diganti), nama, email, "Member sejak …"; bagian **Profil** (username, edit
+    profil publik: nama tampilan & foto, tema tampilan, email), **Metode masuk** (Google terhubung + tombol Putuskan;
+    Email, Apple, Discord menyusul), **Penyimpanan** (pemakaian Google Drive, jumlah project, link ke Drive), **Paket**
+    (Gratis), dan tombol **Keluar dari akun**. Bisa juga dibuka dari sidebar project.
+  - Data akun dibaca dari Google Drive API (`about`) dengan izin yang sudah ada (tanpa izin baru). Username, nama
+    tampilan & foto custom disimpan di browser perangkat ini. Pilihan tema kini diingat.
+- **Ganti gambar halftone di halaman login:** tombol baru di **pojok kiri bawah** halaman login → "Unggah gambar…"
+  (atau seret-lepas gambar ke kolom kiri) untuk mengganti gambar karakter halftone dengan gambar sendiri, dan
+  "Kembalikan gambar bawaan" untuk kembali ke default. Gambar otomatis diperkecil (maks. 1600 px) dan disimpan di
+  perangkat ini (IndexedDB), jadi tetap ada setelah halaman dibuka ulang. Tombol hanya tampil di layar lebar (>900 px),
+  sama seperti kolom gambarnya.
+- **Perbaikan:** setelah logout lalu login dengan akun Google lain di tab yang sama, project kini dibaca dari folder
+  Drive akun yang baru (sebelumnya masih memakai ID folder akun lama).
+
+### v0.9.6
 
 - **Perbaikan deploy Cloudflare Workers:** alat build (`package.json`, `package-lock.json`, `tailwind.input.css`)
   dipindah dari root repo ke folder `tools/`. Saat `package.json` ada di root, Cloudflare Workers Builds menganggap
@@ -502,9 +530,9 @@ nama-repo/
 ├── timeline.js
 ├── map-core.js, map2d.js, map3d.js, map-ui.js   (fitur Map: data, editor 2D, tampilan 3D, UI tab)
 ├── vendor/   (react, react-dom, reactflow, three.js r169 + OrbitControls, motion 13.4.3, base-ui 1.8.0,
-│              radix-ui 1.6.7, shadcn-ui, tailwind.css + lisensinya)
+│              radix-ui 1.6.7, shadcn-ui, tailwind.css, tabler-icons.js (sprite ikon) + lisensinya)
 ├── components/ui/*.tsx, lib/utils.ts, components.json   (kode sumber shadcn/ui)
-├── tools/   (package.json, tailwind.input.css, build-vendor.mjs — hanya untuk membangun ulang vendor/: cd tools && npm install && npm run build)
+├── tools/   (package.json, tailwind.input.css, build-vendor.mjs, build-icons.mjs — hanya untuk membangun ulang vendor/: cd tools && npm install && npm run build)
 ├── config.js
 ├── manifest.json
 ```

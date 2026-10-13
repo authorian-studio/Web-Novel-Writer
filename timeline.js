@@ -215,7 +215,8 @@
       h(Controls, { showInteractive: false, showFitView: false, position: "bottom-right", className: "tl-controls" }),
       ghost ? h("div", { className: "tl-ghost", style: { left: ghost.left, top: ghost.top } },
         h("span", { className: "tl-ghost-tip" + ghost.edge }, h("b", null, fmtDate(ghost.date)), " · klik untuk menambah"),
-        h("span", { className: "tl-ghost-plus" }, "+")) : null);
+        h("span", { className: "tl-ghost-plus" },
+          h("svg", { className: "ti", width: 12, height: 12, "aria-hidden": "true", focusable: "false" }, h("use", { href: "#ti-plus" })))) : null);
   }
 
   function renderFlow() {
@@ -240,7 +241,7 @@
     items.forEach((t) => {
       const b = document.createElement("button");
       b.className = "tl-item" + (tl && t.id === tl.id ? " is-current" : "");
-      b.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><path d="M7 9v6M16 7v10"/></svg><span></span>';
+      b.innerHTML = '<svg class="ti" width="14" height="14" aria-hidden="true" focusable="false"><use href="#ti-timeline"></use></svg><span></span>';
       b.querySelector("span").textContent = t.title || "(tanpa nama)";
       b.onclick = () => openTimeline(t.id);
       list.appendChild(b);
