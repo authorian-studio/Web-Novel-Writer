@@ -112,17 +112,18 @@
 
   <!-- ============ DASHBOARD VIEW ============ -->
   <section id="dashboardView" class="view hidden">
-    <!-- Background: foto ngarai bersalju + aurora (bg-canyon.jpg, di-blur) + vignette + dot-grid ala React Flow (di-blur tipis) -->
+    <!-- Background: foto ngarai bersalju + aurora (bg-canyon.jpg, di-blur) + vignette + dot-grid ala React Flow (di-blur tipis).
+         Foto bisa diganti pengguna di Pengaturan Akun → Tampilan (bagian BACKGROUND di app.js: inline background-image). -->
     <div class="galaxy-bg" aria-hidden="true">
-      <div class="galaxy-photo"></div>
+      <div class="galaxy-photo" id="dashBgPhoto"></div>
       <!-- cover project yang sedang di-hover memudar masuk ke sini (2 lapisan bergantian supaya bisa crossfade) -->
       <div class="galaxy-cover" id="dashCoverBgA"></div>
       <div class="galaxy-cover" id="dashCoverBgB"></div>
       <div class="galaxy-dots"></div>
     </div>
 
-    <!-- Rail ikon di kiri -->
-    <nav class="dash-rail" aria-label="Menu utama">
+    <!-- Rail ikon di kiri — bisa disembunyikan (layar lebar): klik logo kiri atas / arahkan kursor ke tepi kiri. Diatur bagian RAIL SIDEBAR di app.js -->
+    <nav class="dash-rail" id="dashRail" aria-label="Menu utama">
       <div class="dash-rail-top">
         <!-- halaman: daftar project (default) & Pengaturan Akun — yang aktif diberi kelas is-active -->
         <button class="dash-rail-btn is-active" id="btnRailProjects" aria-label="Project" aria-current="page">
@@ -157,12 +158,15 @@
     </nav>
 
     <!-- Logo animasi Novelist (logo-anim.mp4, looping, tanpa suara). Diletakkan DI LUAR rail supaya mix-blend-mode
-         bisa menyatu dengan foto background (latar hitam videonya jadi transparan). -->
-    <div class="rail-logo" title="Novelist">
+         bisa menyatu dengan foto background (latar hitam videonya jadi transparan). Sekaligus tombol buka/tutup rail. -->
+    <button type="button" class="rail-logo" id="btnRailLogo" aria-label="Buka sidebar" aria-expanded="false" aria-controls="dashRail">
       <video id="railLogoVideo" muted loop playsinline preload="auto" poster="logo-anim-poster.webp" aria-hidden="true" tabindex="-1">
         <source src="logo-anim.mp4" type="video/mp4">
       </video>
-    </div>
+    </button>
+    <!-- petunjuk sekali tampil (sampai rail pertama kali dibuka) & tooltip logo; di luar tombol supaya tidak ikut di-blend -->
+    <div id="railHint" class="rail-hint" aria-hidden="true">Klik logo atau arahkan kursor ke tepi kiri untuk membuka menu</div>
+    <span id="railLogoTip" class="rail-logo-tip" aria-hidden="true">Buka sidebar</span>
 
     <span id="syncIndicator" class="sync-indicator"><svg class="ti" width="14" height="14" aria-hidden="true"><use href="#ti-cloud-check"></use></svg><span>Tersinkron</span></span>
 
@@ -227,6 +231,38 @@
               <span class="acc-row-label">Email</span>
               <span id="accEmailValue" class="acc-row-value is-plain">—</span>
             </div>
+          </div>
+        </section>
+
+        <!-- Tampilan: background dashboard pilihan sendiri (di-blur seperti bawaan) + slider blur & redup. Diisi bagian BACKGROUND di app.js -->
+        <section class="acc-section acc-anim" aria-labelledby="accLblLook">
+          <h2 id="accLblLook" class="acc-section-label">Tampilan</h2>
+          <div class="acc-card">
+            <div id="accBgRow" class="acc-row is-static acc-bg-row">
+              <span id="accBgThumb" class="acc-bg-thumb" title="Ganti background" aria-hidden="true"></span>
+              <div class="acc-bg-main">
+                <span class="acc-row-text"><span class="acc-row-label">Background</span><span id="accBgSub" class="acc-row-sub">Bawaan — foto ngarai bersalju</span></span>
+                <div class="acc-bg-actions">
+                  <button id="accBgPick" class="acc-pill acc-bg-btn"><svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-photo"></use></svg><span id="accBgPickLabel">Ganti background…</span></button>
+                  <button id="accBgReset" class="acc-pill acc-bg-btn hidden"><svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-restore"></use></svg>Kembalikan bawaan</button>
+                </div>
+              </div>
+              <input type="file" id="accBgInput" accept="image/*" hidden />
+              <span class="acc-bg-drop" aria-hidden="true"><svg class="ti" width="18" height="18"><use href="#ti-photo-up"></use></svg>Lepaskan gambar untuk dijadikan background</span>
+            </div>
+            <div id="accBgBlurRow" class="acc-row is-static acc-range-row">
+              <svg class="ti acc-method-ic" width="18" height="18" aria-hidden="true"><use href="#ti-blur"></use></svg>
+              <label class="acc-row-label" for="accBgBlur">Blur</label>
+              <input id="accBgBlur" class="acc-range" type="range" min="0" max="30" step="1" value="6" aria-describedby="accBgBlurVal" />
+              <output id="accBgBlurVal" class="acc-range-val" for="accBgBlur">6 px</output>
+            </div>
+            <div id="accBgDimRow" class="acc-row is-static acc-range-row">
+              <svg class="ti acc-method-ic" width="18" height="18" aria-hidden="true"><use href="#ti-brightness-half"></use></svg>
+              <label class="acc-row-label" for="accBgDim">Redup</label>
+              <input id="accBgDim" class="acc-range" type="range" min="0" max="80" step="1" value="30" aria-describedby="accBgDimVal" />
+              <output id="accBgDimVal" class="acc-range-val" for="accBgDim">30%</output>
+            </div>
+            <p id="accBgNote" class="acc-bg-note hidden">Tema terang memakai latar polos — pilih background sendiri supaya blur &amp; redup terlihat.</p>
           </div>
         </section>
 

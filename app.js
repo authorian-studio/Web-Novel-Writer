@@ -709,7 +709,7 @@ async function openMapTab() {
 // ---- HOME TAB: canvas berisi titik-titik scene ----
 // Background project = cover-nya (di-blur); kalau belum ada cover pakai foto default dashboard.
 function applyProjectLook(p) {
-  const bg = p.cover ? `url("${p.cover}")` : `url("bg-canyon.jpg")`;
+  const bg = p.cover ? `url("${p.cover}")` : dashBgImageCss();   // tanpa cover: background dashboard (bawaan / pilihan sendiri)
   el("projBgPhoto").style.backgroundImage = bg;
   el("projChipCover").style.backgroundImage = p.cover ? `url("${p.cover}")` : `linear-gradient(135deg, ${p.colorA}, ${p.colorB})`;
   el("projChipCover").textContent = p.cover ? "" : (p.title || "?").charAt(0).toUpperCase();
@@ -2092,6 +2092,280 @@ function initAccount() {
   });
 }
 
+// ================= BACKGROUND (Pengaturan Akun → Tampilan) =================
+// Foto background dashboard (bawaan bg-canyon.jpg) bisa diganti gambar sendiri. Tampilannya tetap sama dengan bawaan:
+// gambarnya cuma dipasang sebagai inline background-image di #dashBgPhoto (.galaxy-photo), jadi blur, vignette, dot-grid
+// kaca buram & crossfade cover project yang di-hover tetap dari CSS .galaxy-*. Project tanpa cover juga memakainya.
+// Slider Blur & Redup = variabel CSS --dash-bg-blur / --dash-bg-dim di #dashboardView (default = tampilan bawaan).
+// Disimpan HANYA di perangkat ini (tidak ikut akun/Drive, tetap ada setelah logout): gambar (Blob) di IndexedDB
+// "novelist"/"kv" lewat loginArtKv() (helper key-value yang sama dengan login art), setelan slider di localStorage.
+// Storage diblokir -> background tetap dipakai selama sesi ini.
+const DASH_BG_KEY = "dashBgCustom";              // key di IndexedDB novelist/kv
+const DASH_BG_PREFS_KEY = "novelist_dash_bg";    // localStorage: { blur, dim }
+const DASH_BG_MAX_BYTES = 20 * 1024 * 1024;      // batas ukuran file masukan
+const DASH_BG_MAX_SIDE = 2560;                   // sisi terpanjang setelah diperkecil (layar penuh, tapi di-blur -> cukup)
+const DASH_BG_DEFAULT = { blur: 6, dim: 30 };    // = .galaxy-dots bawaan: blur(6px) + tint gelap .3
+const DASH_BG_LIMITS = { blur: [0, 30], dim: [0, 80] };
+
+let dashBg = null;               // { url, objectUrl, w, h, saved } gambar aktif; null = foto bawaan
+let dashBgPrefs = { ...DASH_BG_DEFAULT };
+let dashBgTouched = false;       // pengguna sudah ganti/reset sebelum gambar tersimpan selesai dibaca -> abaikan hasil bacaan
+let dashBgBusy = false;
+
+// url("...") yang aman untuk CSS (object URL / data URI / path)
+function cssUrl(u) { return 'url("' + String(u).replace(/[\\"]/g, "\\$&").replace(/[\n\r]/g, "") + '")'; }
+// background project tanpa cover = background dashboard yang sedang aktif
+function dashBgImageCss() { return dashBg ? cssUrl(dashBg.url) : 'url("bg-canyon.jpg")'; }
+function dashBgPrefsIsDefault() { return dashBgPrefs.blur === DASH_BG_DEFAULT.blur && dashBgPrefs.dim === DASH_BG_DEFAULT.dim; }
+
+function loadDashBgPrefs() {
+  let p = null;
+  try { p = JSON.parse(localStorage.getItem(DASH_BG_PREFS_KEY) || "null"); } catch (e) { p = null; }
+  const out = { ...DASH_BG_DEFAULT };
+  if (p && typeof p === "object") Object.keys(DASH_BG_LIMITS).forEach((k) => {
+    const v = Number(p[k]), [lo, hi] = DASH_BG_LIMITS[k];
+    if (p[k] != null && Number.isFinite(v)) out[k] = Math.round(Math.min(hi, Math.max(lo, v)));
+  });
+  return out;
+}
+function saveDashBgPrefs() {
+  try {
+    if (dashBgPrefsIsDefault()) localStorage.removeItem(DASH_BG_PREFS_KEY);
+    else localStorage.setItem(DASH_BG_PREFS_KEY, JSON.stringify(dashBgPrefs));
+  } catch (e) { /* storage diblokir: setelan tetap berlaku selama sesi ini */ }
+}
+function applyDashBgPrefs() {
+  const s = el("dashboardView").style;
+  if (dashBgPrefs.blur === DASH_BG_DEFAULT.blur) s.removeProperty("--dash-bg-blur"); else s.setProperty("--dash-bg-blur", dashBgPrefs.blur + "px");
+  if (dashBgPrefs.dim === DASH_BG_DEFAULT.dim) s.removeProperty("--dash-bg-dim"); else s.setProperty("--dash-bg-dim", String(dashBgPrefs.dim / 100));
+}
+function applyDashBg() {
+  el("dashBgPhoto").style.backgroundImage = dashBg ? cssUrl(dashBg.url) : "";   // "" = kembali ke bg-canyon.jpg dari CSS
+  el("dashboardView").classList.toggle("has-custom-bg", !!dashBg);
+  const p = currentProjectId && getProject(currentProjectId);
+  if (p && !p.cover) el("projBgPhoto").style.backgroundImage = dashBgImageCss();
+  renderDashBgControls();
+}
+// ganti gambar aktif; object URL lama dilepas sedikit belakangan (transisi background-image project masih memakainya)
+function setDashBg(next) {
+  const prev = dashBg;
+  dashBg = next;
+  applyDashBg();
+  if (prev && prev.objectUrl && (!next || next.url !== prev.url)) setTimeout(() => URL.revokeObjectURL(prev.url), 1500);
+}
+
+function renderDashBgControls() {
+  const thumb = el("accBgThumb");
+  if (!thumb) return;
+  const plain = document.body.classList.contains("light") && !dashBg;   // tema terang bawaan: tanpa foto
+  thumb.classList.toggle("is-plain", plain);
+  thumb.style.backgroundImage = dashBg ? cssUrl(dashBg.url) : "";
+  el("accBgSub").textContent = dashBg
+    ? `Gambar sendiri · ${dashBg.w}×${dashBg.h}` + (dashBg.saved ? " · tersimpan di perangkat ini" : " · hanya sesi ini")
+    : plain ? "Bawaan — tema terang memakai latar polos" : "Bawaan — foto ngarai bersalju";
+  el("accBgReset").classList.toggle("hidden", !dashBg && dashBgPrefsIsDefault());
+  [["blur", "accBgBlur", "accBgBlurVal", (v) => v + " px"], ["dim", "accBgDim", "accBgDimVal", (v) => v + "%"]].forEach(([k, id, valId, fmt]) => {
+    const input = el(id), v = dashBgPrefs[k], [lo, hi] = DASH_BG_LIMITS[k];
+    input.value = String(v);
+    input.style.setProperty("--fill", ((v - lo) / (hi - lo)) * 100 + "%");
+    input.setAttribute("aria-valuetext", fmt(v));
+    input.disabled = plain;
+    input.closest(".acc-range-row").classList.toggle("is-off", plain);
+    el(valId).textContent = fmt(v);
+  });
+  el("accBgNote").classList.toggle("hidden", !plain);
+}
+function setDashBgBusy(on) {
+  dashBgBusy = on;
+  const pick = el("accBgPick");
+  pick.classList.toggle("is-busy", on);
+  pick.setAttribute("aria-busy", String(on));
+  pick.querySelector("use").setAttribute("href", on ? "#ti-loader-2" : "#ti-photo");
+  el("accBgPickLabel").textContent = on ? "Memproses…" : "Ganti background…";
+  el("accBgReset").disabled = on;
+}
+
+function dashBgDecodes(url) {
+  const img = new Image();
+  img.src = url;
+  return img.decode().then(() => img.naturalWidth > 0, () => false);
+}
+// File -> Blob kecil: decode, perkecil (sisi terpanjang <= DASH_BG_MAX_SIDE), encode WebP 0.9.
+// Browser yang tidak bisa encode WebP (Safari) dapat JPEG di atas latar gelap.
+async function prepareDashBgImage(file) {
+  let source = null, url = null;
+  try {
+    if (window.createImageBitmap) { try { source = await createImageBitmap(file); } catch (e) { source = null; } }
+    if (!source) {   // mis. SVG / browser lama: lewat <img>
+      url = URL.createObjectURL(file);
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      source = img;
+    }
+    const w0 = source.naturalWidth || source.width, h0 = source.naturalHeight || source.height;
+    if (!w0 || !h0) throw new Error("ukuran gambar 0");
+    const vector = /svg/i.test(file.type || "") || /\.svg$/i.test(file.name || "");   // SVG boleh diperbesar
+    const scale = vector ? 1920 / Math.max(w0, h0) : Math.min(1, DASH_BG_MAX_SIDE / Math.max(w0, h0));
+    const w = Math.max(1, Math.round(w0 * scale)), h = Math.max(1, Math.round(h0 * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(source, 0, 0, w, h);
+    const encode = (type, q) => new Promise((resolve) => canvas.toBlob(resolve, type, q));
+    let blob = await encode("image/webp", 0.9);
+    if (!blob || blob.type !== "image/webp") {
+      ctx.globalCompositeOperation = "destination-over";   // JPEG tanpa alpha: isi bagian transparan dengan warna latar
+      ctx.fillStyle = "#0a0a0c";
+      ctx.fillRect(0, 0, w, h);
+      blob = await encode("image/jpeg", 0.9);
+    }
+    if (!blob || !blob.size) throw new Error("encode gagal");
+    return { blob, w, h, at: Date.now() };
+  } finally {
+    if (source && source.close) source.close();   // ImageBitmap
+    if (url) URL.revokeObjectURL(url);
+  }
+}
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error || new Error("FileReader gagal"));
+    r.readAsDataURL(blob);
+  });
+}
+
+// ---- simpan / baca di IndexedDB (perangkat ini) ----
+async function saveDashBgCustom(rec) {
+  try { await loginArtKv("readwrite", (s) => s.put(rec, DASH_BG_KEY)); return true; } catch (e) { /* coba sebagai data URI */ }
+  try {   // browser yang menolak Blob di IndexedDB: simpan sebagai data URI
+    const src = await blobToDataUrl(rec.blob);
+    await loginArtKv("readwrite", (s) => s.put({ src, w: rec.w, h: rec.h, at: rec.at }, DASH_BG_KEY));
+    return true;
+  } catch (e) { /* lanjut */ }
+  // gagal total: jangan sampai gambar LAMA yang tersimpan muncul lagi setelah reload
+  try { await loginArtKv("readwrite", (s) => s.delete(DASH_BG_KEY)); } catch (e) { /* abaikan */ }
+  return false;
+}
+async function clearDashBgCustom() {
+  try { await loginArtKv("readwrite", (s) => s.delete(DASH_BG_KEY)); } catch (e) { /* abaikan */ }
+}
+async function loadDashBgCustom() {
+  let rec = null;
+  try { rec = await loginArtKv("readonly", (s) => s.get(DASH_BG_KEY)); } catch (e) { return null; }
+  if (!rec || typeof rec !== "object") return null;
+  const size = (v) => (Number.isFinite(v) && v > 0 ? Math.round(v) : "?");
+  let bg = null;
+  if (rec.blob instanceof Blob && /^image\//.test(rec.blob.type)) bg = { url: URL.createObjectURL(rec.blob), objectUrl: true };
+  else if (typeof rec.src === "string" && /^data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/]+=*$/i.test(rec.src)) bg = { url: rec.src, objectUrl: false };
+  if (!bg) return null;
+  Object.assign(bg, { w: size(rec.w), h: size(rec.h), saved: true });
+  if (!(await dashBgDecodes(bg.url))) {   // data rusak -> buang supaya background tidak kosong terus
+    if (bg.objectUrl) URL.revokeObjectURL(bg.url);
+    clearDashBgCustom();
+    return null;
+  }
+  return bg;
+}
+
+// ---- ganti / kembalikan ----
+function pickDashBg() {
+  if (dashBgBusy) return;
+  const input = el("accBgInput");
+  input.value = "";
+  input.click();
+}
+async function changeDashBg(file) {
+  if (dashBgBusy || !file) return;
+  // file.type kadang kosong (mis. .webp di sistem lama) -> cek ekstensinya
+  const isImage = /^image\//i.test(file.type || "") || (!file.type && /\.(png|jpe?g|webp|gif|bmp|avif|svg)$/i.test(file.name || ""));
+  if (!isImage) { toast("File itu bukan gambar — pilih file JPG, PNG atau WebP", tiIcon("alert-triangle")); return; }
+  if (file.size > DASH_BG_MAX_BYTES) { toast("Gambar terlalu besar (maks. 20 MB)", tiIcon("alert-triangle")); return; }
+  setDashBgBusy(true);
+  try {
+    let rec = null;
+    try { rec = await prepareDashBgImage(file); } catch (e) { console.warn("[background] gambar gagal diproses:", e); }
+    const url = rec ? URL.createObjectURL(rec.blob) : null;
+    if (!url || !(await dashBgDecodes(url))) {
+      if (url) URL.revokeObjectURL(url);
+      toast("Gambar tidak bisa dibaca — coba file lain (JPG, PNG atau WebP)", tiIcon("alert-triangle"));
+      return;
+    }
+    dashBgTouched = true;
+    setDashBg({ url, objectUrl: true, w: rec.w, h: rec.h, saved: false });
+    const saved = await saveDashBgCustom(rec);
+    if (dashBg && dashBg.url === url) { dashBg.saved = saved; renderDashBgControls(); }
+    if (saved) toast("Background diganti", tiIcon("circle-check"));
+    else toast("Background dipakai untuk sesi ini saja — penyimpanan browser diblokir", tiIcon("alert-triangle"));
+  } finally {
+    setDashBgBusy(false);
+  }
+}
+async function resetDashBg() {
+  if (dashBgBusy) return;
+  dashBgTouched = true;
+  dashBgPrefs = { ...DASH_BG_DEFAULT };
+  saveDashBgPrefs();
+  applyDashBgPrefs();
+  setDashBg(null);
+  toast("Background dikembalikan ke bawaan", tiIcon("restore"));
+  await clearDashBgCustom();
+}
+
+function initDashBg() {
+  dashBgPrefs = loadDashBgPrefs();
+  applyDashBgPrefs();
+  renderDashBgControls();
+  // gambar tersimpan dibaca sedini mungkin (login butuh klik + popup Google, jadi biasanya sudah siap sebelum dashboard tampil)
+  loadDashBgCustom().then((bg) => {
+    if (!bg) return;
+    if (dashBgTouched) { if (bg.objectUrl) URL.revokeObjectURL(bg.url); return; }
+    setDashBg(bg);
+  }, () => {});
+
+  el("accBgPick").onclick = pickDashBg;
+  el("accBgThumb").onclick = pickDashBg;
+  el("accBgReset").onclick = () => { el("accBgPick").focus(); resetDashBg(); };   // tombolnya hilang setelah reset -> fokus pindah
+  el("accBgInput").addEventListener("change", (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) changeDashBg(f); });
+  [["blur", "accBgBlur"], ["dim", "accBgDim"]].forEach(([k, id]) => {
+    const input = el(id);
+    input.addEventListener("input", () => { dashBgPrefs[k] = Number(input.value); applyDashBgPrefs(); renderDashBgControls(); });   // pratinjau langsung
+    input.addEventListener("change", saveDashBgPrefs);
+  });
+  // tema berubah: thumbnail & slider ikut (tema terang bawaan tidak memakai foto)
+  let lastLight = document.body.classList.contains("light");
+  new MutationObserver(() => {
+    const light = document.body.classList.contains("light");
+    if (light !== lastLight) { lastLight = light; renderDashBgControls(); }
+  }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+
+  // seret-lepas gambar ke baris Background; file yang dilepas di tempat lain di halaman akun diabaikan
+  // (jangan sampai browser membuka file itu & meninggalkan aplikasi). Counter karena dragenter/leave ikut anak elemen.
+  const view = el("accountView"), row = el("accBgRow");
+  const hasFiles = (e) => !!e.dataTransfer && [...(e.dataTransfer.types || [])].includes("Files");
+  let depth = 0;
+  const endDrag = () => { depth = 0; view.classList.remove("is-file-drag"); row.classList.remove("is-drop"); };
+  view.addEventListener("dragenter", (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth++; view.classList.add("is-file-drag"); });
+  view.addEventListener("dragleave", (e) => { if (!hasFiles(e)) return; depth = Math.max(0, depth - 1); if (!depth) endDrag(); });
+  view.addEventListener("dragover", (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    const inRow = row.contains(e.target);
+    row.classList.toggle("is-drop", inRow);
+    e.dataTransfer.dropEffect = inRow ? "copy" : "none";
+  });
+  view.addEventListener("drop", (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    const inRow = row.contains(e.target);
+    endDrag();
+    const f = inRow && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) changeDashBg(f);
+  });
+}
+
 // ================= LOGIN ART (kolom kiri halaman login) =================
 // HalftoneReveal dari React Bits (sudah di-port ke JS biasa: halftone-reveal.js).
 // Gambar = ilustrasi karakter dengan background transparan (dibuang dari JPG asli). Dimuat dari login-art-data.js (data URI,
@@ -2391,11 +2665,106 @@ function initRailLogo() {
   document.addEventListener("visibilitychange", sync);
 }
 
+// ================= RAIL SIDEBAR (rail kiri dashboard bisa dibuka/ditutup) =================
+// Layar lebar (>700px): klik logo kiri atas = buka/tutup rail. Saat tertutup, kursor yang diam sebentar di tepi kiri layar
+// membukanya otomatis. Sekali terbuka, rail TETAP terbuka (tidak menutup sendiri saat kursor pergi, Esc juga tidak)
+// sampai logo diklik lagi. Status diingat di perangkat ini; pengguna baru mulai dengan rail tertutup + petunjuk kecil.
+// HP (<=700px): rail = bar bawah yang selalu tampil; logo kembali jadi hiasan saja.
+const RAIL_OPEN_KEY = "novelist_rail_open";
+const RAIL_HINT_KEY = "novelist_rail_hint_seen";
+const RAIL_EDGE_PX = 10;            // lebar zona tepi kiri
+const RAIL_EDGE_DWELL_MS = 120;     // kursor harus bertahan di zona tepi selama ini (hindari terbuka tanpa sengaja)
+const RAIL_HINT_DELAY_MS = 900;     // petunjuk muncul sebentar setelah dashboard tampil...
+const RAIL_HINT_SHOW_MS = 9000;     // ...lalu memudar sendiri (tampil lagi di kunjungan berikutnya sampai rail pernah dibuka)
+const railMobileMq = window.matchMedia("(max-width: 700px)");
+let railOpen = false, railHintDone = false, railHintTimer = 0, railEdgeTimer = 0;
+
+function railIsMobile() { return railMobileMq.matches; }
+function railDashVisible() { return !el("dashboardView").classList.contains("hidden"); }
+function setRailOpen(open, { save = true } = {}) {
+  railOpen = !!open;
+  el("dashboardView").classList.toggle("rail-closed", !railOpen);
+  syncRailLogo();
+  if (save) { try { localStorage.setItem(RAIL_OPEN_KEY, railOpen ? "1" : "0"); } catch (e) { /* abaikan */ } }
+  if (railOpen) { markRailHintSeen(); return; }
+  cancelRailEdge();
+  // tutup: menu gear ikut ditutup; fokus yang masih di dalam rail dipindah ke logo (rail jadi visibility:hidden)
+  if (!el("settingsMenu").classList.contains("hidden")) closeAllDropdowns();
+  if (el("dashRail").contains(document.activeElement)) el("btnRailLogo").focus({ preventScroll: true });
+}
+function syncRailLogo() {
+  const btn = el("btnRailLogo");
+  if (railIsMobile()) {   // bar bawah HP: tidak ada yang dibuka/ditutup
+    btn.setAttribute("tabindex", "-1");
+    btn.setAttribute("aria-hidden", "true");
+    btn.removeAttribute("aria-expanded");
+    hideRailHint();
+    return;
+  }
+  const label = railOpen ? "Tutup sidebar" : "Buka sidebar";
+  btn.removeAttribute("tabindex");
+  btn.removeAttribute("aria-hidden");
+  btn.setAttribute("aria-label", label);
+  btn.setAttribute("aria-expanded", String(railOpen));
+  el("railLogoTip").textContent = label;
+}
+
+// ---- petunjuk sekali tampil di samping logo ----
+function railHintSeen() {
+  if (railHintDone) return true;
+  try { return localStorage.getItem(RAIL_HINT_KEY) === "1"; } catch (e) { return false; }
+}
+function hideRailHint() { clearTimeout(railHintTimer); el("railHint").classList.remove("is-on"); }
+function markRailHintSeen() {
+  hideRailHint();
+  if (railHintDone) return;
+  railHintDone = true;
+  try { localStorage.setItem(RAIL_HINT_KEY, "1"); } catch (e) { /* abaikan */ }
+}
+function maybeShowRailHint() {
+  hideRailHint();
+  if (railOpen || railIsMobile() || railHintSeen()) return;
+  railHintTimer = setTimeout(() => {
+    if (railOpen || railIsMobile() || !railDashVisible()) return;
+    el("railHint").classList.add("is-on");
+    railHintTimer = setTimeout(hideRailHint, RAIL_HINT_SHOW_MS);
+  }, RAIL_HINT_DELAY_MS);
+}
+
+// ---- buka otomatis saat kursor bertahan di tepi kiri (mouse/pen saja; tidak saat tombol ditekan / menyeret) ----
+function cancelRailEdge() { clearTimeout(railEdgeTimer); railEdgeTimer = 0; }
+function railEdgeAllowed() {
+  return !railOpen && !railIsMobile() && railDashVisible() && !document.querySelector(".modal:not(.hidden)");
+}
+function onRailEdgePointer(e) {
+  if (e.clientX > RAIL_EDGE_PX || e.pointerType === "touch" || e.buttons || !railEdgeAllowed()) { cancelRailEdge(); return; }
+  if (railEdgeTimer) return;   // sudah menunggu: bergerak di dalam zona tepi tidak mengulang hitungan
+  railEdgeTimer = setTimeout(() => { railEdgeTimer = 0; if (railEdgeAllowed()) setRailOpen(true); }, RAIL_EDGE_DWELL_MS);
+}
+
+function initRailSidebar() {
+  let saved = null;
+  try { saved = localStorage.getItem(RAIL_OPEN_KEY); } catch (e) { /* abaikan */ }
+  setRailOpen(saved === "1", { save: false });   // default pengguna baru: tertutup
+  el("btnRailLogo").addEventListener("click", () => { if (!railIsMobile()) setRailOpen(!railOpen); });
+  el("railHint").addEventListener("click", () => setRailOpen(true));
+  document.addEventListener("pointermove", onRailEdgePointer, { passive: true });
+  document.addEventListener("pointerdown", cancelRailEdge, true);
+  document.documentElement.addEventListener("mouseleave", cancelRailEdge);
+  window.addEventListener("blur", cancelRailEdge);
+  railMobileMq.addEventListener("change", () => { syncRailLogo(); if (!railIsMobile()) maybeShowRailHint(); });
+  // petunjuk hanya saat dashboard benar-benar tampil (setelah login / kembali dari project)
+  new IntersectionObserver((entries) => {
+    if (entries.some((e) => e.isIntersecting)) maybeShowRailHint(); else hideRailHint();
+  }).observe(el("btnRailLogo"));
+}
+
 // ================= EVENT BINDING =================
 window.addEventListener("DOMContentLoaded", () => {
   initLoginArt();
   initLoginFooter();
   initRailLogo();
+  initRailSidebar();   // rail kiri dashboard: buka/tutup lewat logo & tepi kiri layar
   pickDashTitle();
   el("btnLoginGoogle").onclick = handleLogin;
   document.querySelectorAll("#loginView .btn-oauth.is-soon").forEach((b) => b.onclick = () => handleSoonProvider(b.dataset.provider));
@@ -2429,6 +2798,7 @@ window.addEventListener("DOMContentLoaded", () => {
   el("menuCloudLibrary").onclick = openCloudLibrary;
   el("menuDriveLogout").onclick = () => { if (confirm("Logout dari Google?")) driveSignOut(); };
   initAccount();   // rail Project/Akun, menu Pengaturan Akun & Bantuan, halaman akun + modalnya
+  initDashBg();    // background dashboard pilihan sendiri (Pengaturan Akun → Tampilan), dibaca dari IndexedDB sedini mungkin
 
   // ---- Ikon aksi di rail kiri dashboard ----
   el("btnQuickTheme").addEventListener("click", () => document.body.classList.toggle("light"));

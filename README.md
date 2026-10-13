@@ -1,6 +1,19 @@
-# Novelist Web — v0.9.7
+# Novelist Web — v0.9.8
 
-## Riwayat perubahan terbaru (v0.9.7) — paling baru di atas
+## Riwayat perubahan terbaru (v0.9.8) — paling baru di atas
+
+- **Ganti background dashboard (Pengaturan Akun → Tampilan):** pilih gambar sendiri ("Ganti background…" atau
+  seret-lepas gambar ke baris Background) untuk menggantikan foto ngarai di dashboard. Tampilannya tetap seperti
+  sebelumnya: di-blur, dengan vignette & dot-grid di atasnya. Ada slider **Blur** (0–30 px, bawaan 6 px) dan **Redup**
+  (0–80 %, bawaan 30 %), plus "Kembalikan bawaan". Project tanpa sampul juga memakai background ini. Di tema terang,
+  background custom tetap tampil dengan lapisan terang supaya teks terbaca. Gambar diperkecil otomatis (maks.
+  2560 px) dan disimpan di perangkat ini (IndexedDB), jadi tetap ada setelah halaman dibuka ulang.
+- **Sidebar kiri dashboard bisa dibuka-tutup:** klik **logo di kiri atas** untuk membuka/menutup rail ikon, atau
+  arahkan kursor ke **tepi kiri layar** sebentar untuk membukanya otomatis. Setelah terbuka, sidebar tetap terbuka
+  (tidak menutup sendiri) sampai logo diklik lagi. Status buka/tutup diingat. Pengguna baru melihat petunjuk kecil di
+  samping logo. Di HP (≤ 700 px) bar bawah tetap selalu tampil seperti sebelumnya.
+
+### v0.9.7
 
 - **Semua ikon diganti ke Tabler Icons** ([tabler.io/icons](https://tabler.io/icons), MIT) — ikon lama (SVG gaya lama,
   emoji, dan karakter seperti `+ ← ⋮ × ☁ 🗑 📄`) diganti ikon garis yang modern dan sesuai fungsinya, di semua
