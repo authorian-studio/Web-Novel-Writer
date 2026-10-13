@@ -1,12 +1,14 @@
 // ================= MAP 2D (editor peta world-building) =================
 // Dimuat lazy oleh app.js setelah map-core.js; dipakai map-ui.js: NovelMap2D.create(container, opts) -> editor.
-//   opts: { onBeforeChange(), onChange("terrain"|"vector"), onSelect(sel|null), onViewChange({ pxPerCell }) }
+//   opts: { onBeforeChange(), onChange("terrain"|"vector"), onSelect(sel|null), onViewChange({ pxPerCell }),
+//           fitInsets?: { top, right, bottom, left } }   (px tepi kanvas yang tertutup UI; bisa diubah: editor.setFitInsets)
 //   sel  = { type: "place"|"label"|"zone"|"river"|"path", id }
 // Lapisan gambar (dari bawah):
 //   1. medan  -> kanvas offscreen 8 px/sel (1024x1024) diisi per piksel lewat ImageData. Hanya area yang berubah
 //                yang dihitung ulang (diff medan lama vs baru), lalu digambar ke layar dengan transform pan/zoom
 //   2. glyph  -> pohon, alang-alang & simbol gunung (Path2D dalam koordinat sel, di-cache per potongan 16x16 sel)
-//   3. vektor -> wilayah, sungai, jalan, tempat, label (koordinat layar)
+//   3. vektor -> wilayah, sungai (berhenti di pantai), jalan, lalu teks: pin & nama tempat, nama wilayah, label
+//                (koordinat layar; nama otomatis dirapikan supaya tidak bertumpuk)
 //   4. overlay (kanvas kedua) -> lingkaran kuas & pratinjau sungai/jalan/wilayah; digambar ulang tiap gerak pointer
 // Bingkai krem digambar di kanvas; bayangannya pakai div (box-shadow) supaya murah saat pan/zoom.
 (function () {
@@ -69,7 +71,7 @@
     };
     fieldCache = {
       seed, n,
-      cloud: up(grid((u, v) => C.fbm(u / 6.5, v / 6.5, seed + 11, 4)), 0.22, 0.78),
+      cloud: up(grid((u, v) => C.fbm(u / 8.5, v / 8.5, seed + 11, 5)), 0.22, 0.78),
       mottle: up(grid((u, v) => C.fbm(u / 3.2, v / 3.2, seed + 23, 3)), 0.22, 0.78),
       warpX: up(grid((u, v) => C.fbm(u / 2.4, v / 2.4, seed + 37, 3)), 0.27, 0.73),
       warpY: up(grid((u, v) => C.fbm(u / 2.4, v / 2.4, seed + 53, 3)), 0.27, 0.73),
@@ -110,8 +112,9 @@
     return p;
   }
   function polyLength(pts) { let l = 0; for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return l; }
-  // pita (sungai) dengan ujung membulat; sp = titik layar, hw = setengah lebar per titik. Ditambahkan ke path aktif.
-  function traceRibbon(c, sp, hw) {
+  // pita (sungai); sp = titik layar, hw = setengah lebar per titik, roundA/roundB = ujung awal/akhir membulat
+  // (false = rata, untuk muara). Ditambahkan ke path aktif.
+  function traceRibbon(c, sp, hw, roundA = true, roundB = true) {
     const m = sp.length;
     if (m < 2) return;
     const nx = new Float32Array(m), ny = new Float32Array(m);
@@ -122,11 +125,9 @@
     }
     c.moveTo(sp[0][0] + nx[0] * hw[0], sp[0][1] + ny[0] * hw[0]);
     for (let i = 1; i < m; i++) c.lineTo(sp[i][0] + nx[i] * hw[i], sp[i][1] + ny[i] * hw[i]);
-    const ae = Math.atan2(ny[m - 1], nx[m - 1]);
-    c.arc(sp[m - 1][0], sp[m - 1][1], hw[m - 1], ae, ae - Math.PI, true);
+    if (roundB) { const ae = Math.atan2(ny[m - 1], nx[m - 1]); c.arc(sp[m - 1][0], sp[m - 1][1], hw[m - 1], ae, ae - Math.PI, true); }
     for (let i = m - 1; i >= 0; i--) c.lineTo(sp[i][0] - nx[i] * hw[i], sp[i][1] - ny[i] * hw[i]);
-    const as = Math.atan2(-ny[0], -nx[0]);
-    c.arc(sp[0][0], sp[0][1], hw[0], as, as - Math.PI, true);
+    if (roundA) { const as = Math.atan2(-ny[0], -nx[0]); c.arc(sp[0][0], sp[0][1], hw[0], as, as - Math.PI, true); }
     c.closePath();
   }
   // titik label wilayah: pusat massa poligon (kalau jatuh di luar -> rata-rata titik)
@@ -216,12 +217,12 @@
           : { body: scaleHex(base, 0.7), hi: scaleHex(base, 1.12) };
       }
     }
-    // warna dasar laut per nilai awan (LUT 0..255): biru + awan terang lembut
+    // warna dasar laut per nilai awan (LUT 0..255): biru sedikit digelapkan + awan terang tipis & menyebar
     const SEA_C = rgb(BIOMES[0].color), SEA_A = rgb(BIOMES[0].alt || BIOMES[0].color);
     const seaR = new Float32Array(256), seaG = new Float32Array(256), seaB = new Float32Array(256);
     for (let v = 0; v < 256; v++) {
-      const ct = sstep(0.36, 0.92, v / 255) * 0.45;
-      seaR[v] = SEA_C[0] + (SEA_A[0] - SEA_C[0]) * ct; seaG[v] = SEA_C[1] + (SEA_A[1] - SEA_C[1]) * ct; seaB[v] = SEA_C[2] + (SEA_A[2] - SEA_C[2]) * ct;
+      const ct = sstep(0.3, 1.0, v / 255) * 0.3;
+      seaR[v] = (SEA_C[0] + (SEA_A[0] - SEA_C[0]) * ct) * 0.95; seaG[v] = (SEA_C[1] + (SEA_A[1] - SEA_C[1]) * ct) * 0.95; seaB[v] = (SEA_C[2] + (SEA_A[2] - SEA_C[2]) * ct) * 0.95;
     }
 
     // ---------- DOM ----------
@@ -249,12 +250,15 @@
     let pending = null, terrainCost = 5, lastSync = 0;
     let cssW = 0, cssH = 0, dpr = 1;
     const view = { scale: 4, ox: 0, oy: 0 };
+    // tepi kanvas yang tertutup UI shell (px CSS): fit() menaruh peta di area sisanya
+    const normInsets = (o) => { const v = (k) => Math.max(0, Number(o && o[k]) || 0); return { top: v("top"), right: v("right"), bottom: v("bottom"), left: v("left") }; };
+    let insets = normInsets(opts.fitInsets);
     let autoFit = true, lastVS = -1, lastVX = 0, lastVY = 0;
     let tool = "select";
     const brush = { biome: 1, size: 4 }, elev = { mode: "raise", strength: 0.5, size: 4 };
     let placeIcon = "city", pathKind = "road";
     let sel = null, action = null, zoneDraft = null, lastZoneClick = null;
-    let hover = null, hoverInside = false, hoverHit = null, spaceDown = false;
+    let hover = null, hoverInside = false, hoverHit = null, spaceDown = false, coarse = false;   // coarse = pointer terakhir sentuhan
     const touches = new Map();
     let raf = 0, needMain = false, needOver = false, destroyed = false;
 
@@ -286,8 +290,9 @@
     }
     // topeng daratan dihaluskan [1 2 1]/4 per sumbu -> garis pantai membulat (bukan tangga sel); kontur = LAND_T
     const LAND_T = 0.45;
-    let landS = null;
+    let landS = null, landVer = 0;   // landVer naik tiap landS berubah (kunci cache potongan sungai)
     function updateLandS(bb) {
+      landVer++;
       const bio = map.biome, nm = n - 1;
       for (let y = Math.max(0, bb.y0); y <= Math.min(nm, bb.y1); y++) for (let x = Math.max(0, bb.x0); x <= Math.min(nm, bb.x1); x++) {
         let s = 0;
@@ -367,23 +372,26 @@
           if (f > 0) { r += (CRACK[0] - r) * f; g += (CRACK[1] - g) * f; b += (CRACK[2] - b) * f; }
           break;
         }
-        case PAT.mountain:         // batu: makin tinggi makin terang
-          k = clamp01((h - 0.2) / 0.75) * 0.75 + t * 0.25;
+        case PAT.mountain:         // batu: makin tinggi makin terang (dibatasi supaya simbol gunung tetap menonjol)
+          k = clamp01((h - 0.2) / 0.8) * 0.55 + t * 0.25;
           r = cR[bi] + (aR[bi] - cR[bi]) * k; g = cG[bi] + (aG[bi] - cG[bi]) * k; b = cB[bi] + (aB[bi] - cB[bi]) * k;
           if (gr > 0.9) { r *= 0.9; g *= 0.9; b *= 0.9; }
           break;
       }
-      // dataran tinggi non-gunung jadi tanah berbatu, lalu salju (bertepi tegas, berpetak) di ketinggian
+      // dataran tinggi non-gunung jadi tanah berbatu; salju tanah hanya tipis di puncak pegunungan
+      // (kesan bersalju terutama dari tudung salju simbol gunung, supaya tidak jadi kabut putih)
       if (p !== PAT.mountain && h > 0.45) { f = clamp01((h - 0.45) / 0.45) * 0.38; r += (HIGHLAND[0] - r) * f; g += (HIGHLAND[1] - g) * f; b += (HIGHLAND[2] - b) * f; }
-      f = sstep(SNOW_H - 0.03, SNOW_H + 0.04, h + (m - 0.5) * 0.22 + (fields.warpX[i] - 127.5) * 0.0005);
-      if (f > 0) { r += (SNOW[0] - r) * f; g += (SNOW[1] - g) * f; b += (SNOW[2] - b) * f; }
+      if (p === PAT.mountain && h > 1.05) {
+        f = sstep(1.15, 1.35, h + (m - 0.5) * 0.1) * 0.35;
+        if (f > 0) { r += (SNOW[0] - r) * f; g += (SNOW[1] - g) * f; b += (SNOW[2] - b) * f; }
+      }
       // pantai: pasir tipis + garis gelap halus tepat di tepi
       if (edge < 0.24 && p !== PAT.tundra && p !== PAT.mountain) {
         f = (1 - edge / 0.24) * 0.4; r += (SAND[0] - r) * f; g += (SAND[1] - g) * f; b += (SAND[2] - b) * f;
       }
       if (edge < 0.06) { k = 0.82 + edge * 3; r *= k; g *= k; b *= k; }
-      // bayangan bukit (cahaya barat laut) + butiran
-      k = (1 + (sh - 1) * (p === PAT.mountain ? 1.05 : 0.8)) * (0.965 + gr * 0.07);
+      // bayangan bukit (cahaya barat laut) + butiran; sisi terang gunung diredam supaya batu tidak memutih
+      k = (1 + (sh - 1) * (p === PAT.mountain ? (sh > 1 ? 0.45 : 1.05) : 0.8)) * (0.965 + gr * 0.07);
       LR = r * k; LG = g * k; LB = b * k;
     }
     // e = ketinggian dasar laut (0..255), s = kedekatan ke darat (terrain.shore)
@@ -397,6 +405,8 @@
         const rip = (1 - sstep(0.007, 0.02, Math.abs(s - 0.13))) * 0.16; // garis riak tipis sejajar pantai
         if (rip > 0) { r += (RIPPLE[0] - r) * rip; g += (RIPPLE[1] - g) * rip; b += (RIPPLE[2] - b) * rip; }
       }
+      const k = 0.985 + gr * 0.03;                                  // butiran halus
+      r *= k; g *= k; b *= k;
       if (gr > 0.985) { r *= 1.06; g *= 1.05; b *= 1.04; }         // bintik terang
       SR = r; SG = g; SB = b;
     }
@@ -626,8 +636,13 @@
       ctx.restore();
       ctx.strokeStyle = "rgba(70,52,28,0.4)"; ctx.lineWidth = 1;
       ctx.strokeRect(X - 0.5, Y - 0.5, M + 1, M + 1);
-      if (layers.places) drawPlaces();
-      if (layers.labels) drawLabels();
+      // teks di atas semua garis: kotak label jadi rintangan lebih dulu, lalu pin & nama tempat, nama wilayah;
+      // label digambar paling atas
+      textBoxes.clear();
+      const labs = layers.labels ? layoutLabels() : [];
+      if (layers.places) drawPlaces(); else placeNameBox.clear();
+      if (layers.zones) drawZoneNames();
+      if (labs.length) drawLabels(labs);
     }
 
     function drawGlyphs() {
@@ -708,8 +723,53 @@
       for (const ch of text) { stroke ? c.strokeText(ch, cx, y) : c.fillText(ch, cx, y); cx += c.measureText(ch).width + sp; }
     }
 
+    // ---------- penataan teks: kotak terarah {cx,cy,hx,hy,c,s} + uji tabrakan (sumbu pemisah) ----------
+    // Tiap frame: kotak label (posisi tetap) -> pin -> nama tempat -> nama wilayah. Teks otomatis yang bertabrakan
+    // dipindah ke posisi lain atau dilewati; label tetap digambar paling atas.
+    const TB_CELL = 64;               // grid spasial kotak teks (px) supaya cek tabrakan tetap murah di peta padat
+    const textBoxes = new Map();      // kunci sel grid -> kotak di sel itu
+    const placeNameBox = new Map();   // id tempat -> kotak nama yang digambar (dipakai hit-test)
+    const obox = (cx, cy, hx, hy, ang) => ({ cx, cy, hx, hy, c: ang ? Math.cos(ang) : 1, s: ang ? Math.sin(ang) : 0 });
+    function boxCells(b, fn) {        // sel grid yang dilalui AABB kotak
+      const ex = Math.abs(b.c) * b.hx + Math.abs(b.s) * b.hy, ey = Math.abs(b.s) * b.hx + Math.abs(b.c) * b.hy;
+      // dibatasi ke layar ± 4 sel: teks yang dicek tabrakannya selalu dekat layar
+      const mx = Math.ceil(cssW / TB_CELL) + 4, my = Math.ceil(cssH / TB_CELL) + 4;
+      const gx0 = Math.max(-4, Math.floor((b.cx - ex) / TB_CELL)), gx1 = Math.min(mx, Math.floor((b.cx + ex) / TB_CELL));
+      const gy0 = Math.max(-4, Math.floor((b.cy - ey) / TB_CELL)), gy1 = Math.min(my, Math.floor((b.cy + ey) / TB_CELL));
+      for (let gy = gy0; gy <= gy1; gy++) for (let gx = gx0; gx <= gx1; gx++) if (fn(gx * 65536 + gy) === false) return false;
+      return true;
+    }
+    function addBox(b) { boxCells(b, (k) => { const l = textBoxes.get(k); if (l) l.push(b); else textBoxes.set(k, [b]); }); }
+    function boxHit(a, b) {
+      const dx = b.cx - a.cx, dy = b.cy - a.cy;
+      if (!a.s && !b.s) return Math.abs(dx) <= a.hx + b.hx && Math.abs(dy) <= a.hy + b.hy;
+      for (let k = 0; k < 4; k++) {
+        const o = k < 2 ? a : b, ux = k & 1 ? -o.s : o.c, uy = k & 1 ? o.c : o.s;
+        const ra = a.hx * Math.abs(a.c * ux + a.s * uy) + a.hy * Math.abs(a.c * uy - a.s * ux);
+        const rb = b.hx * Math.abs(b.c * ux + b.s * uy) + b.hy * Math.abs(b.c * uy - b.s * ux);
+        if (Math.abs(dx * ux + dy * uy) > ra + rb) return false;
+      }
+      return true;
+    }
+    function freeSpot(b, skip) {
+      return boxCells(b, (k) => { const l = textBoxes.get(k); if (l) for (const o of l) if (o !== skip && boxHit(b, o)) return false; });
+    }
+
+    // tinta nama wilayah: warna wilayah digelapkan 25%; warna pucat digelapkan lagi supaya kontras di atas halo krem
+    const inkCache = new Map();
+    function zoneInk(hex) {
+      let v = inkCache.get(hex);
+      if (v) return v;
+      const lin = (x) => { x /= 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+      let c = rgb(/^#[0-9a-f]{6}$/i.test(hex) ? hex : "#e8e8ec").map((x) => x * 0.75);
+      for (let k = 0; k < 12 && 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]) > 0.16; k++) c = c.map((x) => x * 0.9);
+      v = `rgb(${c.map(Math.round).join(",")})`;
+      inkCache.set(hex, v);
+      return v;
+    }
+
     function drawZones() {
-      const s = view.scale;
+      const s = view.scale, band = Math.max(6, Math.min(24, s * 1.2));
       ctx.lineJoin = "round";
       for (const z of map.zones) {
         const pts = z.points || [];
@@ -718,47 +778,150 @@
         ctx.beginPath();
         pts.forEach(([x, y], i) => (i ? ctx.lineTo(sx(x), sy(y)) : ctx.moveTo(sx(x), sy(y))));
         ctx.closePath();
-        ctx.fillStyle = rgba(z.color, isSel ? 0.26 : 0.17); ctx.fill();
+        // isian tipis (bioma di bawahnya tetap terbaca) + pita tepi dalam sebagai penanda wilayah
+        ctx.fillStyle = rgba(z.color, isSel ? 0.12 : 0.07); ctx.fill();
+        ctx.save(); ctx.clip(); ctx.lineWidth = band; ctx.strokeStyle = rgba(z.color, isSel ? 0.3 : 0.22); ctx.stroke(); ctx.restore();
         if (isSel) { ctx.setLineDash([]); ctx.lineWidth = 5; ctx.strokeStyle = "rgba(20,16,10,0.3)"; ctx.stroke(); }
         ctx.setLineDash(isSel ? [] : [7, 5]); ctx.lineWidth = isSel ? 2.4 : 1.8; ctx.strokeStyle = rgba(z.color, 0.95); ctx.stroke();
         ctx.setLineDash([]);
         if (isSel) pts.forEach(([x, y]) => { ctx.beginPath(); ctx.arc(sx(x), sy(y), 3.5, 0, TAU); ctx.fillStyle = "#fff"; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = z.color; ctx.stroke(); });
       }
-      ctx.font = `700 11.5px ${SANS}`; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
-      for (const z of map.zones) {
-        const pts = z.points || [];
-        if (pts.length < 3 || !z.name) continue;
+    }
+    // nama wilayah: digambar di atas sungai/jalan/tempat (setelah drawPlaces), ukuran ikut zoom, menghindari teks lain
+    const ZONE_DY = [0, 1.2, -1.2, 2.4, -2.4, 3.6, -3.6], ZONE_DX = [0, -0.3, 0.3];
+    function drawZoneNames() {
+      const s = view.scale, fs = Math.max(11, Math.min(22, s * 1.4)), sp = fs * 0.12, hh = fs * 0.62;
+      const list = map.zones.filter((z) => z.name && z.points && z.points.length >= 3);
+      if (!list.length) return;
+      if (sel && sel.type === "zone") list.sort((a, b) => (b.id === sel.id) - (a.id === sel.id));
+      ctx.font = `700 ${fs}px ${SANS}`; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+      for (const z of list) {
+        const pts = z.points, isSel = !!sel && sel.type === "zone" && sel.id === z.id;
         let x0 = Infinity, x1 = -Infinity;
         pts.forEach((p) => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); });
         if ((x1 - x0) * s < 34) continue;
-        const [lx, ly] = polyLabelPoint(C, pts), text = String(z.name).toUpperCase(), w = spacedWidth(ctx, text, 1.6);
-        ctx.strokeStyle = "rgba(18,16,22,0.62)"; ctx.lineWidth = 3.2; spacedText(ctx, text, sx(lx), sy(ly), 1.6, w, true);
-        ctx.fillStyle = z.color || "#fff"; spacedText(ctx, text, sx(lx), sy(ly), 1.6, w, false);
+        const [lx, ly] = polyLabelPoint(C, pts), text = String(z.name).toUpperCase(), w = spacedWidth(ctx, text, sp);
+        const X = sx(lx), Y = sy(ly);
+        if (X + w / 2 < 0 || X - w / 2 > cssW || Y + fs < 0 || Y - fs > cssH) continue;
+        // posisi: titik tengah, lalu bergeser per 1.2x tinggi huruf (bawah/atas, lalu kiri/kanan) selama tetap di dalam wilayah
+        let box = null;
+        for (const ky of ZONE_DY) {
+          for (const kx of ZONE_DX) {
+            const cx = X + kx * w, cy = Y + ky * fs;
+            if ((kx || ky) && !C.pointInPolygon((cx - view.ox) / s, (cy - view.oy) / s, pts)) continue;
+            const b = obox(cx, cy, w / 2 + 2, hh + 2);
+            if (freeSpot(b)) { box = b; break; }
+          }
+          if (box) break;
+        }
+        if (!box && isSel) box = obox(X, Y, w / 2 + 2, hh + 2);
+        if (!box) continue;
+        addBox(box);
+        ctx.strokeStyle = "rgba(246,240,224,0.85)"; ctx.lineWidth = Math.max(3.5, fs * 0.18); spacedText(ctx, text, box.cx, box.cy, sp, w, true);
+        ctx.fillStyle = zoneInk(z.color); spacedText(ctx, text, box.cx, box.cy, sp, w, false);
       }
+      ctx.textAlign = "left";
     }
 
-    function riverShape(rv, extra) {   // titik layar + setengah lebar (meruncing di hulu)
-      const sp = chaikin(rv.points, 2).map((p) => [sx(p[0]), sy(p[1])]);
-      const total = polyLength(sp) || 1, base = ((rv.width || 1.5) * view.scale) / 2, hw = new Float32Array(sp.length);
-      let acc = 0;
-      for (let i = 0; i < sp.length; i++) {
-        if (i) acc += Math.hypot(sp[i][0] - sp[i - 1][0], sp[i][1] - sp[i - 1][1]);
-        hw[i] = Math.max(0.75, base * (0.4 + 0.6 * sstep(0, 0.3, acc / total))) + extra;
+    // ---------- sungai ----------
+    // rapatkan titik (≤ step sel) supaya potongan di garis pantai presisi; key[i] = 1 bila titik asli (verteks)
+    function resample(pts, step) {
+      const out = [[pts[0][0], pts[0][1]]], key = [1];
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1], b = pts[i], d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        if (d < 1e-6) continue;
+        const k = Math.ceil(d / step);
+        for (let j = 1; j <= k; j++) { out.push([a[0] + ((b[0] - a[0]) * j) / k, a[1] + ((b[1] - a[1]) * j) / k]); key.push(j === k ? 1 : 0); }
       }
-      return { sp, hw };
+      return { P: out, key };
     }
-    function drawRiverSet(c, list, extra, style) {
+    const isDry = (x, y) => landAtWarped(x, y) >= LAND_T;
+    // potongan sungai dalam koordinat sel, di-cache per objek sampai titiknya / garis pantai (landVer) berubah.
+    // full = seluruh garis; cut = hanya bagian di darat (sama dengan 3D: sungai berhenti di laut/danau).
+    // potongan: { pts, len (jarak dari hulu), da/db: arah ke air bila ujung awal/akhir berupa muara }
+    const riverCache = new WeakMap();
+    function riverCells(rv) {
+      const src = rv.points;
+      let sum = 0;
+      for (let i = 0; i < src.length; i++) sum += src[i][0] * (i + 1) + src[i][1] * (i + 7) * 1.37;
+      const ck = src.length + ":" + sum + ":" + landVer;
+      let c = riverCache.get(rv);
+      if (c && c.key === ck) return c;
+      const { P, key } = resample(chaikin(src, 2), 0.5), m = P.length, L = new Float32Array(m);
+      for (let i = 1; i < m; i++) L[i] = L[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]);
+      // pita cukup lewat verteks (+ titik potong); titik rapat hanya untuk mencari garis pantai
+      const pick = (i0, i1) => { const pts = [], len = []; for (let i = i0; i <= i1; i++) if (key[i] || i === i0 || i === i1) { pts.push(P[i]); len.push(L[i]); } return { pts, len }; };
+      const full = [{ ...pick(0, m - 1), da: null, db: null }], cut = [];
+      if (landS) {
+        const dry = new Uint8Array(m);
+        for (let i = 0; i < m; i++) dry[i] = isDry(P[i][0], P[i][1]) ? 1 : 0;
+        // titik potong antara w (air) & d (darat): bagi dua, lalu geser 0.15 sel ke arah air
+        const cross = (w, d) => {
+          const A = P[w], B = P[d], seg = Math.abs(L[d] - L[w]) || 1e-6;
+          let lo = 0, hi = 1;
+          for (let k = 0; k < 7; k++) { const t = (lo + hi) / 2; if (isDry(A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t)) hi = t; else lo = t; }
+          const t = Math.max(0, hi - 0.15 / seg);
+          return { p: [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t], l: L[w] + (L[d] - L[w]) * t, dir: [(A[0] - B[0]) / seg, (A[1] - B[1]) / seg] };
+        };
+        for (let i = 0; i < m; i++) {
+          if (!dry[i]) continue;
+          let j = i;
+          while (j + 1 < m && dry[j + 1]) j++;
+          const r = pick(i, j);
+          let ca = null, cb = null;
+          if (i > 0) { ca = cross(i - 1, i); r.pts.unshift(ca.p); r.len.unshift(ca.l); }
+          if (j < m - 1) { cb = cross(j + 1, j); r.pts.push(cb.p); r.len.push(cb.l); }
+          if (r.pts.length >= 2) cut.push({ pts: r.pts, len: r.len, da: ca && ca.dir, db: cb && cb.dir });
+          i = j;
+        }
+      }
+      c = { key: ck, total: L[m - 1] || 1, full, cut: landS ? cut : full };
+      riverCache.set(rv, c);
+      return c;
+    }
+    // geometri layar: tiap potongan { sp: titik layar, hw: setengah lebar (meruncing di hulu), a/b: ujung = muara, da/db }
+    function riverGeom(rv, cut) {
+      const c = riverCells(rv), base = ((rv.width || 1.5) * view.scale) / 2, total = c.total;
+      return (cut ? c.cut : c.full).map((r) => ({
+        sp: r.pts.map((p) => [sx(p[0]), sy(p[1])]),
+        hw: r.len.map((l) => Math.max(0.75, base * (0.4 + 0.6 * sstep(0, 0.3, l / total)))),
+        a: !!r.da, b: !!r.db, da: r.da, db: r.db,
+      }));
+    }
+    function drawRiverSet(c, geoms, extra, style) {
       c.beginPath();
-      for (const rv of list) { const { sp, hw } = riverShape(rv, extra); traceRibbon(c, sp, hw); }
+      for (const runs of geoms) for (const r of runs) traceRibbon(c, r.sp, extra ? r.hw.map((v) => v + extra) : r.hw, !r.a, !r.b);
       c.fillStyle = style; c.fill();
+    }
+    // muara: kipas pendek yang memudar ke air (bukan ujung bulat di tengah laut)
+    function drawMouth(c, p, hw, d) {
+      const len = Math.max(3, Math.min(hw * 1.6, view.scale * 0.9)), nx = -d[1], ny = d[0], we = hw * 1.45;
+      const bx = p[0] - d[0], by = p[1] - d[1];   // mulai 1 px di dalam ujung pita supaya tidak ada celah
+      const ex = p[0] + d[0] * len, ey = p[1] + d[1] * len, g = c.createLinearGradient(bx, by, ex, ey);
+      g.addColorStop(0, "rgba(80,137,176,0.75)"); g.addColorStop(1, "rgba(80,137,176,0)");
+      c.beginPath();
+      c.moveTo(bx + nx * hw, by + ny * hw); c.lineTo(ex + nx * we, ey + ny * we);
+      c.lineTo(ex - nx * we, ey - ny * we); c.lineTo(bx - nx * hw, by - ny * hw);
+      c.closePath(); c.fillStyle = g; c.fill();
     }
     function drawRivers() {
       const list = map.rivers.filter((rv) => rv.points && rv.points.length >= 2);
       if (!list.length) return;
       const selR = sel && sel.type === "river" ? list.find((r) => r.id === sel.id) : null;
-      if (selR) drawRiverSet(ctx, [selR], 5, rgba(ACCENT, 0.6));
-      drawRiverSet(ctx, list, 1.2, "rgba(36,72,98,0.9)");
-      drawRiverSet(ctx, list, 0, "#5089b0");
+      const geoms = list.map((rv) => riverGeom(rv, true));
+      if (selR) {
+        // bagian di air tidak digambar -> jalurnya ditampilkan putus-putus saat terpilih
+        ctx.beginPath();
+        chaikin(selR.points, 2).forEach((p, i) => (i ? ctx.lineTo(sx(p[0]), sy(p[1])) : ctx.moveTo(sx(p[0]), sy(p[1]))));
+        ctx.setLineDash([5, 4]); ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.strokeStyle = ACCENT; ctx.stroke(); ctx.setLineDash([]);
+        drawRiverSet(ctx, [geoms[list.indexOf(selR)]], 5, rgba(ACCENT, 0.6));
+      }
+      drawRiverSet(ctx, geoms, 1.2, "rgba(36,72,98,0.9)");
+      drawRiverSet(ctx, geoms, 0, "#5089b0");
+      for (const runs of geoms) for (const r of runs) {
+        if (r.a) drawMouth(ctx, r.sp[0], r.hw[0], r.da);
+        if (r.b) drawMouth(ctx, r.sp[r.sp.length - 1], r.hw[r.hw.length - 1], r.db);
+      }
       if (selR) endDots(selR.points);
     }
     function endDots(pts) {
@@ -788,54 +951,92 @@
       }
     }
 
-    const pinRadius = () => Math.max(8, Math.min(13, view.scale * 0.9));
+    // ---------- tempat: pin & nama ikut zoom (kecil di HP), nama dirapikan supaya tidak bertumpuk ----------
+    const pinRadius = () => Math.max(5.5, Math.min(13, view.scale * 1.25));
+    const placeFont = () => Math.max(9.5, Math.min(13, view.scale * 2.1));
+    const ICON_RANK = { city: 0, castle: 1, port: 2, temple: 3, village: 4, landmark: 5, ruin: 6, camp: 7 };
     function drawPlaces() {
-      const r = pinRadius();
-      ctx.font = `600 12px ${SANS}`; ctx.textBaseline = "top"; ctx.textAlign = "center"; ctx.lineJoin = "round";
+      const r = pinRadius(), fs = placeFont(), hh = fs * 0.6, named = [];
+      placeNameBox.clear();
+      ctx.lineJoin = "round";
       for (const pl of map.places) {
         const x = sx(pl.x), y = sy(pl.y);
         if (x < -160 || x > cssW + 160 || y < -40 || y > cssH + 40) continue;
-        const isSel = sel && sel.type === "place" && sel.id === pl.id;
-        if (isSel) { ctx.beginPath(); ctx.arc(x, y, r + 5, 0, TAU); ctx.fillStyle = rgba(ACCENT, 0.35); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = ACCENT; ctx.stroke(); }
+        const isSel = !!sel && sel.type === "place" && sel.id === pl.id;
+        if (isSel) {   // sorotan: isian aksen + cincin putih + cincin aksen, tetap jelas di atas daratan terang
+          ctx.beginPath(); ctx.arc(x, y, r + 6, 0, TAU); ctx.fillStyle = rgba(ACCENT, 0.28); ctx.fill();
+          ctx.lineWidth = 3.5; ctx.strokeStyle = "rgba(255,255,255,0.95)"; ctx.stroke();
+          ctx.lineWidth = 2; ctx.strokeStyle = ACCENT; ctx.stroke();
+        }
         ctx.beginPath(); ctx.ellipse(x + 1, y + r * 0.85, r * 0.8, r * 0.28, 0, 0, TAU); ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.fill();
         ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = "#f7f1e1"; ctx.fill();
-        ctx.lineWidth = 1.5; ctx.strokeStyle = INK; ctx.stroke();
+        ctx.lineWidth = r < 8 ? 1.2 : 1.5; ctx.strokeStyle = INK; ctx.stroke();
         ctx.save(); ctx.translate(x, y); const k = r * 0.58; ctx.scale(k, k);
         ctx.fillStyle = INK; ctx.strokeStyle = INK; (ICONS[pl.icon] || ICONS.landmark)(ctx);
         ctx.restore();
-        if (pl.name) {
-          ctx.lineWidth = 3.5; ctx.strokeStyle = "rgba(246,240,224,0.92)"; ctx.strokeText(pl.name, x, y + r + 3);
-          ctx.fillStyle = "#1f1a14"; ctx.fillText(pl.name, x, y + r + 3);
-        }
+        const pin = obox(x, y + r * 0.1, r + 1, r * 1.1 + 1);
+        addBox(pin);
+        if (pl.name) named.push({ pl, x, y, isSel, pin, rank: ICON_RANK[pl.icon] ?? 8 });
+      }
+      // nama: yang terpilih & ikon penting lebih dulu; coba bawah -> kanan -> kiri -> atas, lewati bila semua bertabrakan
+      named.sort((a, b) => (b.isSel - a.isSel) || (a.rank - b.rank));
+      ctx.font = `600 ${fs}px ${SANS}`; ctx.textBaseline = "middle"; ctx.textAlign = "center";
+      for (const v of named) {
+        const name = String(v.pl.name), hw = ctx.measureText(name).width / 2, x = v.x, y = v.y;
+        const spots = [[x, y + r + 3 + hh], [x + r + 5 + hw, y], [x - r - 5 - hw, y], [x, y - r - 3 - hh]];
+        let box = null;
+        for (const [cx, cy] of spots) { const b = obox(cx, cy, hw + 2, hh + 2); if (freeSpot(b, v.pin)) { box = b; break; } }
+        if (!box && v.isSel) box = obox(spots[0][0], spots[0][1], hw + 2, hh + 2);
+        if (!box) continue;
+        addBox(box); placeNameBox.set(v.pl.id, box);
+        ctx.lineWidth = Math.max(2.5, fs * 0.3); ctx.strokeStyle = "rgba(246,240,224,0.92)"; ctx.strokeText(name, box.cx, box.cy);
+        ctx.fillStyle = "#1f1a14"; ctx.fillText(name, box.cx, box.cy);
       }
       ctx.textAlign = "left";
     }
 
-    function labelLook(lb) {
+    // ---------- label ----------
+    const LABEL_MIN_PX = 7.5;   // lebih kecil dari ini tak terbaca -> tidak digambar & tidak bisa diklik (kecuali yang terpilih)
+    function labelLook(lb, isSel) {
       const st = lb.style === "water" || lb.style === "small" ? lb.style : "region";
       let px = Math.max(0.5, Number(lb.size) || 4) * view.scale * 0.9;
-      if (st === "small") px *= 0.6;
+      if (st === "small") px *= 0.72;
+      if (isSel) px = Math.max(px, 10);   // yang terpilih selalu terlihat
       px = Math.min(px, 400);
       const raw = String(lb.text == null ? "" : lb.text).replace(/\s+/g, " ").trim();
-      if (st === "region") return { px, text: raw.toUpperCase(), font: `600 ${px}px ${SERIF}`, sp: px * 0.28, fill: "#3a2c1d", halo: "rgba(244,236,214,0.72)" };
-      if (st === "water") return { px, text: raw, font: `italic 500 ${px}px ${SERIF}`, sp: px * 0.08, fill: "#173550", halo: "rgba(196,220,236,0.45)" };
-      return { px, text: raw, font: `500 ${px}px ${SERIF}`, sp: 0, fill: "#2b2118", halo: "rgba(244,236,214,0.8)" };
+      if (st === "region") return { px, text: raw.toUpperCase(), font: `600 ${px}px ${SERIF}`, sp: px * 0.28, fill: "#3a2c1d", halo: "rgba(244,236,214,0.72)", hw: Math.max(2, px * 0.2) };
+      if (st === "water") return { px, text: raw, font: `italic 500 ${px}px ${SERIF}`, sp: px * 0.08, fill: "#173550", halo: "rgba(196,220,236,0.45)", hw: Math.max(2, px * 0.2) };
+      return { px, text: raw, font: `500 ${px}px ${SERIF}`, sp: 0, fill: "#2b2118", halo: "rgba(244,236,214,0.8)", hw: Math.max(2, px * 0.16) };
     }
-    function drawLabels() {
-      ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    function labelMetrics(lb) {   // null = tidak digambar
+      const isSel = !!sel && sel.type === "label" && sel.id === lb.id, L = labelLook(lb, isSel);
+      if ((L.px < LABEL_MIN_PX && !isSel) || !L.text) return null;
+      ctx.font = L.font;
+      const w = spacedWidth(ctx, L.text, L.sp), x = sx(lb.x), y = sy(lb.y), ang = ((Number(lb.rotation) || 0) * Math.PI) / 180;
+      return { lb, L, w, x, y, ang, isSel, box: obox(x, y, w / 2 + 4, L.px * 0.62 + 2, ang) };
+    }
+    function layoutLabels() {
+      const out = [];
       for (const lb of map.labels) {
-        const L = labelLook(lb);
-        if (L.px < 4.5 || !L.text) continue;
-        const x = sx(lb.x), y = sy(lb.y);
-        ctx.save(); ctx.translate(x, y); if (lb.rotation) ctx.rotate((lb.rotation * Math.PI) / 180);
+        const m = labelMetrics(lb);
+        if (!m || Math.abs(m.x) > cssW * 3 + m.w || Math.abs(m.y) > cssH * 3 + m.L.px) continue;
+        out.push(m); addBox(m.box);
+      }
+      return out;
+    }
+    function drawLabels(list) {
+      ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+      for (const m of list) {
+        const L = m.L, w = m.w;
+        ctx.save(); ctx.translate(m.x, m.y); if (m.ang) ctx.rotate(m.ang);
         ctx.font = L.font;
-        const w = spacedWidth(ctx, L.text, L.sp);
-        if (Math.abs(x) > cssW * 3 + w || Math.abs(y) > cssH * 3 + L.px) { ctx.restore(); continue; }
-        if (sel && sel.type === "label" && sel.id === lb.id) {
-          ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.strokeStyle = ACCENT; ctx.fillStyle = rgba(ACCENT, 0.12);
-          ctx.beginPath(); ctx.rect(-w / 2 - 6, -L.px * 0.68 - 3, w + 12, L.px * 1.36 + 6); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
+        if (m.isSel) {   // kotak pilihan: garis putih di bawah garis putus-putus aksen supaya kontras di daratan terang
+          ctx.beginPath(); ctx.rect(-w / 2 - 6, -L.px * 0.68 - 3, w + 12, L.px * 1.36 + 6);
+          ctx.fillStyle = rgba(ACCENT, 0.12); ctx.fill();
+          ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.stroke();
+          ctx.setLineDash([6, 4]); ctx.lineWidth = 2; ctx.strokeStyle = ACCENT; ctx.stroke(); ctx.setLineDash([]);
         }
-        ctx.strokeStyle = L.halo; ctx.lineWidth = Math.max(2, L.px * 0.2); spacedText(ctx, L.text, 0, 0, L.sp, w, true);
+        ctx.strokeStyle = L.halo; ctx.lineWidth = L.hw; spacedText(ctx, L.text, 0, 0, L.sp, w, true);
         ctx.fillStyle = L.fill; spacedText(ctx, L.text, 0, 0, L.sp, w, false);
         ctx.restore();
       }
@@ -849,9 +1050,18 @@
       if (!map) return;
       if (action && action.type === "line" && action.pts.length > 1) {
         octx.save(); octx.globalAlpha = 0.85;
-        if (action.kind === "river") { drawRiverSet(octx, [{ points: action.pts, width: 1.5 }], 1.2, "rgba(36,72,98,0.9)"); drawRiverSet(octx, [{ points: action.pts, width: 1.5 }], 0, "#5089b0"); }
+        if (action.kind === "river") { const g = [riverGeom({ points: action.pts, width: 1.5 }, false)]; drawRiverSet(octx, g, 1.2, "rgba(36,72,98,0.9)"); drawRiverSet(octx, g, 0, "#5089b0"); }
         else strokePath(octx, action.pts, pathKind, false);
         octx.restore();
+      }
+      // sungai di bawah kursor (alat pilih): tampilkan seluruh jalurnya, karena bagian di air tidak digambar
+      if (tool === "select" && !action && hoverHit && hoverHit.type === "river" && !(sel && sel.type === "river" && sel.id === hoverHit.id)) {
+        const rv = findObj(hoverHit);
+        if (rv && rv.points && rv.points.length >= 2) {
+          octx.beginPath();
+          chaikin(rv.points, 2).forEach((p, i) => (i ? octx.lineTo(sx(p[0]), sy(p[1])) : octx.moveTo(sx(p[0]), sy(p[1]))));
+          octx.setLineDash([5, 4]); octx.lineWidth = 1.5; octx.lineJoin = "round"; octx.strokeStyle = "rgba(255,255,255,0.75)"; octx.stroke(); octx.setLineDash([]);
+        }
       }
       if (zoneDraft && zoneDraft.length) {
         const col = nextZoneColor(), pts = zoneDraft.map((p) => [sx(p[0]), sy(p[1])]);
@@ -889,22 +1099,20 @@
       const s = view.scale, c = toCell(p);
       if (layers.labels) {
         for (let i = map.labels.length - 1; i >= 0; i--) {
-          const lb = map.labels[i], L = labelLook(lb);
-          if (L.px < 4.5 || !L.text) continue;
-          ctx.font = L.font;
-          const w = spacedWidth(ctx, L.text, L.sp), a = -((lb.rotation || 0) * Math.PI) / 180;
-          const dx = p.x - sx(lb.x), dy = p.y - sy(lb.y);
+          const m = labelMetrics(map.labels[i]);
+          if (!m) continue;
+          const a = -m.ang, dx = p.x - m.x, dy = p.y - m.y;
           const lx = dx * Math.cos(a) - dy * Math.sin(a), ly = dx * Math.sin(a) + dy * Math.cos(a);
-          if (Math.abs(lx) <= w / 2 + 6 && Math.abs(ly) <= L.px * 0.68 + 4) return { type: "label", id: lb.id };
+          if (Math.abs(lx) <= m.w / 2 + 6 && Math.abs(ly) <= m.L.px * 0.68 + 4) return { type: "label", id: m.lb.id };
         }
       }
       if (layers.places) {
-        const r = pinRadius();
-        ctx.font = `600 12px ${SANS}`;
+        const r = pinRadius(), slop = coarse ? 9 : 4;
         for (let i = map.places.length - 1; i >= 0; i--) {
           const pl = map.places[i], x = sx(pl.x), y = sy(pl.y);
-          if (Math.hypot(p.x - x, p.y - y) <= r + 4) return { type: "place", id: pl.id };
-          if (pl.name) { const w = ctx.measureText(pl.name).width; if (Math.abs(p.x - x) <= w / 2 + 3 && p.y >= y + r + 1 && p.y <= y + r + 19) return { type: "place", id: pl.id }; }
+          if (Math.hypot(p.x - x, p.y - y) <= r + slop) return { type: "place", id: pl.id };
+          const b = placeNameBox.get(pl.id);   // nama hanya bisa diklik bila memang tergambar (posisi hasil penataan)
+          if (b && Math.abs(p.x - b.cx) <= b.hx + 1 && Math.abs(p.y - b.cy) <= b.hy + 1) return { type: "place", id: pl.id };
         }
       }
       let best = null, bd = Infinity;
@@ -912,6 +1120,8 @@
         const d = C.distToPolyline(c.x, c.y, pt.points) * s;
         if (d <= Math.max(7, pathWidth(pt.kind) / 2 + 4) && d < bd) { bd = d; best = { type: "path", id: pt.id }; }
       }
+      // sungai tetap bisa diklik di sepanjang garisnya (termasuk bagian di air yang tidak digambar) supaya
+      // sungai yang seluruhnya di laut tidak jadi objek tak terjangkau; saat terpilih jalurnya tampil putus-putus
       if (layers.rivers) for (const rv of map.rivers) {
         const d = C.distToPolyline(c.x, c.y, rv.points) * s;
         if (d <= Math.max(7, ((rv.width || 1.5) * s) / 2 + 4) && d < bd) { bd = d; best = { type: "river", id: rv.id }; }
@@ -939,9 +1149,18 @@
     }
     function localPos(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
 
+    // area fit = kanvas dikurangi tepi yang tertutup UI shell (insets); minimal 40% kanvas per sumbu
+    function fitArea() {
+      const I = insets, side = (full, a, b) => {
+        const free = full - a - b, len = Math.max(full * 0.4, free);
+        return [free >= len ? a : ((full - len) * a) / (a + b || 1), len];
+      };
+      const [x, w] = side(cssW, I.left, I.right), [y, h] = side(cssH, I.top, I.bottom);
+      return { x, y, w, h };
+    }
     function fitScale() {
-      const m = Math.max(14, Math.min(cssW, cssH) * 0.03) + FRAME;
-      return Math.max(0.3, Math.min((cssW - 2 * m) / n, (cssH - 2 * m) / n));
+      const A = fitArea(), m = Math.max(14, Math.min(A.w, A.h) * 0.03) + FRAME;
+      return Math.max(0.3, Math.min((A.w - 2 * m) / n, (A.h - 2 * m) / n));
     }
     function clampView() {
       const M = n * view.scale, pad = 48;
@@ -1161,6 +1380,7 @@
     function onDown(e) {
       if (!map) return;
       const p = localPos(e);
+      coarse = e.pointerType === "touch";
       if (e.pointerType === "touch") {
         touches.set(e.pointerId, p);
         try { cv.setPointerCapture(e.pointerId); } catch (_) { /* abaikan */ }
@@ -1189,12 +1409,15 @@
       if (e.pointerType === "touch") {
         if (touches.has(e.pointerId)) touches.set(e.pointerId, p);
         if (action && action.type === "pinch") { if (touches.size >= 2) updatePinch(); return; }
-      } else hoverInside = true;
+      } else { hoverInside = true; coarse = false; }
       if (!action) {
         if (e.pointerType === "touch") return;
         hover = p;
         const h = tool === "select" ? hitTest(p) : null;
-        if ((h && h.id) !== (hoverHit && hoverHit.id)) hoverHit = h;
+        if ((h && h.id) !== (hoverHit && hoverHit.id)) {
+          if ((h && h.type === "river") || (hoverHit && hoverHit.type === "river")) requestDraw(false, true);
+          hoverHit = h;
+        }
         updateCursor();
         if (BRUSH_TOOLS[tool] || zoneDraft) requestDraw(false, true);
         return;
@@ -1302,8 +1525,8 @@
     function fit() {
       autoFit = true;
       if (!map || !cssW) return;
-      const s = fitScale();
-      view.scale = s; view.ox = (cssW - n * s) / 2; view.oy = (cssH - n * s) / 2;
+      const s = fitScale(), A = fitArea();
+      view.scale = s; view.ox = A.x + (A.w - n * s) / 2; view.oy = A.y + (A.h - n * s) / 2;
       requestDraw();
     }
 
@@ -1370,6 +1593,12 @@
         requestDraw();
       },
       fit,
+      setFitInsets(o) {   // tambahan kontrak: {top,right,bottom,left} px; fit ulang bila tampilan masih auto-fit
+        const v = normInsets(o);
+        if (v.top === insets.top && v.right === insets.right && v.bottom === insets.bottom && v.left === insets.left) return;
+        insets = v;
+        if (autoFit) fit();
+      },
       zoomBy(f) { if (cssW) zoomAt(cssW / 2, cssH / 2, Number(f) || 1); },
       getPxPerCell() { return view.scale; },
       resize() { resize(); requestDraw(); },
