@@ -3,7 +3,7 @@
 ## Riwayat perubahan terbaru (v0.9.10) — paling baru di atas
 
 - **Simpan di perangkat dulu + sinkron dengan deteksi konflik** (`novelist-sync.js`, dimuat setelah `app.js`; file yang
-  sama dipakai aplikasi Android, repo Novelist-Android). Tidak ada kode `app.js` yang diubah — fungsi simpan/muat Drive
+  sama dipakai aplikasi Android, repo Web-Novel-Writer-Android). Tidak ada kode `app.js` yang diubah — fungsi simpan/muat Drive
   dibungkus dari file itu.
   - Setiap simpan langsung ditulis ke IndexedDB `novelist-sync` (per akun Google), baru dikirim ke Drive. Koneksi putus /
     sesi Google habis: tulisan tetap aman di browser dan dikirim otomatis saat online / setelah login lagi (indikator
