@@ -14,6 +14,14 @@
     kata. Teks yang ditempel dibersihkan dari kode berbahaya.
   - Bar bawah: **Putar** (mode baca seperti buku, 2 halaman di layar lebar), **Audio** (dibacakan suara browser,
     suara Indonesia diutamakan), **Tulis**, **Terbitkan** (unduh **EPUB**, **Word .doc**, **HTML**).
+  - **Panel kanan editor (alat & tile):** tombol alat **Draf** (simpan/pulihkan versi chapter, otomatis tiap
+    buka chapter bila > 30 menit, maks. 20), **Gaya** (font termasuk OpenDyslexic, ukuran, jarak baris & paragraf,
+    indentasi, lebar halaman, tema kertas Gelap/Kertas/Sepia — berlaku di editor & mode Putar), **Pohon relasi**
+    (peta hubungan karakter dari Organize dengan React Flow, relasi berlabel), **Kanvas** (papan bebas: catatan
+    tempel berwarna & gambar, geser/ubah ukuran), **Map** (buka peta project di tab Map) dan **Model 3D** (segera).
+    Tile: **Kartu dunia** (cari karakter/lokasi/catatan, sisipkan namanya), **Kartu terdeteksi** (item Organize yang
+    disebut di chapter, diperbarui saat mengetik), **Catatan chapter**, **Papan suasana** (kumpulan gambar) dan
+    **Grafik dunia** (siapa/di mana muncul di chapter mana). Tile bisa ditutup & ditambah lagi, dan ada tab panel sendiri.
   - Data cerita tersimpan di dalam project (ikut autosave & backup Google Drive); gambar diperkecil otomatis.
 - **Pengaturan Akun → Aksesibilitas:** **Ukuran teks** (Bawaan 100 % / Sedang 105 % / Besar 110 % / Sangat besar 120 %,
   hanya memperbesar teks), **Font ramah disleksia** (OpenDyslexic, disimpan di `vendor/fonts/`) dan **Mode hemat
