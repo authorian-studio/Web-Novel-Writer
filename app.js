@@ -166,6 +166,7 @@ function driveSignOut() {
   stopBackupInterval();
   if (window.NovelMap) window.NovelMap.hide();
   if (window.NovelQuill) window.NovelQuill.hide();
+  if (window.NovelHome) window.NovelHome.hide();
   muteTimelineKeys(true);
   el("dashboardView").classList.add("hidden");
   el("editorView").classList.add("hidden");
@@ -598,6 +599,7 @@ function backToLibrary() {
   flushCurrentEdits();
   if (window.NovelMap) window.NovelMap.hide();
   if (window.NovelQuill) window.NovelQuill.hide();
+  if (window.NovelHome) window.NovelHome.hide();
   muteTimelineKeys(true);
   const p = getProject(currentProjectId);
   if (p) { p.title = el("projectTitle").value; p.data.title = p.title; p.updatedAt = new Date().toISOString(); }
@@ -613,6 +615,7 @@ function flushCurrentEdits() {
   syncOrganizeFromDetail();
   if (window.NovelMap) window.NovelMap.flush();
   if (window.NovelQuill) window.NovelQuill.flush();   // Quill: isi editor chapter
+  if (window.NovelHome) window.NovelHome.flush();     // Beranda: teks catatan/bentuk yang sedang diedit
 }
 
 // ================= TAB PROJECT =================
@@ -626,7 +629,7 @@ function flushCurrentEdits() {
 // "quill" = panel Write dalam mode Quill (tab sendiri). switchTab(x) dari mana pun (Timeline "buka scene", alat Map di
 // Quill, Home, riwayat, ...) otomatis membuka tab x kalau sedang tertutup (disisipkan setelah tab aktif).
 const TAB_DEFS = [
-  { id: "home", panel: "home", name: "Beranda", icon: tiIcon("home"), desc: "Peta scene project — klik titik untuk menulis" },
+  { id: "home", panel: "home", name: "Beranda", icon: tiIcon("home"), desc: "Kanvas scene & papan ide — geser, susun, hubungkan" },
   { id: "write", panel: "write", name: "Tulis", icon: tiIcon("pencil"), desc: "Editor scene: bab & adegan bertingkat" },
   { id: "quill", panel: "write", name: "Quill", icon: tiIcon("feather"), desc: "Tulis cerita bergaya buku, lalu terbitkan" },
   { id: "organize", panel: "organize", name: "Organize", icon: tiIcon("folders"), desc: "Karakter, lokasi & catatan dunia cerita" },
@@ -642,7 +645,7 @@ const TAB_DEFAULT = ["home", "write", "organize"];
 const TAB_QUICK = ["home", "write", "quill", "timeline", "map"];          // baris ikon bawah sidebar
 const TAB_EMPTY_MAIN = ["home", "write", "quill", "organize", "timeline"]; // chip utama saat semua tab ditutup
 const TAB_HIST_MAX = 30;
-const TAB_DOC_ICONS = { scene: tiIcon("file-text"), characters: tiIcon("user"), locations: tiIcon("map-pin"), notes: tiIcon("note"), timeline: tiIcon("timeline"), map: tiIcon("map"), story: tiIcon("book-2") };
+const TAB_DOC_ICONS = { scene: tiIcon("file-text"), characters: tiIcon("user"), locations: tiIcon("map-pin"), notes: tiIcon("note"), timeline: tiIcon("timeline"), map: tiIcon("map"), story: tiIcon("book-2"), board: tiIcon("layout-board") };
 const tabNarrowMq = window.matchMedia("(max-width: 900px)");
 const tabReduceMq = window.matchMedia("(prefers-reduced-motion: reduce)");
 let projTabs = { open: [], active: null };   // tab project yang sedang dibuka
@@ -678,6 +681,7 @@ function restoreProjectTabs(p) {
   el("tabPicker").style.setProperty("--ptab-tint", p.colorA || "#d7a86e");
   v.classList.add("tsb-no-anim");                               // ganti project: tanpa animasi buka sidebar/tab
   el("tabStrip").innerHTML = "";
+  v.dataset.ptab = "";   // ganti project: panel tab aktif selalu dibangun ulang walau id tabnya sama (mis. Beranda -> Beranda)
   tabSbDrawer = false;
   applyTabSidebar();
   if (projTabs.active) switchTab(projTabs.active);
@@ -703,6 +707,7 @@ function insertProjectTab(tab, atEnd) {
 // tampilkan panel milik tab (null = semua ditutup -> layar kosong). Isi lama switchTab().
 function showTabPanel(tab) {
   const panel = tab ? TAB_BY_ID[tab].panel : null;
+  if (panel !== "home" && window.NovelHome) window.NovelHome.hide();   // Beranda: simpan teks yang diedit + lepas kanvas
   if (panel === "home") { flushCurrentEdits(); renderProjectHome(); }
   if (panel === "write") setWriteModeQuiet(tab === "quill" ? "quill" : "scene");
   else if (window.NovelQuill) window.NovelQuill.hide();   // Quill: simpan + bersihkan sebelum tab lain tampil
@@ -1068,6 +1073,7 @@ function tabDocInfo(p, h) {
   else if (h.tab === "timeline") x = (d.timelines || []).find((t) => t && t.id === h.doc);
   else if (h.tab === "map") x = (d.maps || []).find((m) => m && m.id === h.doc);
   else if (h.tab === "quill") x = ((d.quill && d.quill.stories) || []).find((s) => s && s.id === h.doc);
+  else if (h.tab === "home") x = ((d.canvas && Array.isArray(d.canvas.boards) && d.canvas.boards) || []).find((b) => b && b.id === h.doc && b.id !== "home");
   if (!x) return null;
   return { title: String(x.title || "").trim() || (h.tab === "quill" ? "Cerita tanpa judul" : "(tanpa judul)") };
 }
@@ -1128,7 +1134,7 @@ function noteTabVisit(tab) {
 // dokumen dibuka di dalam tab (scene, item Organize, timeline, peta, cerita Quill). doc = { doc, kind, title }
 function noteTabDoc(tab, doc) {
   if (!currentProjectId || !doc || !doc.doc) return;
-  if (tab === "timeline" || tab === "map" || tab === "quill") tabLastDoc[tab] = { doc: doc.doc, kind: doc.kind, title: doc.title };
+  if (tab === "timeline" || tab === "map" || tab === "quill" || tab === "home") tabLastDoc[tab] = { doc: doc.doc, kind: doc.kind, title: doc.title };
   if (projTabs.active !== tab) return;
   if (tabVisitPending && tabVisitPending.tab === tab) tabVisitPending = null;
   pushTabHist(Object.assign({ tab }, doc));
@@ -1154,14 +1160,14 @@ function openTabHist(h) {
     switchTab("organize");
     if (currentOrgCat !== h.kind) switchOrganizeCat(h.kind);
     if (currentOrgItemId !== h.doc) { syncOrganizeFromDetail(); currentOrgItemId = h.doc; renderOrganizeList(); renderOrganizeDetail(); }
-  } else if (h.tab === "timeline" || h.tab === "map") { tabPendingDoc = { tab: h.tab, id: h.doc }; switchTab(h.tab); }
+  } else if (h.tab === "timeline" || h.tab === "map" || h.tab === "home") { tabPendingDoc = { tab: h.tab, id: h.doc }; switchTab(h.tab); }
   else if (h.tab === "quill") { quillNav = { id: h.doc, steps: 0 }; switchTab("quill"); }
 }
 // timeline/peta dari riwayat: dibuka setelah modulnya tampil (openTimelineTab/openMapTab memanggil ini)
 function consumeTabPendingDoc(tab) {
   const d = tabPendingDoc;
   if (!d || d.tab !== tab) return;
-  const api = tab === "timeline" ? window.NovelTimeline : window.NovelMap;
+  const api = tab === "timeline" ? window.NovelTimeline : tab === "home" ? window.NovelHome : window.NovelMap;
   if (!api || typeof api.open !== "function" || el("tab" + capitalize(tab)).classList.contains("hidden")) return;
   tabPendingDoc = null;
   api.open(d.id);
@@ -1496,24 +1502,50 @@ function flattenScenes(list, out = []) {
   (list || []).forEach((n) => { if (n.type === "folder") flattenScenes(n.children, out); else out.push(n); });
   return out;
 }
-function hashUnit(str, salt) {   // angka 0..1 yang tetap untuk id yang sama (posisi node di canvas tidak loncat-loncat)
-  let h = 2166136261 ^ salt;
-  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return ((h >>> 0) % 10000) / 10000;
+// Beranda = kanvas papan (home-canvas.js + home-canvas.css, dimuat saat tab ini pertama kali dibuka; React Flow dari
+// vendor/ dipakai bersama Timeline). Data: p.data.canvas (lihat komentar di awal home-canvas.js).
+let homeLibPromise = null;
+const stylePromises = {};
+function loadStyleOnce(href) {
+  if (!stylePromises[href]) {
+    stylePromises[href] = new Promise((resolve, reject) => {
+      const l = document.createElement("link");
+      l.rel = "stylesheet"; l.href = href; l.onload = resolve;
+      l.onerror = () => { delete stylePromises[href]; l.remove(); reject(new Error("Gagal memuat " + href)); };
+      document.head.appendChild(l);
+    });
+  }
+  return stylePromises[href];
 }
-function renderProjectHome() {
-  const p = getProject(currentProjectId);
-  if (!p) return;
-  const scenes = flattenScenes(p.data.scenes);
-
-  // canvas: setiap scene = titik bercahaya + label, disambung garis tipis sesuai urutan
-  const canvas = el("homeCanvas");
-  const pts = scenes.map((s, i) => ({ s, x: 0.08 + hashUnit(s.id, 1) * 0.84, y: 0.12 + (scenes.length > 1 ? (i / (scenes.length - 1)) * 0.7 : 0.3) + (hashUnit(s.id, 2) - 0.5) * 0.08 }));
-  const lines = pts.slice(1).map((pt, i) => `<line x1="${pts[i].x * 100}%" y1="${pts[i].y * 100}%" x2="${pt.x * 100}%" y2="${pt.y * 100}%" />`).join("");
-  canvas.innerHTML = `<div class="home-canvas-area"><svg class="home-links" aria-hidden="true">${lines}</svg>` +
-    pts.map((pt) => `<button class="home-node${pt.s.id === currentSceneId ? " is-current" : ""}" data-id="${pt.s.id}" style="left:${pt.x * 100}%;top:${pt.y * 100}%">` +
-      `<span class="home-node-dot ${pt.s.status || "todo"}"></span><span class="home-node-label">${escapeHtml(pt.s.title || "(tanpa judul)")}</span></button>`).join("") + `</div>`;
-  canvas.querySelectorAll(".home-node").forEach((b) => b.onclick = () => openSceneInWrite(b.dataset.id));
+function ensureHomeLib() {
+  if (!homeLibPromise) {
+    homeLibPromise = Promise.all([ensureReact().then(() => loadScriptOnce("vendor/reactflow-11.11.4.umd.js")), loadStyleOnce("home-canvas.css")])
+      .then(() => loadScriptOnce("home-canvas.js"));
+    homeLibPromise.catch(() => { homeLibPromise = null; });   // boleh dicoba lagi
+  }
+  return homeLibPromise;
+}
+async function renderProjectHome() {
+  const box = el("homeCanvas");
+  if (!window.NovelHome) box.innerHTML = `<div class="home-loading">${tiPx(tiIcon("loader-2"), 18)}<span>Memuat kanvas…</span></div>`;
+  try { await ensureHomeLib(); }
+  catch (e) { box.innerHTML = '<div class="home-loading">Kanvas gagal dimuat. Periksa koneksi lalu buka tab ini lagi.</div>'; return; }
+  if (el("tabHome").classList.contains("hidden") || el("editorView").classList.contains("hidden") || !currentProjectId) return;   // pengguna sudah pindah
+  window.NovelHome.show({
+    project: getProject(currentProjectId),
+    onChange: markDirtyAndSchedule,
+    getCurrentSceneId: () => currentSceneId,
+    openScene: (id) => openSceneInWrite(id),
+    closeTab: () => closeProjectTab("home"),
+    preview: () => el("btnPreview").click(),
+    toggleTheme: () => el("btnProjectTheme").click(),
+    onOpen: (id, title, isDefault) => {   // TAB PROJECT: riwayat (papan Beranda bawaan = kunjungan tab biasa)
+      if (isDefault) tabLastDoc.home = null;
+      else noteTabDoc("home", { doc: id, kind: "board", title });
+      if (tabSidebarVisible()) renderTabSidebar();
+    },
+  });
+  consumeTabPendingDoc("home");   // papan dibuka dari riwayat
 }
 
 // jam kecil di pojok kanan atas (seperti vvd)
@@ -1563,6 +1595,7 @@ function renderSceneList() {
   const container = el("sceneList");
   container.innerHTML = "";
   (p.data.scenes || []).forEach((node) => container.appendChild(buildTreeNode(node)));
+  if (window.NovelHome) window.NovelHome.refresh();   // Beranda tampil: node scene ikut diperbarui
 }
 
 function buildTreeNode(node) {

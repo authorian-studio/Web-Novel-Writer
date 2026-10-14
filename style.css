@@ -581,21 +581,13 @@ body.light .proj-float-btn:hover { background: rgba(0,0,0,.06); }
 .tab-panel { position: absolute; inset: 0; display: flex; }
 .placeholder-panel { align-items: center; justify-content: center; gap: 10px; color: var(--text-dim); font-size: calc(15px * var(--fs-scale, 1)); }
 
-/* --- Home: canvas berisi titik-titik scene (memenuhi seluruh panel) --- */
+/* --- Beranda: kanvas papan (gaya lengkapnya di home-canvas.css, dimuat bersama home-canvas.js) --- */
 .home-panel { display: block; overflow: hidden; }
 .home-canvas { position: absolute; inset: 0; z-index: 1; }
-.home-canvas-area { position: absolute; top: 60px; bottom: 70px; left: 90px; right: 110px; }
-.home-links { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.home-links line { stroke: rgba(255,255,255,.14); stroke-width: 1; stroke-dasharray: 3 5; }
-body.light .home-links line { stroke: rgba(0,0,0,.18); }
-.home-node { position: absolute; transform: translate(-50%, -6px); display: flex; flex-direction: column; align-items: center; gap: 6px; background: none; border: none; padding: 4px 8px; cursor: pointer; color: var(--text); font: inherit; }
-.home-node-dot { width: 11px; height: 11px; border-radius: 50%; background: #e8e8ec; box-shadow: 0 0 0 4px rgba(255,255,255,.06), 0 0 14px rgba(255,255,255,.35); transition: transform .2s ease, box-shadow .2s ease; }
-.home-node-dot.draft { background: var(--accent); box-shadow: 0 0 0 4px rgba(215,168,110,.1), 0 0 14px rgba(215,168,110,.45); }
-.home-node-dot.done { background: var(--success); box-shadow: 0 0 0 4px rgba(76,175,130,.1), 0 0 14px rgba(76,175,130,.45); }
-.home-node-label { font-size: calc(11.5px * var(--fs-scale, 1)); font-weight: 600; white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 8px rgba(0,0,0,.6); }
-body.light .home-node-label { text-shadow: none; }
-.home-node:hover .home-node-dot, .home-node.is-current .home-node-dot { transform: scale(1.35); }
-.home-node:focus-visible { outline: 1px solid rgba(255,255,255,.4); border-radius: 8px; }
+.home-loading { position: absolute; inset: 2px 12px 12px; display: flex; align-items: center; justify-content: center; gap: 10px; border-radius: 14px; border: 1px solid var(--glass-border); color: var(--text-dim); font-size: calc(13px * var(--fs-scale, 1)); }
+.home-loading .ti { animation: homeSpin 1s linear infinite; }
+@keyframes homeSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .home-loading .ti { animation: none; } }
 
 /* --- Timeline (React Flow): sidebar daftar timeline + kanvas sumbu tahun --- */
 #tabTimeline { padding: 4px 70px 16px 12px; gap: 12px; }
@@ -1469,7 +1461,6 @@ body.light .acc-range::-moz-range-thumb { box-shadow: 0 0 0 1px rgba(0,0,0,.18),
   .proj-float-sep { width: 1px; height: 20px; }
   .save-status { top: 18px; bottom: auto; right: 64px; }
   .proj-clock { display: none; }
-  .home-canvas-area { top: 40px; bottom: 90px; left: 50px; right: 50px; }
   .obsidian-pane, .obsidian-statusbar { padding-left: 16px; padding-right: 16px; }
   /* dashboard: rail pindah jadi bar bawah */
   .dash-rail { top: auto; width: 100%; height: 56px; flex-direction: row; padding: 0 18px; background: rgba(10,10,12,.88); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid var(--border); }

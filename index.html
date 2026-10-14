@@ -527,9 +527,10 @@
         </div>
       </aside>
       <div id="tabContent">
-        <!-- ============ HOME TAB (canvas berisi titik-titik scene) ============ -->
+        <!-- ============ HOME TAB (Beranda): panel kaca berisi kanvas React Flow — scene + papan ide.
+             Isinya dibangun home-canvas.js (+ home-canvas.css), dimuat saat tab ini pertama kali dibuka ============ -->
         <div id="tabHome" class="tab-panel home-panel">
-          <div class="home-canvas" id="homeCanvas" aria-label="Peta scene"></div>
+          <div class="home-canvas" id="homeCanvas" role="region" aria-label="Kanvas Beranda"></div>
         </div>
 
         <!-- ============ WRITE TAB ============ -->

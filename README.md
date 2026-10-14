@@ -1,6 +1,24 @@
-# Novelist Web — v0.10.0
+# Novelist Web — v0.10.1
 
-## Riwayat perubahan terbaru (v0.10.0) — paling baru di atas
+## Riwayat perubahan terbaru (v0.10.1) — paling baru di atas
+
+- **Beranda jadi kanvas yang bisa digeser & di-zoom** (React Flow, seperti kanvas di vvd): tampil di panel kaca
+  berbingkai dengan dot-grid.
+  - **Navigasi:** seret area kosong = geser (Shift+seret = kotak pilihan), alat Geser / Spasi+seret selalu menggeser,
+    roda mouse / dua jari = geser, Ctrl/⌘+roda atau cubit = zoom (20–250 %). Posisi tampilan diingat per papan.
+  - **Scene** tampil sebagai titik bernama yang bisa diseret (posisinya disimpan); klik = buka di Tulis, hover =
+    status, folder, sinopsis & jumlah kata. Garis putus-putus antar-scene tetap ada (bisa disembunyikan).
+  - **Toolbar bawah:** Pilih (V), Geser (H), Bentuk (S), Catatan tempel (N), Gambar (I), Penghubung/panah (C),
+    Teks (T), Frame (F). Objek bisa diubah ukuran, diedit (klik dua kali), diwarnai, diduplikat (Ctrl+D), dihapus,
+    disalin-tempel, undo/redo (Ctrl+Z / Ctrl+Shift+Z), dipindah ke depan/belakang (Ctrl+] / Ctrl+[). Frame ikut
+    membawa objek di dalamnya.
+  - **Header panel:** dropdown papan (ganti, papan baru, ubah nama, hapus, tambah scene ke papan lain), zoom %,
+    daftar "Pintasan", menu "…" (pas ke layar, 100 %, minimap, ekspor PNG, bersihkan papan), perbesar & tutup;
+    tombol zoom/pas/minimap di tepi kanan.
+  - Data tersimpan di project (`data.canvas`, ikut autosave Drive); project lama otomatis memakai tata letak lama.
+    Tombol Delete hanya bekerja saat Beranda tampil & tidak sedang mengetik. File: `home-canvas.js`, `home-canvas.css`.
+
+### v0.10.0
 
 - **Tab project bisa ditutup & dibuka (tidak bertumpuk lagi):** topbar project kini hanya menampilkan tab yang
   sedang terbuka. Tab aktif berupa pil berikon + label (diwarnai warna project), tab lain berupa ikon bulat. Tutup tab
@@ -609,6 +627,7 @@ nama-repo/
 ├── logo-anim-poster.webp
 ├── login-logo.webm, login-logo.mp4, login-logo-poster.webp
 ├── timeline.js
+├── home-canvas.js, home-canvas.css   (kanvas Beranda: papan React Flow + toolbar)
 ├── smooth-scroll.js, smooth-scroll.css   (scrollbar custom + Lenis smooth scroll)
 ├── quill.js, quill.css, quill-tiles.js   (fitur Quill di tab Write: cerita, buku 3D, editor chapter, panel alat)
 ├── map-core.js, map2d.js, map3d.js, map-ui.js   (fitur Map: data, editor 2D, tampilan 3D, UI tab)

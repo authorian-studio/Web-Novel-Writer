@@ -1,0 +1,334 @@
+/* ================= BERANDA: kanvas papan (home-canvas.js, dimuat lazy) =================
+   Panel kaca (inset dari bar atas & tepi, ikut lebar sidebar tab) berisi React Flow + dot-grid, kepala panel,
+   tombol tampilan di tepi kanan & bilah alat mengambang di bawah. Gelap = bawaan, body.light = terang. */
+.hc-panel {
+  --hc-bg: rgba(10,11,15,.34);
+  --hc-border: rgba(255,255,255,.085);
+  --hc-glass: rgba(18,19,24,.74);
+  --hc-glass-b: rgba(255,255,255,.09);
+  --hc-pop: rgba(22,23,28,.95);
+  --hc-hover: rgba(255,255,255,.08);
+  --hc-on: rgba(255,255,255,.14);
+  --hc-dot: rgba(220,224,232,.17);
+  --hc-edge: #9a9aa3;
+  --hc-seq: rgba(255,255,255,.2);
+  --hc-frame-b: rgba(255,255,255,.17);
+  --hc-frame-bg: rgba(255,255,255,.025);
+  --hc-shadow: 0 18px 44px rgba(0,0,0,.42);
+  --hc-tint: rgba(215,168,110,.08);
+  position: absolute; inset: 2px 12px 12px 12px; overflow: hidden; border-radius: 14px;
+  background: var(--hc-bg); border: 1px solid var(--hc-border);
+  box-shadow: 0 18px 50px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.035);
+  color: var(--text); isolation: isolate; -webkit-user-select: none; user-select: none;
+  transition: inset .3s cubic-bezier(.32,.72,0,1), border-radius .3s ease;
+}
+body.light .hc-panel {
+  --hc-bg: rgba(255,255,255,.42);
+  --hc-border: rgba(0,0,0,.08);
+  --hc-glass: rgba(255,255,255,.86);
+  --hc-glass-b: rgba(0,0,0,.08);
+  --hc-pop: rgba(255,255,255,.97);
+  --hc-hover: rgba(0,0,0,.05);
+  --hc-on: rgba(0,0,0,.08);
+  --hc-dot: rgba(0,0,0,.2);
+  --hc-edge: #7e796d;
+  --hc-seq: rgba(0,0,0,.22);
+  --hc-frame-b: rgba(0,0,0,.16);
+  --hc-frame-bg: rgba(0,0,0,.018);
+  --hc-shadow: 0 16px 38px rgba(0,0,0,.12);
+  box-shadow: 0 14px 40px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.6);
+}
+#editorView.tsb-docked .hc-panel { left: 4px; }   /* sidebar tab menempel: jarak 10px dari panelnya */
+.hc-panel.is-max { inset: 0; border-radius: 0; border-color: transparent; box-shadow: none; }
+.hc-panel button { font-family: inherit; }
+.hc-panel input, .hc-panel textarea { -webkit-user-select: text; user-select: text; }
+.hc-panel button:focus-visible, .hc-panel input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---- kanvas ---- */
+.hc-flow { position: absolute; inset: 0; z-index: 1; }
+.hc-flow > .react-flow { position: absolute; inset: 0; width: auto; height: auto; background: transparent; }
+.hc-rf .react-flow__background circle { fill: var(--hc-dot); }
+.hc-rf .react-flow__pane { cursor: default; }
+.hc-rf .react-flow__pane.dragging { cursor: grabbing; }
+.hc-rf.is-hand .react-flow__pane, .hc-rf.is-hand .react-flow__node, .hc-rf.is-hand .hc-scene,
+.hc-rf.is-hand .hc-frame-title, .hc-rf.is-hand .hc-frame-edge { cursor: grab; }
+.hc-rf.is-hand .react-flow__pane.dragging, .hc-rf.is-hand .react-flow__pane.dragging ~ * .react-flow__node { cursor: grabbing; }
+.hc-rf .react-flow__node { font-family: inherit; }
+.hc-rf .react-flow__attribution { background: transparent; color: var(--text-dim); opacity: .45; font-size: calc(10px * var(--fs-scale, 1)); margin: 0 0 6px 8px; }
+.hc-rf .react-flow__attribution a { color: inherit; }
+.hc-rf .react-flow__selection { background: var(--hc-tint); border: 1px dashed rgba(215,168,110,.65); border-radius: 4px; }
+.hc-rf:not(.is-select) .react-flow__nodesselection { display: none; }   /* Geser/alat lain: kotak pilihan tidak menghalangi */
+.hc-rf .react-flow__nodesselection-rect { background: rgba(215,168,110,.04); border: 1px dashed rgba(215,168,110,.45); border-radius: 4px; }
+.hc-rf .react-flow__connection-path { stroke: var(--accent); }
+
+/* ---- kepala panel ---- */
+.hc-head { position: absolute; z-index: 6; top: 0; left: 0; right: 0; height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 8px 0 10px; pointer-events: none; }
+.hc-board, .hc-head-right { display: flex; align-items: center; min-width: 0; pointer-events: auto; }
+.hc-board { gap: 8px; }
+.hc-board-btn, .hc-board-input {
+  height: 30px; border-radius: 9px; border: 1px solid var(--hc-glass-b); background: var(--hc-glass); color: var(--text);
+  font-size: calc(13px * var(--fs-scale, 1)); font-weight: 700; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.hc-board-btn { display: inline-flex; align-items: center; gap: 6px; max-width: min(340px, 46vw); padding: 0 8px 0 11px; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+.hc-board-btn .ti { color: var(--text-dim); transition: transform .2s ease; }
+.hc-board-btn[aria-expanded="true"] .ti { transform: rotate(180deg); }
+.hc-board-btn:hover, .hc-board-btn[aria-expanded="true"] { border-color: rgba(255,255,255,.2); }
+body.light .hc-board-btn:hover, body.light .hc-board-btn[aria-expanded="true"] { border-color: rgba(0,0,0,.18); }
+.hc-board-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hc-board-input { width: 230px; max-width: 46vw; padding: 0 10px; outline: 2px solid var(--accent); outline-offset: -1px; }
+.hc-board-sub { pointer-events: none; font-size: calc(11.5px * var(--fs-scale, 1)); color: var(--text-dim); white-space: nowrap; text-shadow: 0 1px 6px rgba(0,0,0,.5); }
+body.light .hc-board-sub { text-shadow: none; }
+.hc-head-right { gap: 3px; }
+.hc-pill { height: 26px; margin-right: 4px; padding: 0 10px 0 8px; display: inline-flex; align-items: center; gap: 6px; border-radius: 13px; border: 1px solid var(--hc-glass-b); background: var(--hc-glass); color: var(--text-dim); font-size: calc(11.5px * var(--fs-scale, 1)); font-weight: 600; cursor: pointer; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: background .15s ease, color .15s ease; }
+.hc-zoom { min-width: 48px; height: 28px; padding: 0 6px; border: none; border-radius: 8px; background: none; color: var(--text-dim); font-size: calc(11.5px * var(--fs-scale, 1)); font-weight: 650; font-variant-numeric: tabular-nums; cursor: pointer; }
+.hc-ibtn { width: 30px; height: 30px; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.hc-pill:hover, .hc-zoom:hover, .hc-ibtn:hover, .hc-ibtn[aria-expanded="true"], .hc-pill[aria-expanded="true"] { background: var(--hc-hover); color: var(--text); }
+.hc-max-btn .ti + .ti, .hc-max-btn[aria-pressed="true"] .ti:first-child { display: none; }
+.hc-max-btn[aria-pressed="true"] .ti + .ti { display: block; }
+
+/* tombol mengambang project (preview & tema) duduk di tepi kanan panel, di bawah kepala (seperti referensi) */
+#editorView[data-tab="home"] .proj-float-tools { top: 104px; right: 22px; gap: 2px; padding: 4px; border-radius: 12px; }
+#editorView[data-tab="home"] .proj-float-btn { width: 30px; height: 30px; border-radius: 8px; }
+#editorView[data-tab="home"] .proj-float-sep { width: 16px; }
+#editorView[data-tab="home"].hc-max .proj-float-tools { display: none; }   /* perbesar: preview & tema ada di menu "…" */
+@media (min-width: 701px) { #editorView[data-tab="home"] .save-status { right: 28px; bottom: 22px; } }   /* HP: tetap di bar atas */
+
+/* ---- tombol tampilan (tepi kanan) ---- */
+.hc-side { position: absolute; z-index: 6; right: 9px; top: 131px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px; border-radius: 12px; background: var(--hc-glass); border: 1px solid var(--hc-glass-b); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.hc-panel.is-max .hc-side { top: 52px; }
+.hc-sbtn { width: 30px; height: 30px; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.hc-sbtn:hover { background: var(--hc-hover); color: var(--text); }
+.hc-sbtn[aria-pressed="true"] { background: var(--hc-on); color: var(--text); }
+.hc-side-sep { width: 16px; height: 1px; margin: 2px 0; background: var(--hc-glass-b); }
+
+/* ---- bilah alat bawah (pil kaca) ---- */
+.hc-tools-wrap { position: absolute; z-index: 6; left: 10px; right: 10px; bottom: 12px; display: flex; justify-content: center; pointer-events: none; }
+.hc-tools {
+  pointer-events: auto; display: flex; align-items: center; gap: 2px; max-width: 100%; padding: 5px; border-radius: 16px;
+  background: var(--hc-glass); border: 1px solid var(--hc-glass-b); box-shadow: var(--hc-shadow);
+  backdrop-filter: blur(16px) saturate(1.2); -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+}
+.hc-tools::-webkit-scrollbar { display: none; }
+.hc-tool { position: relative; flex-shrink: 0; height: 40px; min-width: 36px; padding: 0 6px; border: none; border-radius: 11px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.hc-tool:hover { background: var(--hc-hover); color: var(--text); }
+.hc-tool[aria-pressed="true"] { background: var(--hc-on); color: var(--text); box-shadow: inset 0 0 0 1px var(--hc-glass-b); }
+.hc-t-sm { width: 34px; min-width: 34px; padding: 0; }
+.hc-t-big { width: 54px; }
+.hc-tsep { flex-shrink: 0; width: 1px; height: 22px; margin: 0 4px; background: var(--hc-glass-b); }
+.hc-shape-ic { display: flex; color: #e9e9ee; filter: drop-shadow(0 2px 5px rgba(0,0,0,.35)); transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+body.light .hc-shape-ic { color: #57534a; filter: drop-shadow(0 2px 4px rgba(0,0,0,.12)); }
+.hc-note-prev { width: 42px; height: 30px; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 0 7px; border-radius: 3px; background: var(--c, #f6d97a); box-shadow: 0 3px 9px rgba(0,0,0,.32); transform: rotate(-3deg) translateY(2px); transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+.hc-note-prev i { display: block; height: 2px; border-radius: 1px; background: rgba(60,50,20,.28); }
+.hc-note-prev i:nth-child(2) { width: 80%; }
+.hc-note-prev i:nth-child(3) { width: 52%; }
+.hc-img-prev { width: 42px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 7px; color: rgba(255,255,255,.88);
+  background: linear-gradient(135deg, #6b5a8a, #c08457) center / cover no-repeat; box-shadow: 0 3px 9px rgba(0,0,0,.32); transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+.hc-img-prev.has-img .ti { display: none; }
+.hc-tool:hover .hc-note-prev { transform: rotate(0) translateY(-1px); }
+.hc-tool:hover .hc-img-prev, .hc-tool:hover .hc-shape-ic { transform: translateY(-2px); }
+.hc-conn-ic { position: relative; width: 26px; height: 22px; }
+.hc-conn-ic .ti { position: absolute; }
+.hc-conn-ic .ti:nth-child(1) { left: 0; bottom: 1px; }
+.hc-conn-ic .ti:nth-child(2) { right: 0; bottom: 1px; }
+.hc-conn-ic .ti:nth-child(3) { right: 1px; top: -2px; }
+
+/* ---- petunjuk alat, kosong, toast ---- */
+.hc-hint { position: absolute; z-index: 6; top: 52px; left: 50%; max-width: calc(100% - 150px); padding: 6px 12px; border-radius: 10px; background: var(--hc-glass); border: 1px solid var(--hc-glass-b); color: var(--text); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; opacity: 0; transform: translate(-50%, -4px); transition: opacity .15s ease, transform .15s ease; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.hc-hint.is-on { opacity: 1; transform: translate(-50%, 0); }
+.hc-empty { position: absolute; z-index: 5; left: 50%; top: 50%; width: min(340px, calc(100% - 40px)); transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; color: var(--text-dim); font-size: calc(12.5px * var(--fs-scale, 1)); line-height: 1.45; pointer-events: none; }
+.hc-empty p { margin: 4px 0 0; color: var(--text); font-size: calc(14px * var(--fs-scale, 1)); font-weight: 700; }
+.hc-empty-ic { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 13px; background: var(--hc-hover); border: 1px solid var(--hc-glass-b); }
+.hc-toast { position: absolute; z-index: 9; left: 50%; bottom: 74px; max-width: calc(100% - 40px); padding: 8px 14px; border-radius: 10px; background: var(--bg-panel); border: 1px solid var(--border); color: var(--text); font-size: calc(12.5px * var(--fs-scale, 1)); box-shadow: 0 10px 26px rgba(0,0,0,.3); pointer-events: none; opacity: 0; transform: translate(-50%, 6px); transition: opacity .18s ease, transform .18s ease; }
+.hc-toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+.hc-panel.is-drop::after { content: ""; position: absolute; z-index: 8; inset: 8px; border: 2px dashed var(--accent); border-radius: 12px; background: var(--hc-tint); pointer-events: none; }
+
+/* ---- menu / popover ---- */
+.hc-pop {
+  position: absolute; z-index: 20; min-width: 236px; max-width: min(330px, calc(100% - 16px)); padding: 6px; border-radius: 13px;
+  background: var(--hc-pop); border: 1px solid var(--hc-glass-b); box-shadow: var(--hc-shadow); color: var(--text);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); animation: hcPop .14s cubic-bezier(.2,.9,.3,1.1);
+}
+@keyframes hcPop { from { opacity: 0; transform: translateY(-3px) scale(.98); } to { opacity: 1; transform: none; } }
+.hc-pop.is-shape, .hc-pop.is-note { min-width: 0; padding: 10px; }
+.hc-pop.is-help { width: 350px; }
+.hc-mi { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 32px; padding: 5px 9px 5px 8px; border: none; border-radius: 8px; background: none; color: var(--text); font-size: calc(13px * var(--fs-scale, 1)); text-align: left; cursor: pointer; }
+.hc-mi:hover, .hc-mi:focus-visible { background: var(--hc-hover); outline: none; }
+.hc-mi[disabled] { opacity: .4; cursor: default; background: none; }
+.hc-mi.is-danger, .hc-mi.is-danger .hc-mi-ic { color: var(--danger); }
+.hc-mi-ic { width: 18px; flex-shrink: 0; display: flex; justify-content: center; color: var(--text-dim); }
+.hc-mi-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3; }
+.hc-mi-label small { display: block; font-size: calc(11px * var(--fs-scale, 1)); color: var(--text-dim); }
+.hc-mi kbd, .hc-help kbd { flex-shrink: 0; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--hc-glass-b); background: var(--hc-hover); color: var(--text-dim); font: inherit; font-size: calc(10.5px * var(--fs-scale, 1)); white-space: nowrap; }
+.hc-mi-check { display: flex; flex-shrink: 0; color: var(--accent); }
+.hc-mi-sep { height: 1px; margin: 5px 6px; background: var(--hc-glass-b); }
+.hc-mi-head { padding: 6px 9px 4px; font-size: calc(10.5px * var(--fs-scale, 1)); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.hc-mi-scroll { max-height: 260px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.hc-mi-empty { margin: 4px 9px 8px; font-size: calc(12.5px * var(--fs-scale, 1)); color: var(--text-dim); }
+.hc-pick-head { margin: 0 2px 6px; font-size: calc(10.5px * var(--fs-scale, 1)); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.hc-pick-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: 10px; }
+.hc-pick-row:last-child { margin-bottom: 0; }
+.hc-pick { width: 38px; height: 38px; padding: 0; border: 1px solid transparent; border-radius: 10px; background: var(--hc-hover); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+.hc-pick:hover { background: var(--hc-on); }
+.hc-pick[aria-pressed="true"] { border-color: var(--accent); background: rgba(215,168,110,.16); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.hc-pick-note { margin: 0 2px; font-size: calc(11.5px * var(--fs-scale, 1)); color: var(--text-dim); }
+.hc-sw { flex-shrink: 0; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 2px solid transparent; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); cursor: pointer; transition: transform .12s ease; }
+.hc-sw:hover { transform: scale(1.12); }
+.hc-sw[aria-pressed="true"] { border-color: var(--text); }
+.hc-sw.is-note { border-radius: 6px; }
+.hc-sw[style*="transparent"] { background: linear-gradient(135deg, transparent 45%, var(--danger) 45%, var(--danger) 55%, transparent 55%), var(--hc-hover); box-shadow: inset 0 0 0 1px var(--hc-glass-b); }
+.hc-help-head { display: flex; align-items: center; gap: 8px; padding: 4px 6px 10px; font-size: calc(13px * var(--fs-scale, 1)); }
+.hc-help dl { display: grid; grid-template-columns: auto 1fr; gap: 7px 12px; margin: 0; padding: 0 6px 6px; font-size: calc(12.5px * var(--fs-scale, 1)); align-items: center; }
+.hc-help dt { white-space: nowrap; }
+.hc-help dd { margin: 0; color: var(--text-dim); }
+
+/* ---- bilah aksi objek terpilih (NodeToolbar) ---- */
+.hc-selbar { display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 12px; background: var(--hc-pop); border: 1px solid var(--hc-glass-b); box-shadow: var(--hc-shadow); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.hc-sb-btn { height: 28px; min-width: 28px; padding: 0 6px; border: none; border-radius: 7px; background: none; color: var(--text-dim); display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; font-size: calc(12px * var(--fs-scale, 1)); font-weight: 700; transition: background .15s ease, color .15s ease; }
+.hc-sb-btn:hover { background: var(--hc-hover); color: var(--text); }
+.hc-sb-btn[aria-pressed="true"] { background: var(--hc-on); color: var(--text); }
+.hc-sb-wide { padding: 0 10px; color: var(--text); background: rgba(215,168,110,.2); background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.hc-sb-wide:hover { background: color-mix(in srgb, var(--accent) 32%, transparent); }
+.hc-sb-sep { width: 1px; height: 18px; margin: 0 3px; background: var(--hc-glass-b); }
+.hc-sb-group { display: flex; gap: 1px; }
+.hc-selbar .hc-sw { width: 18px; height: 18px; margin: 0 1px; }
+
+/* ---- node: scene (titik + judul, gaya Beranda lama) ---- */
+.hc-scene { width: 160px; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 7.5px 4px 4px; color: var(--text); cursor: pointer; }
+.hc-scene-dot { width: 11px; height: 11px; flex-shrink: 0; border-radius: 50%; background: #e8e8ec; box-shadow: 0 0 0 4px rgba(255,255,255,.06), 0 0 14px rgba(255,255,255,.35); transition: transform .2s ease, box-shadow .2s ease; }
+.hc-scene-dot.is-draft { background: var(--accent); box-shadow: 0 0 0 4px rgba(215,168,110,.1), 0 0 14px rgba(215,168,110,.45); }
+.hc-scene-dot.is-done { background: var(--success); box-shadow: 0 0 0 4px rgba(76,175,130,.1), 0 0 14px rgba(76,175,130,.45); }
+.hc-scene-label { max-width: 100%; padding: 1px 6px; border-radius: 6px; font-size: calc(11.5px * var(--fs-scale, 1)); font-weight: 600; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 8px rgba(0,0,0,.6); transition: background .15s ease; }
+.hc-scene:hover .hc-scene-dot, .hc-scene.is-current .hc-scene-dot { transform: scale(1.35); }
+.hc-scene.is-sel .hc-scene-dot { outline: 2px solid var(--accent); outline-offset: 3px; }
+.hc-scene.is-sel .hc-scene-label { background: rgba(215,168,110,.22); background: color-mix(in srgb, var(--accent) 24%, transparent); }
+body.light .hc-scene-label { text-shadow: none; }
+body.light .hc-scene-dot { background: #5d5a52; box-shadow: 0 0 0 4px rgba(0,0,0,.05), 0 1px 4px rgba(0,0,0,.2); }
+body.light .hc-scene-dot.is-draft { background: var(--accent); box-shadow: 0 0 0 4px rgba(179,119,62,.12); }
+body.light .hc-scene-dot.is-done { background: var(--success); box-shadow: 0 0 0 4px rgba(76,175,130,.14); }
+/* kartu hover scene */
+.hc-tip { pointer-events: none !important; }
+.hc-tip-card { width: 252px; padding: 10px 12px 9px; border-radius: 12px; background: var(--hc-pop); border: 1px solid var(--hc-glass-b); box-shadow: var(--hc-shadow); color: var(--text); text-align: left; animation: hcPop .14s ease-out; }
+.hc-tip-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.hc-tip-status { flex-shrink: 0; padding: 2px 7px; border-radius: 6px; background: var(--hc-hover); font-size: calc(10.5px * var(--fs-scale, 1)); font-weight: 700; }
+.hc-tip-status.is-draft { color: var(--accent); background: rgba(215,168,110,.14); }
+.hc-tip-status.is-done { color: var(--success); background: rgba(76,175,130,.14); }
+.hc-tip-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: calc(11px * var(--fs-scale, 1)); color: var(--text-dim); }
+.hc-tip-title { margin-bottom: 4px; font-size: calc(13.5px * var(--fs-scale, 1)); font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.hc-tip-snip { margin: 0 0 8px; font-size: calc(12px * var(--fs-scale, 1)); line-height: 1.45; color: var(--text-dim); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.hc-tip-snip.is-empty { font-style: italic; }
+.hc-tip-foot { padding-top: 6px; border-top: 1px solid var(--hc-glass-b); font-size: calc(11px * var(--fs-scale, 1)); color: var(--text-dim); }
+
+/* ---- node: bentuk ---- */
+.hc-shape { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 10px 12px; color: var(--text); text-align: center; font-size: calc(14px * var(--fs-scale, 1)); font-weight: 600; line-height: 1.35; }
+.hc-shape.is-rect, .hc-shape.is-circle { background: rgba(163,168,180,.18); background: color-mix(in srgb, var(--c) 20%, transparent); border: 1.5px solid var(--c); border-radius: 12px; }
+.hc-shape.is-circle { border-radius: 50%; }
+.hc-shape.is-triangle { align-items: flex-end; padding: 0 22% 14%; }
+.hc-shape.is-diamond { padding: 0 24%; }
+.hc-shape-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.hc-shape-svg polygon { fill: rgba(163,168,180,.18); fill: color-mix(in srgb, var(--c) 20%, transparent); stroke: var(--c); stroke-width: 1.5; stroke-linejoin: round; }
+.hc-shape-text { position: relative; max-width: 100%; max-height: 100%; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
+.hc-shape-edit { position: relative; width: 100%; height: 100%; max-height: 100%; padding: 0; border: none; outline: none; resize: none; background: transparent; color: inherit; font: inherit; line-height: inherit; text-align: center; }
+/* ---- node: catatan tempel ---- */
+.hc-note { width: 100%; height: 100%; padding: 14px; border-radius: 4px; background: var(--c); color: #2b2618; font-size: calc(14px * var(--fs-scale, 1)); line-height: 1.45; box-shadow: 0 10px 26px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.4); }
+body.light .hc-note { box-shadow: 0 8px 22px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.5); }
+.hc-note-text { height: 100%; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
+.hc-note .hc-ph { color: rgba(43,38,24,.45); }
+.hc-note-edit { display: block; width: 100%; height: 100%; padding: 0; border: none; outline: none; resize: none; background: transparent; color: inherit; font: inherit; line-height: inherit; }
+/* ---- node: gambar ---- */
+.hc-image { width: 100%; height: 100%; border-radius: 10px; background: var(--hc-hover); box-shadow: 0 10px 26px rgba(0,0,0,.3); }
+.hc-image img { display: block; width: 100%; height: 100%; border-radius: 10px; object-fit: cover; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+body.light .hc-image { box-shadow: 0 8px 22px rgba(0,0,0,.14); }
+/* ---- node: teks bebas (tinggi mengikuti isi) ---- */
+.hc-rf .react-flow__node-text { height: auto !important; }
+.hc-textn { width: 100%; min-height: 1.3em; padding: 2px 4px; border-radius: 4px; color: var(--text); font-size: calc(var(--fz, 24) * 1px * var(--fs-scale, 1)); font-weight: 650; line-height: 1.25; white-space: pre-wrap; overflow-wrap: anywhere; }
+.hc-textn.is-sel { outline: 1.5px solid var(--accent); outline-offset: 3px; }
+.hc-textn .hc-ph { color: var(--text-dim); font-weight: 500; }
+.hc-textn-edit { display: block; width: 100%; min-height: 1.25em; padding: 0; border: none; outline: none; resize: none; overflow: hidden; background: transparent; color: inherit; font: inherit; line-height: inherit; }
+/* ---- node: frame (judul di atas, isi tembus klik) ---- */
+.hc-frame { width: 100%; height: 100%; border: 1.5px solid var(--hc-frame-b); border-radius: 14px; background: var(--hc-frame-bg); }
+.hc-frame.has-c { border-color: color-mix(in srgb, var(--c) 60%, transparent); background: color-mix(in srgb, var(--c) 7%, transparent); }
+.hc-frame-title { position: absolute; left: 2px; top: -28px; height: 24px; max-width: calc(100% / var(--k, 1)); transform: scale(var(--k, 1)); transform-origin: 0 100%; display: flex; align-items: center; padding: 0 6px; border-radius: 6px; color: var(--text-dim); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: all; cursor: move; transition: background .15s ease, color .15s ease; }
+.hc-frame-title:hover { color: var(--text); background: var(--hc-hover); }
+.hc-rf .react-flow__node.selected .hc-frame-title { color: var(--accent); }
+.hc-frame-edge { position: absolute; pointer-events: all; cursor: move; }
+.hc-frame-edge.is-t { left: 0; right: 0; top: calc(-5px * var(--k, 1)); height: calc(10px * var(--k, 1)); }
+.hc-frame-edge.is-b { left: 0; right: 0; bottom: calc(-5px * var(--k, 1)); height: calc(10px * var(--k, 1)); }
+.hc-frame-edge.is-l { top: 0; bottom: 0; left: calc(-5px * var(--k, 1)); width: calc(10px * var(--k, 1)); }
+.hc-frame-edge.is-r { top: 0; bottom: 0; right: calc(-5px * var(--k, 1)); width: calc(10px * var(--k, 1)); }
+.hc-frame-edit { width: 220px; height: 24px; padding: 0 6px; border: 1px solid var(--accent); border-radius: 6px; outline: none; background: var(--hc-pop); color: var(--text); font: inherit; }
+.hc-rf .react-flow__node-frame .react-flow__resize-control { pointer-events: all; }
+
+/* ---- ubah ukuran ---- */
+.hc-rf .react-flow__resize-control.line.hc-rz-line, .hc-rf .react-flow__resize-control.line.hc-rz-w { border-color: var(--accent); }
+.hc-rf .react-flow__resize-control.handle.hc-rz-handle { width: 9px; height: 9px; border-radius: 2px; background: #fff; border: 1.5px solid var(--accent); }
+.hc-rf .react-flow__resize-control.line.hc-rz-w { width: 9px; border-left-width: 0; background: transparent; }
+.hc-rf .react-flow__resize-control.line.hc-rz-w::after { content: ""; position: absolute; top: 2px; bottom: 2px; left: 3px; width: 3px; border-radius: 2px; background: var(--accent); }
+
+/* ---- pegangan penghubung: menutupi seluruh objek, hanya aktif di alat Penghubung ---- */
+.hc-rf .react-flow__handle.hc-handle { top: 0; left: 0; right: 0; bottom: 0; width: auto; height: auto; min-width: 0; min-height: 0; transform: none; border: none; border-radius: 10px; background: transparent; z-index: 0; }
+.hc-rf .react-flow__handle.hc-handle-frame { top: -28px; bottom: auto; right: auto; width: min(calc(100% / var(--k, 1)), 240px); height: 24px; border-radius: 6px; transform: scale(var(--k, 1)); transform-origin: 0 100%; }
+.hc-rf.is-connect .hc-handle { z-index: 4; cursor: crosshair; }
+.hc-rf.is-connect .react-flow__node:hover .hc-handle, .hc-rf .hc-handle.connectingfrom, .hc-rf .hc-handle.connectingto { box-shadow: 0 0 0 2px var(--accent); }
+.hc-rf .hc-handle.connectingto.valid { box-shadow: 0 0 0 3px var(--accent), 0 0 18px rgba(215,168,110,.45); }
+
+/* ---- garis ---- */
+.hc-rf .react-flow__edge-seq .react-flow__edge-path { stroke: var(--hc-seq); stroke-width: 1; stroke-dasharray: 3 5; }
+.hc-rf .react-flow__edge-link .react-flow__edge-path { stroke: var(--hc-edge); stroke-width: 1.6; }
+.hc-rf .hc-arrow { fill: var(--hc-edge); pointer-events: none; }
+.hc-rf .react-flow__edge-link:hover .react-flow__edge-path { stroke: var(--text); }
+.hc-rf .react-flow__edge-link:hover .hc-arrow { fill: var(--text); }
+.hc-rf .react-flow__edge-link.selected .react-flow__edge-path { stroke: var(--accent); stroke-width: 2.2; }
+.hc-rf .react-flow__edge-link.selected .hc-arrow { fill: var(--accent); }
+.hc-elabel { position: absolute; max-width: 240px; padding: 3px 9px; border-radius: 8px; background: var(--hc-pop); border: 1px solid var(--hc-glass-b); box-shadow: 0 4px 12px rgba(0,0,0,.2); color: var(--text); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: all; cursor: default; }
+.hc-elabel.is-sel { border-color: var(--accent); }
+.hc-elabel.is-edit { padding: 0; overflow: visible; border: none; background: none; box-shadow: none; }
+.hc-elabel-edit { width: 190px; height: 28px; padding: 0 9px; border: 1px solid var(--accent); border-radius: 8px; outline: none; background: var(--hc-pop); color: var(--text); font: inherit; }
+
+/* ---- peta mini ---- */
+.hc-rf .react-flow__minimap.hc-minimap { margin: 0 12px 46px 0; overflow: hidden; border-radius: 10px; border: 1px solid var(--hc-glass-b); background: var(--hc-pop) !important; box-shadow: var(--hc-shadow); }
+.hc-minimap .react-flow__minimap-mask { fill: rgba(0,0,0,.42); }
+body.light .hc-minimap .react-flow__minimap-mask { fill: rgba(0,0,0,.08); }
+/* warna isi dari nodeColor (home-canvas.js); frame = garis tepi saja */
+.hc-minimap .hc-mm-frame { stroke: var(--text-dim); stroke-width: 6; }
+.hc-minimap .hc-mm-scene { fill: var(--accent); }
+.hc-minimap .hc-mm-text { fill: var(--text-dim); }
+
+/* ---- alat taruh: kotak bayangan saat menyeret ---- */
+.hc-place { position: absolute; inset: 0; z-index: 5; cursor: crosshair; touch-action: none; }
+.hc-ghost { position: absolute; border: 1.5px dashed var(--accent); border-radius: 8px; background: var(--hc-tint); pointer-events: none; }
+.hc-ghost.is-note { border-radius: 4px; background: rgba(246,217,122,.22); }
+.hc-ghost.is-circle { border-radius: 50%; }
+.hc-ghost.is-frame { border-style: solid; border-radius: 14px; background: rgba(255,255,255,.03); }
+
+/* ---- HP (<= 700 px): panel menyisakan bar tab bawah, bilah alat menggulir ke samping ---- */
+@media (max-width: 700px) {
+  .hc-panel { inset: 2px 8px 66px 8px; border-radius: 12px; }
+  .hc-panel.is-max { inset: 0 0 58px 0; }
+  .hc-pill, .hc-zoom, .hc-board-sub { display: none; }
+  .hc-board-btn { max-width: 52vw; }
+  .hc-side { top: 50px; right: 8px; }
+  .hc-tools-wrap { left: 6px; right: 6px; bottom: 8px; }
+  .hc-tool { height: 38px; }
+  .hc-t-big { width: 46px; }
+  .hc-note-prev, .hc-img-prev { width: 36px; height: 28px; }
+  .hc-tsep { margin: 0 2px; }
+  .hc-hint { top: 50px; max-width: calc(100% - 64px); white-space: normal; text-align: center; }
+  .hc-toast { bottom: 60px; }
+  .hc-rf .react-flow__attribution { display: none; }
+  .hc-rf .react-flow__minimap.hc-minimap { margin: 0 8px 62px 0; transform: scale(.78); transform-origin: bottom right; }
+  #editorView[data-tab="home"] .proj-float-tools { display: none; }   /* preview & tema ada di menu "…" */
+}
+@media (hover: none) {
+  .hc-sbtn[data-act="zoomin"], .hc-sbtn[data-act="zoomout"] { display: none; }   /* layar sentuh: cubit untuk zoom */
+}
+
+/* ---- hemat performa: tanpa blur, permukaan solid ---- */
+body.perf-boost .hc-tools, body.perf-boost .hc-side, body.perf-boost .hc-pop, body.perf-boost .hc-selbar, body.perf-boost .hc-tip-card,
+body.perf-boost .hc-board-btn, body.perf-boost .hc-pill, body.perf-boost .hc-hint, body.perf-boost .hc-elabel { background: var(--bg-panel); }
+body.perf-boost .hc-panel { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .hc-panel, .hc-panel .hc-tool, .hc-panel .hc-note-prev, .hc-panel .hc-img-prev, .hc-panel .hc-shape-ic, .hc-hint, .hc-toast,
+  .hc-scene-dot, .hc-board-btn .ti, .hc-sw { transition: none !important; }
+  .hc-pop, .hc-tip-card { animation: none; }
+}
