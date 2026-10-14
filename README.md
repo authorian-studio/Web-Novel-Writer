@@ -2,6 +2,14 @@
 
 ## Riwayat perubahan terbaru (v0.9.8) — paling baru di atas
 
+- **Map 2D kini tampil seperti Map 3D:** warna & pola tiap bioma memakai palet yang sama dengan 3D (rumput, ladang
+  berpagar semak, retakan, genangan rawa, bukit pasir, tundra berawan, gunung berbatu berkaki rumput, salju di puncak
+  tertinggi), pencahayaan bukit dari arah matahari yang sama, laut dengan bercak awan terang, cincin air dangkal
+  toska, buih putih & garis tinta pantai. **Pohon & puncak gunung** kini memakai model kartun yang sama dengan 3D
+  (digambar sebagai sprite bergaris tepi, sedikit dari atas) di posisi yang sama. Contoh warna di panel kuas juga
+  dibuat dari renderer 2D yang baru. Menggambar ulang malah sedikit lebih cepat; format data peta tidak berubah.
+- **Perbaikan Map 3D:** bintik-bintik cyan di bioma gurun hilang (warna bukit pasir yang terlalu terang tidak lagi
+  "melingkar").
 - **Ganti background dashboard (Pengaturan Akun → Tampilan):** pilih gambar sendiri ("Ganti background…" atau
   seret-lepas gambar ke baris Background) untuk menggantikan foto ngarai di dashboard. Tampilannya tetap seperti
   sebelumnya: di-blur, dengan vignette & dot-grid di atasnya. Ada slider **Blur** (0–30 px, bawaan 6 px) dan **Redup**
