@@ -1,6 +1,23 @@
-# Novelist Web — v0.9.9
+# Novelist Web — v0.9.10
 
-## Riwayat perubahan terbaru (v0.9.9) — paling baru di atas
+## Riwayat perubahan terbaru (v0.9.10) — paling baru di atas
+
+- **Simpan di perangkat dulu + sinkron dengan deteksi konflik** (`novelist-sync.js`, dimuat setelah `app.js`; file yang
+  sama dipakai aplikasi Android, repo Novelist-Android). Tidak ada kode `app.js` yang diubah — fungsi simpan/muat Drive
+  dibungkus dari file itu.
+  - Setiap simpan langsung ditulis ke IndexedDB `novelist-sync` (per akun Google), baru dikirim ke Drive. Koneksi putus /
+    sesi Google habis: tulisan tetap aman di browser dan dikirim otomatis saat online / setelah login lagi (indikator
+    sinkron di dashboard bisa diklik untuk sinkron sekarang atau login ulang).
+  - Sebelum mengunggah, `modifiedTime` file di Drive dicek. Diubah dari perangkat lain (mis. HP) sementara di sini tidak
+    ada perubahan → versi Drive langsung dimuat (tetap di tab yang sama). Dua-duanya berubah → dialog **Versi project
+    berbeda**: *Simpan keduanya* / *Pakai versi web* / *Pakai versi Drive*; versi yang tidak dipakai disimpan dulu ke
+    folder backup Drive. Tab yang dibiarkan terbuka tidak lagi menimpa tulisan dari perangkat lain.
+  - Project yang terbuka dicek ke Drive saat tab kembali aktif dan tiap 2 menit; dashboard ikut menampilkan project baru
+    / menghapus project yang dipindah ke Trash dari perangkat lain.
+  - Mengetik di **mode fokus** kini ikut autosave (sebelumnya baru tersimpan saat mode fokus ditutup).
+  - Hapus akun ikut menghapus IndexedDB `novelist-sync`.
+
+### v0.9.9
 
 - **Quill — fitur menulis cerita di dalam tab Write.** Di atas tab Write ada pilihan **Scene | Quill** (diingat per
   project); "Scene" tetap editor lama.
