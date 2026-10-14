@@ -191,6 +191,7 @@
     updateScale(editor.getPxPerCell());
     dirty3d = true;
     if (mode === "3d") activate3d();
+    if (ctx.onOpen) ctx.onOpen(cur.map.id);   // app.js: riwayat sidebar tab
   }
   function newMap() {
     const map = C.createMap(nextTitle()), ser = C.serialize(map);
@@ -922,6 +923,12 @@
       clearTimeout(refresh3dTimer);
       if (view3d) view3d.setActive(false);
       closeLayers();
+    },
+    // buka peta tertentu (mis. dari riwayat sidebar tab); dipanggil setelah show()
+    open(id) {
+      if (!ctx || !shown || !findSer(id) || (cur && cur.map.id === id)) return;
+      if ($("mpSearch").value) { $("mpSearch").value = ""; }
+      openMap(id);
     },
     // tulis data peta terbaru ke project (biasanya sudah sinkron; ini jaring pengaman sebelum simpan)
     flush() {

@@ -544,7 +544,7 @@ function openProject(id) {
   currentOrgItemId = null;
   renderOrganizeDetail();
   markSaved();
-  switchTab("home");
+  restoreProjectTabs(p);   // TAB PROJECT: tab terbuka + tab aktif project ini (bawaan: Beranda)
   el("dashboardView").classList.add("hidden");
   el("editorView").classList.remove("hidden");
   startProjClock();
@@ -615,18 +615,718 @@ function flushCurrentEdits() {
   if (window.NovelQuill) window.NovelQuill.flush();   // Quill: isi editor chapter
 }
 
+// ================= TAB PROJECT =================
+// Bar atas hanya berisi tab yang TERBUKA: tab aktif = pill berlabel, lainnya ikon bulat; × (hover/fokus) atau klik
+// tengah menutup, seret untuk mengurutkan, "+" membuka jendela "Tambah tab". Sidebar tab (kiri) berisi tab terbuka +
+// riwayat (tab & dokumen yang dibuka: scene, item Organize, timeline, peta, cerita Quill).
+// Disimpan per project DI PERANGKAT INI (status tampilan, tidak memicu simpan ke Drive):
+//   novelist_tabs_<id>    = { open: ["home", "write", ...], active: "write" | null }   (null = semua tab ditutup)
+//   novelist_tabhist_<id> = [{ k, tab, doc, kind, title, t }]  (terbaru di depan, maks. 30)
+//   novelist_tabsidebar   = true/false  (sidebar menempel di desktop)
+// "quill" = panel Write dalam mode Quill (tab sendiri). switchTab(x) dari mana pun (Timeline "buka scene", alat Map di
+// Quill, Home, riwayat, ...) otomatis membuka tab x kalau sedang tertutup (disisipkan setelah tab aktif).
+const TAB_DEFS = [
+  { id: "home", panel: "home", name: "Beranda", icon: tiIcon("home"), desc: "Peta scene project — klik titik untuk menulis" },
+  { id: "write", panel: "write", name: "Tulis", icon: tiIcon("pencil"), desc: "Editor scene: bab & adegan bertingkat" },
+  { id: "quill", panel: "write", name: "Quill", icon: tiIcon("feather"), desc: "Tulis cerita bergaya buku, lalu terbitkan" },
+  { id: "organize", panel: "organize", name: "Organize", icon: tiIcon("folders"), desc: "Karakter, lokasi & catatan dunia cerita" },
+  { id: "timeline", panel: "timeline", name: "Timeline", icon: tiIcon("timeline"), desc: "Garis waktu peristiwa, terhubung ke scene" },
+  { id: "map", panel: "map", name: "Map", icon: tiIcon("map"), desc: "Lukis peta dunia & lihat sebagai diorama 3D" },
+  { id: "plot", panel: "plot", name: "Plot", icon: tiIcon("git-branch"), desc: "Susun alur & konflik cerita (segera hadir)" },
+  { id: "schedule", panel: "schedule", name: "Schedule", icon: tiIcon("calendar-time"), desc: "Jadwal & target menulis (segera hadir)" },
+  { id: "tools", panel: "tools", name: "Tools", icon: tiIcon("tool"), desc: "Alat bantu menulis (segera hadir)" },
+];
+const TAB_BY_ID = Object.fromEntries(TAB_DEFS.map((d) => [d.id, d]));
+const TAB_PANELS = ["home", "write", "organize", "timeline", "map", "plot", "schedule", "tools"];
+const TAB_DEFAULT = ["home", "write", "organize"];
+const TAB_QUICK = ["home", "write", "quill", "timeline", "map"];          // baris ikon bawah sidebar
+const TAB_EMPTY_MAIN = ["home", "write", "quill", "organize", "timeline"]; // chip utama saat semua tab ditutup
+const TAB_HIST_MAX = 30;
+const TAB_DOC_ICONS = { scene: tiIcon("file-text"), characters: tiIcon("user"), locations: tiIcon("map-pin"), notes: tiIcon("note"), timeline: tiIcon("timeline"), map: tiIcon("map"), story: tiIcon("book-2") };
+const tabNarrowMq = window.matchMedia("(max-width: 900px)");
+const tabReduceMq = window.matchMedia("(prefers-reduced-motion: reduce)");
+let projTabs = { open: [], active: null };   // tab project yang sedang dibuka
+let tabHist = [];                            // riwayat project ini
+let tabLastDoc = {};                         // dokumen terakhir per tab (timeline/map/quill) untuk label & riwayat
+let tabPendingDoc = null;                    // { tab, id }: timeline/peta dari riwayat, dibuka setelah modulnya tampil
+let tabVisitPending = null, tabVisitTimer = null;
+let tabSbDocked = false, tabSbDrawer = false; // sidebar: menempel (desktop, diingat) / laci (<= 900 px)
+let tabHistRows = [];                        // baris riwayat yang sedang tampil (indeks = data-i)
+let quillNav = null, quillScreen = null;     // buka cerita Quill dari riwayat (lewat tombol di layar Quill)
+let teMore = false;                          // layar kosong: chip "Lainnya" dibuka
+
+function tabStoreGet(key) { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (e) { return null; } }
+function tabStoreSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* storage diblokir: cukup di memori */ } }
+function saveProjectTabs() { if (currentProjectId) tabStoreSet("novelist_tabs_" + currentProjectId, { open: projTabs.open, active: projTabs.active }); }
+function saveTabHist() { if (currentProjectId) tabStoreSet("novelist_tabhist_" + currentProjectId, tabHist); }
+
+// dipanggil openProject: pulihkan tab project ini (bawaan: Beranda, Tulis, Organize) lalu tampilkan tab aktifnya
+function restoreProjectTabs(p) {
+  const s = tabStoreGet("novelist_tabs_" + p.id);
+  let open = s && Array.isArray(s.open) ? s.open.filter((t, i, a) => TAB_BY_ID[t] && a.indexOf(t) === i) : null;
+  if (!open) {
+    open = TAB_DEFAULT.slice();
+    if (writeMode(p) === "quill") open.splice(2, 0, "quill");   // project yang dulu ditulis di mode Quill: tab Quill ikut terbuka
+  }
+  projTabs = { open, active: s && open.includes(s.active) ? s.active : (open[0] || null) };
+  const h = tabStoreGet("novelist_tabhist_" + p.id);
+  tabHist = Array.isArray(h) ? h.filter((x) => x && TAB_BY_ID[x.tab] && typeof x.k === "string" && typeof x.t === "number").slice(0, TAB_HIST_MAX) : [];
+  tabLastDoc = {}; tabPendingDoc = null; quillNav = null; quillScreen = null; teMore = false;
+  el("tsbSearch").value = ""; el("teSearch").value = "";
+  const v = el("editorView");
+  v.style.setProperty("--ptab-tint", p.colorA || "#d7a86e");   // warna pill tab aktif mengikuti warna project
+  el("tabPicker").style.setProperty("--ptab-tint", p.colorA || "#d7a86e");
+  v.classList.add("tsb-no-anim");                               // ganti project: tanpa animasi buka sidebar/tab
+  el("tabStrip").innerHTML = "";
+  tabSbDrawer = false;
+  applyTabSidebar();
+  if (projTabs.active) switchTab(projTabs.active);
+  else { saveProjectTabs(); showTabPanel(null); renderProjectTabs(); }
+  requestAnimationFrame(() => requestAnimationFrame(() => v.classList.remove("tsb-no-anim")));
+}
+
 function switchTab(tab) {
-  if (tab === "home") { flushCurrentEdits(); renderProjectHome(); }
-  if (tab !== "write" && window.NovelQuill) window.NovelQuill.hide();   // Quill: simpan + bersihkan sebelum tab lain tampil
-  document.querySelectorAll(".rail-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
-  ["home", "write", "organize", "timeline", "map", "plot", "schedule", "tools"].forEach((t) => el("tab" + capitalize(t)).classList.toggle("hidden", t !== tab));
-  el("editorView").dataset.tab = tab;
-  if (tab === "write") applyWriteMode();   // Quill: tampilkan mode Scene / Quill milik project ini
+  if (!TAB_BY_ID[tab] || !currentProjectId) return;
+  if (!projTabs.open.includes(tab)) insertProjectTab(tab, false);   // tab tertutup dipanggil fitur lain -> buka otomatis
+  const same = projTabs.active === tab && el("editorView").dataset.ptab === tab;
+  projTabs.active = tab;
+  saveProjectTabs();
+  if (same) { consumeTabPendingDoc(tab); stepQuillNav(); }   // tab yang sama: panel tidak dibangun ulang
+  else showTabPanel(tab);
+  renderProjectTabs();
+  noteTabVisit(tab);
+}
+function insertProjectTab(tab, atEnd) {
+  const i = projTabs.open.indexOf(projTabs.active);
+  if (atEnd || i < 0) projTabs.open.push(tab); else projTabs.open.splice(i + 1, 0, tab);
+}
+// tampilkan panel milik tab (null = semua ditutup -> layar kosong). Isi lama switchTab().
+function showTabPanel(tab) {
+  const panel = tab ? TAB_BY_ID[tab].panel : null;
+  if (panel === "home") { flushCurrentEdits(); renderProjectHome(); }
+  if (panel === "write") setWriteModeQuiet(tab === "quill" ? "quill" : "scene");
+  else if (window.NovelQuill) window.NovelQuill.hide();   // Quill: simpan + bersihkan sebelum tab lain tampil
+  TAB_PANELS.forEach((t) => el("tab" + capitalize(t)).classList.toggle("hidden", t !== panel));
+  el("tabEmpty").classList.toggle("hidden", !!panel);
+  el("editorView").dataset.tab = panel || "empty";
+  el("editorView").dataset.ptab = tab || "";
+  if (panel === "write") applyWriteMode();   // Quill: tampilkan mode Scene / Quill sesuai tabnya
   updateSceneDrawerVisibility();
-  muteTimelineKeys(tab !== "timeline");
-  if (tab !== "map" && window.NovelMap) window.NovelMap.hide();   // hentikan render loop 3D
-  if (tab === "timeline") openTimelineTab();
-  if (tab === "map") openMapTab();
+  muteTimelineKeys(panel !== "timeline");
+  if (panel !== "map" && window.NovelMap) window.NovelMap.hide();   // hentikan render loop 3D
+  if (panel === "timeline") openTimelineTab();
+  if (panel === "map") openMapTab();
+  if (!panel) renderTabEmpty();
+}
+// mode Scene/Quill kini mengikuti tab (Tulis / Quill) — tidak menandai project berubah (bukan isi cerita)
+function setWriteModeQuiet(mode) {
+  const p = getProject(currentProjectId);
+  if (!p || writeMode(p) === mode) return;
+  flushCurrentEdits();
+  if (mode === "quill" && !p.data.quill) p.data.quill = { mode: "quill", stories: [] };
+  if (p.data.quill) p.data.quill.mode = mode;
+}
+function closeProjectTab(tab) {
+  const i = projTabs.open.indexOf(tab);
+  if (i < 0) return;
+  projTabs.open.splice(i, 1);
+  if (projTabs.active !== tab) { saveProjectTabs(); renderProjectTabs(); return; }
+  const next = projTabs.open[i] || projTabs.open[i - 1] || null;   // tab aktif ditutup -> tetangga kanan, lalu kiri
+  if (next) { switchTab(next); return; }
+  projTabs.active = null;
+  saveProjectTabs();
+  showTabPanel(null);
+  renderProjectTabs();
+}
+function moveProjectTab(tab, delta) {
+  const i = projTabs.open.indexOf(tab), j = i + delta;
+  if (i < 0 || j < 0 || j >= projTabs.open.length) return;
+  projTabs.open.splice(i, 1);
+  projTabs.open.splice(j, 0, tab);
+  saveProjectTabs();
+  renderProjectTabs();
+}
+function renderProjectTabs() {
+  renderTabStrip();
+  if (tabSidebarVisible()) renderTabSidebar();
+}
+
+// ---- bar tab (atas; bar bawah di HP) ----
+function buildTabNode(id) {
+  const d = TAB_BY_ID[id];
+  const n = document.createElement("div");
+  n.className = "ptab";
+  n.dataset.tab = id;
+  n.innerHTML = `<button type="button" class="ptab-btn" role="tab" id="ptab-${id}" aria-controls="tabContent" aria-keyshortcuts="Delete">` +
+    `<span class="ptab-ic">${tiPx(d.icon, 17)}</span><span class="ptab-lw"><span class="ptab-label"><span class="ptab-text">${d.name}</span></span></span></button>` +
+    `<button type="button" class="ptab-x" tabindex="-1" aria-hidden="true" title="Tutup (klik tengah juga bisa)">${tiPx(tiIcon("x"), 12)}</button>`;
+  return n;
+}
+function renderTabStrip() {
+  const strip = el("tabStrip");
+  const anim = !tabReduceMq.matches && !el("editorView").classList.contains("tsb-no-anim");
+  const nodes = new Map();
+  strip.querySelectorAll(".ptab").forEach((n) => { if (!n.classList.contains("is-leaving")) nodes.set(n.dataset.tab, n); });
+  nodes.forEach((n, id) => { if (!projTabs.open.includes(id)) leaveTabNode(n, anim); });
+  let prev = null;
+  projTabs.open.forEach((id) => {
+    let n = nodes.get(id);
+    const fresh = !n;
+    if (fresh) n = buildTabNode(id);
+    const want = prev ? prev.nextSibling : strip.firstChild;
+    if (n !== want) strip.insertBefore(n, want);
+    const on = id === projTabs.active, b = n.firstElementChild;
+    n.classList.toggle("is-active", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+    b.tabIndex = on ? 0 : -1;
+    if (on) delete b.dataset.tip; else b.dataset.tip = TAB_BY_ID[id].name;
+    if (fresh && anim) enterTabNode(n);
+    prev = n;
+  });
+  if (!projTabs.active) { const f = strip.querySelector(".ptab:not(.is-leaving) .ptab-btn"); if (f) f.tabIndex = 0; }
+  el("btnAddTab").classList.toggle("is-alone", !projTabs.open.length);
+  revealActiveTab();
+  setTimeout(revealActiveTab, 340);   // setelah pill aktif selesai melebar
+}
+// tab baru: melebar dari 0 sampai lebar aslinya; tab ditutup: menyusut lalu dilepas
+function enterTabNode(n) {
+  const w = n.scrollWidth;
+  n.classList.add("is-entering");
+  n.style.maxWidth = "0px";
+  void n.offsetWidth;
+  n.classList.remove("is-entering");
+  n.style.maxWidth = w + 40 + "px";
+  setTimeout(() => { n.style.maxWidth = ""; }, 360);
+}
+function leaveTabNode(n, anim) {
+  if (!anim) { n.remove(); return; }
+  n.style.maxWidth = n.offsetWidth + "px";
+  void n.offsetWidth;
+  n.classList.add("is-leaving");
+  n.setAttribute("aria-hidden", "true");
+  n.inert = true;
+  n.style.maxWidth = "0px";
+  setTimeout(() => n.remove(), 300);
+}
+// tab aktif selalu terlihat walau bar tab digulir (banyak tab / layar sempit) + bayangan tepi saat bisa digulir
+function revealActiveTab() {
+  const strip = el("tabStrip");
+  const a = strip.querySelector(".ptab.is-active");
+  if (a && strip.scrollWidth > strip.clientWidth + 1) {
+    const l = a.offsetLeft, r = l + a.offsetWidth, sl = strip.scrollLeft, w = strip.clientWidth;
+    if (l < sl + 8) strip.scrollTo({ left: Math.max(0, l - 8), behavior: tabReduceMq.matches ? "auto" : "smooth" });
+    else if (r > sl + w - 8) strip.scrollTo({ left: r - w + 8, behavior: tabReduceMq.matches ? "auto" : "smooth" });
+  }
+  updateTabStripFade();
+}
+function updateTabStripFade() {
+  const s = el("tabStrip");
+  s.classList.toggle("fade-l", s.scrollLeft > 2);
+  s.classList.toggle("fade-r", s.scrollLeft + s.clientWidth < s.scrollWidth - 2);
+}
+
+// ---- seret untuk mengurutkan (mouse/pen; sentuhan dipakai untuk menggulir bar tab). axis "x" | "y" ----
+function makeTabSortable(container, itemSel, axis, onDrop, enabled) {
+  const X = axis === "x", T = X ? "translateX" : "translateY";
+  const pos = (e) => (X ? e.clientX : e.clientY);
+  const items = () => [...container.querySelectorAll(itemSel)].filter((n) => !n.classList.contains("is-leaving"));
+  let d = null;
+  container.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || e.pointerType === "touch" || (enabled && !enabled())) return;
+    const item = e.target.closest(itemSel);
+    if (!item || item.classList.contains("is-leaving") || e.target.closest(".ptab-x, .tsb-row-x")) return;
+    d = { item, id: e.pointerId, start: pos(e), on: false, grab: 0, tx: 0, order0: items().map((n) => n.dataset.tab) };
+  });
+  container.addEventListener("pointermove", (e) => {
+    if (!d || e.pointerId !== d.id) return;
+    if (!d.on) {
+      if (Math.abs(pos(e) - d.start) < 6) return;
+      const r = d.item.getBoundingClientRect();
+      d.on = true;
+      d.grab = d.start - (X ? r.left : r.top);
+      d.item.classList.add("is-dragging");
+      container.classList.add("is-sorting");
+      try { container.setPointerCapture(e.pointerId); } catch (err) { /* abaikan */ }
+      hideTabTip();
+    }
+    e.preventDefault();
+    const place = () => {
+      const r = d.item.getBoundingClientRect();
+      d.tx = pos(e) - d.grab - ((X ? r.left : r.top) - d.tx);
+      d.item.style.transform = `${T}(${d.tx}px)`;
+      return r;
+    };
+    const r = place();
+    const center = pos(e) - d.grab + (X ? r.width : r.height) / 2;
+    const sibs = items().filter((n) => n !== d.item);
+    const before = sibs.find((s) => { const sr = s.getBoundingClientRect(); return center < (X ? sr.left + sr.width / 2 : sr.top + sr.height / 2); }) || null;
+    const nextNow = items()[items().indexOf(d.item) + 1] || null;
+    if (before === nextNow) return;
+    const old = new Map(sibs.map((s) => [s, s.getBoundingClientRect()]));
+    if (before) container.insertBefore(d.item, before);
+    else if (sibs.length) container.insertBefore(d.item, sibs[sibs.length - 1].nextSibling);
+    place();
+    if (!tabReduceMq.matches) sibs.forEach((s) => {   // FLIP: tetangga meluncur ke tempat barunya
+      const a = old.get(s), b = s.getBoundingClientRect(), dd = X ? a.left - b.left : a.top - b.top;
+      if (Math.abs(dd) > 0.5) s.animate([{ transform: `${T}(${dd}px)` }, { transform: "none" }], { duration: 170, easing: "cubic-bezier(.2,.8,.2,1)" });
+    });
+  });
+  const end = (e) => {
+    if (!d || e.pointerId !== d.id) return;
+    const was = d;
+    d = null;
+    if (!was.on) return;
+    container.classList.remove("is-sorting");
+    was.item.classList.remove("is-dragging");
+    was.item.style.transform = "";
+    if (was.tx && !tabReduceMq.matches) was.item.animate([{ transform: `${T}(${was.tx}px)` }, { transform: "none" }], { duration: 180, easing: "cubic-bezier(.2,.8,.2,1)" });
+    container.dataset.dragged = "1";   // klik setelah seret tidak dihitung
+    setTimeout(() => { delete container.dataset.dragged; }, 0);
+    const order = items().map((n) => n.dataset.tab);
+    if (order.join() !== was.order0.join()) onDrop(order);
+  };
+  container.addEventListener("pointerup", end);
+  container.addEventListener("pointercancel", end);
+}
+
+// ---- tooltip kecil untuk tombol ber-data-tip (tab bulat, +, sidebar). Satu elemen, mengambang di #editorView ----
+let tabTipEl = null, tabTipFor = null;
+function showTabTip(t) {
+  const v = el("editorView");
+  if (!tabTipEl) { tabTipEl = document.createElement("div"); tabTipEl.className = "ptab-tip"; tabTipEl.setAttribute("aria-hidden", "true"); v.appendChild(tabTipEl); }
+  tabTipFor = t;
+  tabTipEl.textContent = t.dataset.tip;
+  const r = t.getBoundingClientRect(), vr = v.getBoundingClientRect();
+  const w = tabTipEl.offsetWidth, h = tabTipEl.offsetHeight;
+  const up = t.dataset.tipPos === "top" || r.bottom + h + 12 > vr.bottom;
+  const top = up ? r.top - vr.top - h - 8 : r.bottom - vr.top + 8;
+  const left = Math.max(6, Math.min(vr.width - w - 6, r.left - vr.left + r.width / 2 - w / 2));
+  tabTipEl.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
+  tabTipEl.classList.add("is-on");
+}
+function hideTabTip() { tabTipFor = null; if (tabTipEl) tabTipEl.classList.remove("is-on"); }
+
+// ---- jendela "Tambah tab" ----
+let tpItems = [], tpIndex = 0, tpPrevFocus = null, tpHideTimer = null;
+function openTabPicker(query) {
+  if (!currentProjectId) return;
+  if (tabSbDrawer) toggleTabSidebar(false);
+  hideTabTip();
+  tpPrevFocus = document.activeElement;
+  clearTimeout(tpHideTimer);
+  const o = el("tabPicker");
+  el("tpSearch").value = query || "";
+  o.classList.remove("hidden");
+  el("btnAddTab").setAttribute("aria-expanded", "true");
+  renderTabPicker(true);
+  void o.offsetWidth;
+  o.classList.add("is-open");
+  el("tpSearch").focus();
+  if (window.NovelScroll && typeof window.NovelScroll.attach === "function" && !el("tpGrid").dataset.scrollAttached) {
+    try { window.NovelScroll.attach(el("tpGrid")); el("tpGrid").dataset.scrollAttached = "1"; } catch (e) { /* opsional */ }
+  }
+  document.addEventListener("keydown", tabPickerKeys, true);
+}
+function closeTabPicker(restoreFocus = true) {
+  const o = el("tabPicker");
+  if (o.classList.contains("hidden")) return;
+  o.classList.remove("is-open");
+  document.removeEventListener("keydown", tabPickerKeys, true);
+  el("btnAddTab").setAttribute("aria-expanded", "false");
+  if (tabReduceMq.matches) o.classList.add("hidden");
+  else tpHideTimer = setTimeout(() => o.classList.add("hidden"), 200);
+  if (restoreFocus && tpPrevFocus && tpPrevFocus.isConnected) tpPrevFocus.focus();
+}
+function isTabPickerOpen() { return !el("tabPicker").classList.contains("hidden") && el("tabPicker").classList.contains("is-open"); }
+function renderTabPicker(reset) {
+  const q = el("tpSearch").value.trim().toLowerCase();
+  tpItems = TAB_DEFS.filter((d) => !q || (d.name + " " + d.desc + " " + d.id).toLowerCase().includes(q));
+  if (reset || tpIndex >= tpItems.length) tpIndex = 0;
+  el("tpGrid").innerHTML = tpItems.map((d, i) => {
+    const isOpen = projTabs.open.includes(d.id), on = i === tpIndex;
+    return `<div class="tp-card${on ? " is-active" : ""}${isOpen ? " is-open" : ""}" role="option" id="tp-opt-${d.id}" data-tab="${d.id}" aria-selected="${on}">` +
+      `<span class="tp-card-ic">${tiPx(d.icon, 20)}</span>` +
+      `<span class="tp-card-text"><span class="tp-card-name">${d.name}${isOpen ? '<span class="tp-badge">Terbuka</span>' : ""}</span><span class="tp-card-desc">${d.desc}</span></span></div>`;
+  }).join("");
+  el("tpEmpty").classList.toggle("hidden", tpItems.length > 0);
+  if (tpItems.length) el("tpSearch").setAttribute("aria-activedescendant", "tp-opt-" + tpItems[tpIndex].id);
+  else el("tpSearch").removeAttribute("aria-activedescendant");
+}
+function setTabPickerIndex(i) {
+  if (!tpItems.length) return;
+  tpIndex = Math.max(0, Math.min(tpItems.length - 1, i));
+  el("tpGrid").querySelectorAll(".tp-card").forEach((c, k) => { c.classList.toggle("is-active", k === tpIndex); c.setAttribute("aria-selected", k === tpIndex ? "true" : "false"); });
+  el("tpSearch").setAttribute("aria-activedescendant", "tp-opt-" + tpItems[tpIndex].id);
+  const c = el("tpGrid").children[tpIndex];
+  if (c) c.scrollIntoView({ block: "nearest" });
+}
+function tabPickerCols() {
+  const cards = el("tpGrid").children;
+  if (!cards.length) return 1;
+  let n = 0;
+  for (const c of cards) { if (c.offsetTop !== cards[0].offsetTop) break; n++; }
+  return Math.max(1, n);
+}
+function chooseTabPicker(id) {
+  if (!TAB_BY_ID[id]) return;
+  closeTabPicker(false);
+  if (!projTabs.open.includes(id)) insertProjectTab(id, true);   // dari "+": tab baru di ujung kanan
+  switchTab(id);
+  const b = el("ptab-" + id);
+  if (b) b.focus({ preventScroll: true });
+}
+function tabPickerKeys(e) {
+  if (!isTabPickerOpen()) return;
+  const k = e.key;
+  if (k === "Escape") { e.preventDefault(); e.stopPropagation(); closeTabPicker(); return; }
+  if (k === "Tab") {   // jebakan fokus: kolom cari <-> tombol tutup
+    const f = [el("tpSearch"), el("tpClose")];
+    const i = f.indexOf(document.activeElement);
+    e.preventDefault();
+    f[(i + (e.shiftKey ? f.length - 1 : 1) + f.length) % f.length].focus();
+    return;
+  }
+  if (document.activeElement !== el("tpSearch")) return;
+  const empty = !el("tpSearch").value;
+  if (k === "ArrowDown") { e.preventDefault(); setTabPickerIndex(tpIndex + tabPickerCols()); }
+  else if (k === "ArrowUp") { e.preventDefault(); setTabPickerIndex(tpIndex - tabPickerCols()); }
+  else if (k === "ArrowRight" && empty) { e.preventDefault(); setTabPickerIndex(tpIndex + 1); }
+  else if (k === "ArrowLeft" && empty) { e.preventDefault(); setTabPickerIndex(tpIndex - 1); }
+  else if (k === "Enter") { e.preventDefault(); if (tpItems[tpIndex]) chooseTabPicker(tpItems[tpIndex].id); }
+}
+
+// ---- layar kosong (semua tab ditutup) ----
+function renderTabEmpty() {
+  const p = getProject(currentProjectId);
+  if (!p) return;
+  el("teTitle").textContent = el("projectTitle").value || p.title || "";
+  el("teCover").style.backgroundImage = el("projChipCover").style.backgroundImage;
+  el("teCover").textContent = el("projChipCover").textContent;
+  const q = el("teSearch").value.trim().toLowerCase();
+  const list = TAB_DEFS.filter((d) => (q ? (d.name + " " + d.desc).toLowerCase().includes(q) : teMore || TAB_EMPTY_MAIN.includes(d.id)));
+  el("teChips").innerHTML = list.map((d) => `<button type="button" class="te-chip" data-tab="${d.id}">${tiPx(d.icon, 16)}<span>${d.name}</span></button>`).join("") +
+    (q && !list.length ? '<p class="te-none">Tidak ada fitur yang cocok.</p>' : "") +
+    (q ? "" : `<div class="te-more-row"><button type="button" class="te-chip te-more" data-act="more" aria-expanded="${teMore}">${tiPx(tiIcon(teMore ? "chevron-up" : "chevron-down"), 16)}<span>${teMore ? "Lebih sedikit" : "Lainnya"}</span></button></div>`);
+}
+function openTabFromEmpty(id) {
+  if (!projTabs.open.includes(id)) insertProjectTab(id, true);
+  el("teSearch").value = "";
+  switchTab(id);
+}
+
+// ---- sidebar tab: daftar tab terbuka + riwayat ----
+function tabSidebarVisible() { return tabNarrowMq.matches ? tabSbDrawer : tabSbDocked; }
+function applyTabSidebar() {
+  const v = el("editorView"), narrow = tabNarrowMq.matches, open = tabSidebarVisible();
+  v.classList.toggle("tsb-docked", !narrow && tabSbDocked);
+  v.classList.toggle("tsb-drawer-open", narrow && tabSbDrawer);
+  el("tabSidebar").setAttribute("aria-hidden", open ? "false" : "true");
+  el("tabSidebar").inert = !open;
+  el("tabSidebarScrim").classList.toggle("is-open", narrow && tabSbDrawer);
+  const b = el("btnTabSidebar");
+  b.setAttribute("aria-expanded", open ? "true" : "false");
+  b.setAttribute("aria-label", open ? "Tutup sidebar tab" : "Buka sidebar tab");
+  b.dataset.tip = open ? "Tutup sidebar" : "Buka sidebar";
+  b.classList.toggle("is-open", open);
+  if (open) {
+    renderTabSidebar();
+    if (window.NovelScroll && typeof window.NovelScroll.attach === "function" && !el("tsbScroll").dataset.scrollAttached) {
+      try { window.NovelScroll.attach(el("tsbScroll")); el("tsbScroll").dataset.scrollAttached = "1"; } catch (e) { /* opsional */ }
+    }
+  }
+}
+function toggleTabSidebar(force) {
+  const narrow = tabNarrowMq.matches;
+  const next = typeof force === "boolean" ? force : !tabSidebarVisible();
+  const hadFocus = el("tabSidebar").contains(document.activeElement);
+  if (narrow) tabSbDrawer = next;
+  else { tabSbDocked = next; tabStoreSet("novelist_tabsidebar", next); }
+  hideTabTip();
+  applyTabSidebar();
+  if (!next && hadFocus) el("btnTabSidebar").focus();
+  if (next && narrow) { const f = el("tabSidebar").querySelector(".tsb-row-main") || el("tsbCollapse"); setTimeout(() => f.focus({ preventScroll: true }), 30); }
+}
+// label dokumen yang sedang dibuka di sebuah tab (baris "Terbuka" di sidebar)
+function tabCurrentDoc(tab) {
+  const p = getProject(currentProjectId);
+  if (!p) return null;
+  if (tab === "write") { const s = currentSceneId ? findScene(currentSceneId) : null; return s && s.type !== "folder" ? { doc: s.id, kind: "scene", title: s.title } : null; }
+  if (tab === "organize") {
+    const it = currentOrgItemId ? (p.data.organize[currentOrgCat] || []).find((x) => x.id === currentOrgItemId) : null;
+    return it ? { doc: it.id, kind: currentOrgCat, title: it.title } : null;
+  }
+  const last = tabLastDoc[tab];
+  return last && tabDocInfo(p, Object.assign({ tab }, last)) ? last : null;
+}
+// judul terkini dokumen di riwayat; null = dokumennya sudah dihapus
+function tabDocInfo(p, h) {
+  if (!h.doc) return { title: TAB_BY_ID[h.tab].name };
+  const d = p.data;
+  let x = null;
+  if (h.tab === "write") { x = findScene(h.doc); if (x && x.type === "folder") x = null; }
+  else if (h.tab === "organize") x = ((d.organize || {})[h.kind] || []).find((i) => i && i.id === h.doc);
+  else if (h.tab === "timeline") x = (d.timelines || []).find((t) => t && t.id === h.doc);
+  else if (h.tab === "map") x = (d.maps || []).find((m) => m && m.id === h.doc);
+  else if (h.tab === "quill") x = ((d.quill && d.quill.stories) || []).find((s) => s && s.id === h.doc);
+  if (!x) return null;
+  return { title: String(x.title || "").trim() || (h.tab === "quill" ? "Cerita tanpa judul" : "(tanpa judul)") };
+}
+function renderTabSidebar() {
+  const p = getProject(currentProjectId);
+  if (!p) return;
+  const q = el("tsbSearch").value.trim().toLowerCase();
+  const has = (s) => !q || String(s || "").toLowerCase().includes(q);
+  const x14 = tiPx(tiIcon("x"), 14);
+  // Terbuka
+  const open = projTabs.open.map((id) => ({ id, d: TAB_BY_ID[id], doc: tabCurrentDoc(id) })).filter((r) => has(r.d.name) || (r.doc && has(r.doc.title)));
+  el("tsbOpenCount").textContent = projTabs.open.length ? String(projTabs.open.length) : "";
+  el("tsbOpenList").innerHTML = open.map((r) => {
+    const on = r.id === projTabs.active;
+    return `<div class="tsb-row${on ? " is-active" : ""}" role="listitem" data-tab="${r.id}">` +
+      `<button type="button" class="tsb-row-main" data-act="tab"${on ? ' aria-current="true"' : ""}><span class="tsb-row-ic">${tiPx(r.d.icon, 16)}</span>` +
+      `<span class="tsb-row-text"><span class="tsb-row-name">${r.d.name}</span>${r.doc ? `<span class="tsb-row-sub">${escapeHtml(r.doc.title || "(tanpa judul)")}</span>` : ""}</span></button>` +
+      `<button type="button" class="tsb-row-x" data-act="close" aria-label="Tutup tab ${r.d.name}">${x14}</button></div>`;
+  }).join("") || (q ? '<p class="tsb-empty-line">Tidak ada yang cocok.</p>'
+    : `<div class="tsb-empty"><span class="tsb-empty-ic">${tiPx(tiIcon("layout-grid-add"), 20)}</span><p>Semua tab ditutup.</p><button type="button" class="tsb-empty-btn" data-act="add">${tiPx(tiIcon("plus"), 14)}<span>Tambah tab</span></button></div>`);
+  // Riwayat (dokumen yang sudah dihapus tidak ditampilkan)
+  tabHistRows = [];
+  tabHist.forEach((h) => {
+    const info = tabDocInfo(p, h);
+    if (!info) return;
+    const tabName = TAB_BY_ID[h.tab].name;
+    if (has(info.title) || has(tabName)) tabHistRows.push({ h, title: info.title, tabName });
+  });
+  el("tsbClearHist").hidden = !tabHist.length;
+  el("tsbHistList").innerHTML = tabHistRows.map((r, i) => {
+    const icon = r.h.doc ? TAB_DOC_ICONS[r.h.kind] || TAB_BY_ID[r.h.tab].icon : TAB_BY_ID[r.h.tab].icon;
+    return `<div class="tsb-row tsb-hist" role="listitem" data-i="${i}">` +
+      `<button type="button" class="tsb-row-main" data-act="hist"><span class="tsb-row-ic">${tiPx(icon, 16)}</span>` +
+      `<span class="tsb-row-text"><span class="tsb-row-name">${escapeHtml(r.title)}</span><span class="tsb-row-sub">${r.h.doc ? r.tabName + " · " : ""}<span class="tsb-time" data-t="${r.h.t}">${timeAgo(r.h.t)}</span></span></span></button>` +
+      `<button type="button" class="tsb-row-x" data-act="del" aria-label="Hapus dari riwayat">${x14}</button></div>`;
+  }).join("") || (q && tabHist.length ? '<p class="tsb-empty-line">Tidak ada yang cocok.</p>'
+    : `<div class="tsb-empty"><span class="tsb-empty-ic">${tiPx(tiIcon("history"), 20)}</span><p>Belum ada riwayat</p><span class="tsb-empty-hint">Tab, scene, timeline, peta &amp; cerita yang kamu buka akan muncul di sini.</span></div>`);
+  // baris ikon bawah
+  el("tsbQuick").querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("is-on", b.dataset.tab === projTabs.active));
+}
+function refreshTabHistTimes() {
+  if (!tabSidebarVisible() || el("editorView").classList.contains("hidden")) return;
+  el("tsbHistList").querySelectorAll(".tsb-time").forEach((s) => { s.textContent = timeAgo(Number(s.dataset.t)); });
+}
+
+// ---- riwayat ----
+// kunjungan tab ditunda sebentar: kalau dokumen di tab itu langsung dibuka (mis. Beranda -> scene), cukup dokumennya
+function noteTabVisit(tab) {
+  tabVisitPending = { tab, pid: currentProjectId };
+  clearTimeout(tabVisitTimer);
+  tabVisitTimer = setTimeout(() => {
+    const v = tabVisitPending;
+    tabVisitPending = null;
+    if (!v || v.pid !== currentProjectId || projTabs.active !== v.tab) return;
+    pushTabHist(Object.assign({ tab: v.tab }, tabCurrentDoc(v.tab) || {}));
+  }, 0);
+}
+// dokumen dibuka di dalam tab (scene, item Organize, timeline, peta, cerita Quill). doc = { doc, kind, title }
+function noteTabDoc(tab, doc) {
+  if (!currentProjectId || !doc || !doc.doc) return;
+  if (tab === "timeline" || tab === "map" || tab === "quill") tabLastDoc[tab] = { doc: doc.doc, kind: doc.kind, title: doc.title };
+  if (projTabs.active !== tab) return;
+  if (tabVisitPending && tabVisitPending.tab === tab) tabVisitPending = null;
+  pushTabHist(Object.assign({ tab }, doc));
+}
+function pushTabHist(e) {
+  const k = e.tab + ":" + (e.doc || "");
+  if (e.doc && tabHist[0] && tabHist[0].tab === e.tab && !tabHist[0].doc) tabHist.shift();   // kunjungan tab polos -> diganti dokumennya
+  tabHist = tabHist.filter((h) => h.k !== k);
+  tabHist.unshift({ k, tab: e.tab, doc: e.doc || null, kind: e.kind || null, title: String(e.title || "").slice(0, 120), t: Date.now() });
+  if (tabHist.length > TAB_HIST_MAX) tabHist.length = TAB_HIST_MAX;
+  saveTabHist();
+  if (tabSidebarVisible()) renderTabSidebar();
+}
+function removeTabHist(k) { tabHist = tabHist.filter((h) => h.k !== k); saveTabHist(); renderTabSidebar(); }
+// buka lagi entri riwayat: tabnya (dibuka kalau tertutup) + dokumennya
+function openTabHist(h) {
+  const p = getProject(currentProjectId);
+  if (!p) return;
+  if (h.doc && !tabDocInfo(p, h)) { removeTabHist(h.k); switchTab(h.tab); return; }
+  if (!h.doc) { switchTab(h.tab); return; }
+  if (h.tab === "write") openSceneInWrite(h.doc);
+  else if (h.tab === "organize") {
+    switchTab("organize");
+    if (currentOrgCat !== h.kind) switchOrganizeCat(h.kind);
+    if (currentOrgItemId !== h.doc) { syncOrganizeFromDetail(); currentOrgItemId = h.doc; renderOrganizeList(); renderOrganizeDetail(); }
+  } else if (h.tab === "timeline" || h.tab === "map") { tabPendingDoc = { tab: h.tab, id: h.doc }; switchTab(h.tab); }
+  else if (h.tab === "quill") { quillNav = { id: h.doc, steps: 0 }; switchTab("quill"); }
+}
+// timeline/peta dari riwayat: dibuka setelah modulnya tampil (openTimelineTab/openMapTab memanggil ini)
+function consumeTabPendingDoc(tab) {
+  const d = tabPendingDoc;
+  if (!d || d.tab !== tab) return;
+  const api = tab === "timeline" ? window.NovelTimeline : window.NovelMap;
+  if (!api || typeof api.open !== "function" || el("tab" + capitalize(tab)).classList.contains("hidden")) return;
+  tabPendingDoc = null;
+  api.open(d.id);
+}
+// Quill: catat cerita yang dibuka (hook "screen") + jalankan navigasi dari riwayat langkah demi langkah
+function onQuillScreen(e) {
+  if (!e || !e.project || e.project.id !== currentProjectId) return;
+  quillScreen = { view: e.view, storyId: e.story ? e.story.id : null };
+  if (!e.view) return;   // Quill disembunyikan
+  if (e.story) noteTabDoc("quill", { doc: e.story.id, kind: "story", title: String(e.story.title || "").trim() || "Cerita tanpa judul" });
+  else if (e.view === "library") tabLastDoc.quill = null;
+  stepQuillNav();
+}
+function stepQuillNav() {
+  const nav = quillNav;
+  if (!nav || projTabs.active !== "quill" || !quillScreen || !quillScreen.view) return;
+  const v = quillScreen.view, host = el("quillRoot");
+  // sudah di cerita itu / form cerita baru (jangan buang isiannya) / terlalu banyak langkah -> selesai
+  if ((quillScreen.storyId === nav.id && v !== "create") || v === "create" || nav.steps++ > 6) { quillNav = null; return; }
+  const btn = v === "library" ? [...host.querySelectorAll('.qd-card[data-act="open"]')].find((b) => b.dataset.id === nav.id)
+    : host.querySelector('.qd-back[data-act="back"], [data-act="tostory"]');
+  if (!btn) { quillNav = null; return; }
+  setTimeout(() => { if (quillNav === nav && btn.isConnected) btn.click(); }, 0);   // klik setelah hook layar selesai
+}
+
+// ---- pasang semua event (dipanggil sekali saat halaman siap) ----
+function initProjectTabs() {
+  tabSbDocked = tabStoreGet("novelist_tabsidebar") === true;
+  const strip = el("tabStrip");
+  strip.addEventListener("click", (e) => {
+    if (strip.dataset.dragged) return;
+    const n = e.target.closest(".ptab");
+    if (!n || n.classList.contains("is-leaving")) return;
+    if (e.target.closest(".ptab-x")) closeProjectTab(n.dataset.tab);
+    else switchTab(n.dataset.tab);
+  });
+  strip.addEventListener("mousedown", (e) => { if (e.button === 1 && e.target.closest(".ptab")) e.preventDefault(); });   // tanpa autoscroll
+  strip.addEventListener("auxclick", (e) => {
+    const n = e.target.closest(".ptab");
+    if (e.button === 1 && n && !n.classList.contains("is-leaving")) { e.preventDefault(); closeProjectTab(n.dataset.tab); }
+  });
+  strip.addEventListener("keydown", (e) => {
+    const b = e.target.closest(".ptab-btn");
+    if (!b) return;
+    const id = b.parentElement.dataset.tab;
+    const btns = [...strip.querySelectorAll(".ptab:not(.is-leaving) .ptab-btn")];
+    const i = btns.indexOf(b);
+    if (e.altKey && e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {   // Alt+Shift+panah: pindahkan tab
+      e.preventDefault();
+      moveProjectTab(id, e.key === "ArrowLeft" ? -1 : 1);
+      const nb = el("ptab-" + id); if (nb) { nb.tabIndex = 0; nb.focus(); }
+      return;
+    }
+    if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      closeProjectTab(id);
+      const left = [...strip.querySelectorAll(".ptab:not(.is-leaving) .ptab-btn")];
+      const f = left[Math.min(i, left.length - 1)] || el("btnAddTab");
+      f.focus();
+      return;
+    }
+    let to = null;
+    if (e.key === "ArrowRight") to = btns[(i + 1) % btns.length];
+    else if (e.key === "ArrowLeft") to = btns[(i - 1 + btns.length) % btns.length];
+    else if (e.key === "Home") to = btns[0];
+    else if (e.key === "End") to = btns[btns.length - 1];
+    if (to) { e.preventDefault(); btns.forEach((x) => { x.tabIndex = x === to ? 0 : -1; }); to.focus(); }
+  });
+  strip.addEventListener("scroll", updateTabStripFade, { passive: true });
+  strip.addEventListener("wheel", (e) => {   // roda mouse vertikal menggulir bar tab ke samping
+    if (strip.scrollWidth <= strip.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    e.preventDefault();
+    strip.scrollLeft += e.deltaY;
+  }, { passive: false });
+  window.addEventListener("resize", () => { if (currentProjectId) updateTabStripFade(); });
+  makeTabSortable(strip, ".ptab", "x", (order) => { projTabs.open = order.filter((t) => TAB_BY_ID[t]); saveProjectTabs(); renderProjectTabs(); });
+
+  el("btnAddTab").onclick = () => openTabPicker();
+  el("btnTabSidebar").onclick = () => toggleTabSidebar();
+  el("tsbCollapse").onclick = () => toggleTabSidebar(false);
+  el("tabSidebarScrim").onclick = () => toggleTabSidebar(false);
+  tabNarrowMq.addEventListener("change", () => { tabSbDrawer = false; if (currentProjectId) applyTabSidebar(); });
+
+  // tooltip
+  const v = el("editorView");
+  v.addEventListener("pointerover", (e) => {
+    if (e.pointerType === "touch") return;
+    const t = e.target.closest("[data-tip]");
+    if (t && t !== tabTipFor && !document.querySelector(".is-sorting")) showTabTip(t);
+    else if (!t && tabTipFor) hideTabTip();
+  });
+  v.addEventListener("pointerout", (e) => { if (tabTipFor && !tabTipFor.contains(e.relatedTarget)) hideTabTip(); });
+  v.addEventListener("focusin", (e) => { const t = e.target.closest("[data-tip]"); if (t && t.matches(":focus-visible")) showTabTip(t); else hideTabTip(); });
+  v.addEventListener("focusout", hideTabTip);
+  v.addEventListener("pointerdown", hideTabTip, true);
+  strip.addEventListener("scroll", hideTabTip, { passive: true });
+
+  // jendela "Tambah tab"
+  el("tpSearch").addEventListener("input", () => renderTabPicker(true));
+  el("tpClose").onclick = () => closeTabPicker();
+  el("tabPicker").addEventListener("click", (e) => { if (e.target === el("tabPicker")) closeTabPicker(); });
+  el("tpGrid").addEventListener("click", (e) => { const c = e.target.closest(".tp-card"); if (c) chooseTabPicker(c.dataset.tab); });
+  el("tpGrid").addEventListener("pointermove", (e) => {
+    const c = e.target.closest(".tp-card");
+    if (c && e.pointerType !== "touch") { const i = [...el("tpGrid").children].indexOf(c); if (i !== tpIndex && i >= 0) setTabPickerIndex(i); }
+  });
+
+  // layar kosong
+  el("teChips").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.act === "more") { teMore = !teMore; renderTabEmpty(); const m = el("teChips").querySelector(".te-more"); if (m) m.focus(); return; }
+    if (b.dataset.tab) openTabFromEmpty(b.dataset.tab);
+  });
+  el("teSearch").addEventListener("input", renderTabEmpty);
+  el("teSearch").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { const c = el("teChips").querySelector(".te-chip[data-tab]"); if (c) { e.preventDefault(); openTabFromEmpty(c.dataset.tab); } }
+    else if (e.key === "Escape" && el("teSearch").value) { e.preventDefault(); el("teSearch").value = ""; renderTabEmpty(); }
+  });
+  el("projectTitle").addEventListener("input", () => { if (!projTabs.active) el("teTitle").textContent = el("projectTitle").value; });
+
+  // sidebar
+  el("tsbSearch").addEventListener("input", renderTabSidebar);
+  el("tabSidebar").addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (document.activeElement === el("tsbSearch") && el("tsbSearch").value) { e.preventDefault(); el("tsbSearch").value = ""; renderTabSidebar(); return; }
+    if (tabNarrowMq.matches && tabSbDrawer) { e.preventDefault(); e.stopPropagation(); toggleTabSidebar(false); }
+  });
+  document.addEventListener("keydown", (e) => {   // Esc menutup laci sidebar (layar sempit) dari mana pun
+    if (e.key === "Escape" && tabSbDrawer && tabNarrowMq.matches && !isTabPickerOpen() && !el("editorView").classList.contains("hidden")) toggleTabSidebar(false);
+  });
+  el("tsbOpenList").addEventListener("click", (e) => {
+    if (el("tsbOpenList").dataset.dragged) return;
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.act === "add") { openTabPicker(); return; }
+    const row = b.closest(".tsb-row");
+    if (!row) return;
+    if (b.dataset.act === "close") closeProjectTab(row.dataset.tab);
+    else { switchTab(row.dataset.tab); if (tabNarrowMq.matches) toggleTabSidebar(false); }
+  });
+  el("tsbOpenList").addEventListener("auxclick", (e) => { const row = e.target.closest(".tsb-row"); if (e.button === 1 && row) { e.preventDefault(); closeProjectTab(row.dataset.tab); } });
+  makeTabSortable(el("tsbOpenList"), ".tsb-row", "y", (order) => { projTabs.open = order.filter((t) => TAB_BY_ID[t]); saveProjectTabs(); renderProjectTabs(); }, () => !el("tsbSearch").value.trim());
+  el("tsbHistList").addEventListener("click", (e) => {
+    const b = e.target.closest("button"), row = b && b.closest(".tsb-row");
+    const r = row && tabHistRows[Number(row.dataset.i)];
+    if (!r) return;
+    if (b.dataset.act === "del") { removeTabHist(r.h.k); return; }
+    openTabHist(r.h);
+    if (tabNarrowMq.matches) toggleTabSidebar(false);
+  });
+  el("tsbClearHist").onclick = () => { tabHist = []; saveTabHist(); renderTabSidebar(); };
+  el("tsbQuick").innerHTML = TAB_QUICK.map((id) => `<button type="button" class="tsb-quick-btn" data-tab="${id}" data-tip="${TAB_BY_ID[id].name}" data-tip-pos="top" aria-label="Buka ${TAB_BY_ID[id].name}">${tiPx(TAB_BY_ID[id].icon, 17)}</button>`).join("") +
+    `<span class="tsb-quick-sep" aria-hidden="true"></span><button type="button" class="tsb-quick-btn" data-act="add" data-tip="Tambah tab" data-tip-pos="top" aria-label="Tambah tab" aria-haspopup="dialog">${tiPx(tiIcon("plus"), 17)}</button>`;
+  el("tsbQuick").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.act === "add") { openTabPicker(); return; }
+    switchTab(b.dataset.tab);
+    if (tabNarrowMq.matches) toggleTabSidebar(false);
+  });
+  setInterval(refreshTabHistTimes, 30000);   // "5 menit lalu" tetap akurat
+
+  // Quill (dimuat belakangan): catat cerita yang dibuka
+  (window.__novelQuillReady = window.__novelQuillReady || []).push((api) => { if (api && typeof api.on === "function") api.on("screen", onQuillScreen); });
 }
 
 // ---- QUILL (tab Write → tombol "Scene | Quill"): quill.js baru dimuat saat Quill pertama kali dibuka.
@@ -654,16 +1354,8 @@ function applyWriteMode() {
   if (quill) openQuillMode();
   else if (window.NovelQuill) window.NovelQuill.hide();
 }
-function setWriteMode(mode) {
-  const p = getProject(currentProjectId);
-  if (!p || writeMode(p) === mode) return;
-  flushCurrentEdits();
-  if (mode === "quill" && !p.data.quill) p.data.quill = { mode: "quill", stories: [] };
-  if (p.data.quill) p.data.quill.mode = mode;
-  markDirtyAndSchedule();
-  applyWriteMode();
-  updateSceneDrawerVisibility();
-}
+// tombol "Scene | Quill" = pindah ke tab Tulis / Quill (TAB PROJECT; tab dibuka otomatis kalau sedang tertutup)
+function setWriteMode(mode) { switchTab(mode === "quill" ? "quill" : "write"); }
 async function openQuillMode() {
   const root = el("quillRoot");
   if (!window.NovelQuill) root.innerHTML = '<div class="quill-loading">Memuat Quill…</div>';
@@ -694,8 +1386,7 @@ function quillUserName() {
 }
 // dari Home/Timeline/Map ke scene tertentu: selalu buka editor Scene
 function openSceneInWrite(id) {
-  if (writeMode(getProject(currentProjectId)) === "quill") setWriteMode("scene");
-  switchTab("write");
+  switchTab("write");   // tab Tulis = mode Scene
   selectScene(id);
 }
 
@@ -753,7 +1444,12 @@ async function openTimelineTab() {
     onChange: markDirtyAndSchedule,
     getScenes: () => flattenScenes(getProject(currentProjectId).data.scenes),
     openScene: (id) => openSceneInWrite(id),
+    onOpen: (id) => {   // TAB PROJECT: riwayat
+      const t = (getProject(currentProjectId).data.timelines || []).find((x) => x && x.id === id);
+      noteTabDoc("timeline", { doc: id, kind: "timeline", title: t ? t.title : "" });
+    },
   });
+  consumeTabPendingDoc("timeline");   // dibuka dari riwayat
 }
 
 // ---- MAP: map-core.js (data) + map2d.js (editor 2D) + map-ui.js (shell) baru dimuat saat tab ini pertama kali dibuka.
@@ -778,7 +1474,12 @@ async function openMapTab() {
     onChange: markDirtyAndSchedule,
     getScenes: () => flattenScenes(getProject(currentProjectId).data.scenes),
     openScene: (id) => openSceneInWrite(id),
+    onOpen: (id) => {   // TAB PROJECT: riwayat
+      const m = (getProject(currentProjectId).data.maps || []).find((x) => x && x.id === id);
+      noteTabDoc("map", { doc: id, kind: "map", title: m ? m.title : "" });
+    },
   });
+  consumeTabPendingDoc("map");   // dibuka dari riwayat
 }
 
 // ---- HOME TAB: canvas berisi titik-titik scene ----
@@ -1004,6 +1705,8 @@ function selectScene(id, addToHistory = true) {
   }
   renderSceneList();
   renderSceneDetail();
+  const sc = findScene(id);
+  if (sc && sc.type !== "folder") noteTabDoc("write", { doc: id, kind: "scene", title: sc.title });   // TAB PROJECT: riwayat
 }
 function goSceneBack() { if (sceneHistoryIndex > 0) { sceneHistoryIndex--; selectScene(sceneHistory[sceneHistoryIndex], false); } }
 function goSceneForward() { if (sceneHistoryIndex < sceneHistory.length - 1) { sceneHistoryIndex++; selectScene(sceneHistory[sceneHistoryIndex], false); } }
@@ -1398,6 +2101,7 @@ function renderOrganizeDetail() {
     <div id="orgEditor" class="organize-editor" contenteditable="true" spellcheck="false">${item.content || ""}</div>`;
   el("orgTitleField").addEventListener("input", () => { item.title = el("orgTitleField").value; renderOrganizeList(); markDirtyAndSchedule(); });
   el("orgEditor").addEventListener("input", () => { item.content = el("orgEditor").innerHTML; markDirtyAndSchedule(); });
+  noteTabDoc("organize", { doc: item.id, kind: currentOrgCat, title: item.title });   // TAB PROJECT: riwayat
 }
 function openAddOrganizeModal() { el("organizeFieldTitle").value = ""; el("organizeModal").classList.remove("hidden"); el("organizeFieldTitle").focus(); }
 function saveNewOrganizeItem() {
@@ -3198,7 +3902,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (action === "exportWord") { flushCurrentEdits(); exportProjectToWord(p); }
   });
 
-  document.querySelectorAll(".rail-btn").forEach((btn) => btn.onclick = () => switchTab(btn.dataset.tab));
+  initProjectTabs();   // TAB PROJECT: bar tab, jendela "Tambah tab", sidebar tab & riwayat
   // Quill: tombol "Scene | Quill" di atas tab Write (panah kiri/kanan berpindah antar-tombol)
   el("writeModeSwitch").querySelectorAll(".wms-btn").forEach((btn) => {
     btn.onclick = () => setWriteMode(btn.dataset.mode);

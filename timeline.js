@@ -260,6 +260,7 @@
     selectedId = null; hideEditor();
     rev++;
     renderList(); renderHead(); renderFlow();
+    if (tl && ctx.onOpen) ctx.onOpen(tl.id);   // app.js: riwayat sidebar tab
   }
 
   // ---------- event: tambah & panel edit ----------
@@ -363,6 +364,12 @@
       const keep = sameProject && tl && timelines().includes(tl) ? tl.id : (timelines()[0] || {}).id;
       if (keep) openTimeline(keep);
       else { tl = null; selectedId = null; hideEditor(); renderList(); renderHead(); renderFlow(); }
+    },
+    // buka timeline tertentu (mis. dari riwayat sidebar tab); dipanggil setelah show()
+    open(id) {
+      if (!ctx || !timelines().some((t) => t.id === id) || (tl && tl.id === id)) return;
+      $("tlSearch").value = "";
+      openTimeline(id);
     },
   };
 })();
