@@ -1,6 +1,33 @@
-# Novelist Web — v0.9.8
+# Novelist Web — v0.9.9
 
-## Riwayat perubahan terbaru (v0.9.8) — paling baru di atas
+## Riwayat perubahan terbaru (v0.9.9) — paling baru di atas
+
+- **Quill — fitur menulis cerita di dalam tab Write.** Di atas tab Write ada pilihan **Scene | Quill** (diingat per
+  project); "Scene" tetap editor lama.
+  - **Pustaka "Cerita Saya"** berisi buku-buku 3D, plus "Cerita baru".
+  - **Buat/edit cerita:** buku 3D (CSS) yang miring mengikuti kursor & bisa diputar; tab **Gaya buku** (Hardcover /
+    Paperback / Sampul kertas), **Sampul** (unggah gambar, warna/gradasi) dan **Teks** (font & warna judul, nama
+    penulis).
+  - **Halaman cerita:** daftar chapter (seret untuk mengurutkan, hapus), "Tulis chapter pertama", edit sampul, hapus cerita.
+  - **Editor chapter:** sidebar chapter, judul serif "Chapter I" dengan ornamen, gambar header, toolbar (paragraf/
+    judul/kutipan, ukuran, tebal/miring/garis bawah/coret, daftar, rata, pemisah adegan, gambar, undo/redo), hitungan
+    kata. Teks yang ditempel dibersihkan dari kode berbahaya.
+  - Bar bawah: **Putar** (mode baca seperti buku, 2 halaman di layar lebar), **Audio** (dibacakan suara browser,
+    suara Indonesia diutamakan), **Tulis**, **Terbitkan** (unduh **EPUB**, **Word .doc**, **HTML**).
+  - Data cerita tersimpan di dalam project (ikut autosave & backup Google Drive); gambar diperkecil otomatis.
+- **Pengaturan Akun → Aksesibilitas:** **Ukuran teks** (Bawaan 100 % / Sedang 105 % / Besar 110 % / Sangat besar 120 %,
+  hanya memperbesar teks), **Font ramah disleksia** (OpenDyslexic, disimpan di `vendor/fonts/`) dan **Mode hemat
+  performa** (mematikan blur & transparansi; otomatis mengikuti pengaturan sistem sampai dipilih). Semua disimpan di
+  perangkat ini dan langsung berlaku sejak halaman dimuat (termasuk halaman login).
+- **Pengaturan Akun → Zona berbahaya → Hapus akun:** setelah mengetik `HAPUS`, folder Novelist di Google Drive
+  (project, backup, trash) dipindah ke **Sampah Google Drive** (masih bisa dipulihkan 30 hari), semua data Novelist di
+  perangkat ini dihapus, akses Google dicabut, lalu kembali ke halaman login. Kalau ada yang gagal, semuanya
+  dikembalikan dan kamu tetap login.
+- Tombol "Keluar dari akun" di halaman akun dihapus (logout tetap ada di sidebar & menu pengaturan).
+- Perbaikan tata letak kecil: topbar project di lebar 701–860 px tidak lagi meluber, judul project di HP tidak
+  menabrak status "Tersimpan", panel Scene Settings tidak lagi tertutup topbar.
+
+### v0.9.8
 
 - **Map 2D kini tampil seperti Map 3D:** warna & pola tiap bioma memakai palet yang sama dengan 3D (rumput, ladang
   berpagar semak, retakan, genangan rawa, bukit pasir, tundra berawan, gunung berbatu berkaki rumput, salju di puncak
@@ -549,9 +576,10 @@ nama-repo/
 ├── logo-anim-poster.webp
 ├── login-logo.webm, login-logo.mp4, login-logo-poster.webp
 ├── timeline.js
+├── quill.js, quill.css, quill-tiles.js   (fitur Quill di tab Write: cerita, buku 3D, editor chapter, panel alat)
 ├── map-core.js, map2d.js, map3d.js, map-ui.js   (fitur Map: data, editor 2D, tampilan 3D, UI tab)
 ├── vendor/   (react, react-dom, reactflow, three.js r169 + OrbitControls, motion 13.4.3, base-ui 1.8.0,
-│              radix-ui 1.6.7, shadcn-ui, tailwind.css, tabler-icons.js (sprite ikon) + lisensinya)
+│              radix-ui 1.6.7, shadcn-ui, tailwind.css, tabler-icons.js (sprite ikon), fonts/ (OpenDyslexic) + lisensinya)
 ├── components/ui/*.tsx, lib/utils.ts, components.json   (kode sumber shadcn/ui)
 ├── tools/   (package.json, tailwind.input.css, build-vendor.mjs, build-icons.mjs — hanya untuk membangun ulang vendor/: cd tools && npm install && npm run build)
 ├── config.js
