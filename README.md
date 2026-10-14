@@ -1,6 +1,62 @@
-# Novelist Web — v0.9.7
+# Novelist Web — v0.9.9
 
-## Riwayat perubahan terbaru (v0.9.7) — paling baru di atas
+## Riwayat perubahan terbaru (v0.9.9) — paling baru di atas
+
+- **Quill — fitur menulis cerita di dalam tab Write.** Di atas tab Write ada pilihan **Scene | Quill** (diingat per
+  project); "Scene" tetap editor lama.
+  - **Pustaka "Cerita Saya"** berisi buku-buku 3D, plus "Cerita baru".
+  - **Buat/edit cerita:** buku 3D (CSS) yang miring mengikuti kursor & bisa diputar; tab **Gaya buku** (Hardcover /
+    Paperback / Sampul kertas), **Sampul** (unggah gambar, warna/gradasi) dan **Teks** (font & warna judul, nama
+    penulis).
+  - **Halaman cerita:** daftar chapter (seret untuk mengurutkan, hapus), "Tulis chapter pertama", edit sampul, hapus cerita.
+  - **Editor chapter:** sidebar chapter, judul serif "Chapter I" dengan ornamen, gambar header, toolbar (paragraf/
+    judul/kutipan, ukuran, tebal/miring/garis bawah/coret, daftar, rata, pemisah adegan, gambar, undo/redo), hitungan
+    kata. Teks yang ditempel dibersihkan dari kode berbahaya.
+  - Bar bawah: **Putar** (mode baca seperti buku, 2 halaman di layar lebar), **Audio** (dibacakan suara browser,
+    suara Indonesia diutamakan), **Tulis**, **Terbitkan** (unduh **EPUB**, **Word .doc**, **HTML**).
+  - **Panel kanan editor (alat & tile):** tombol alat **Draf** (simpan/pulihkan versi chapter, otomatis tiap
+    buka chapter bila > 30 menit, maks. 20), **Gaya** (font termasuk OpenDyslexic, ukuran, jarak baris & paragraf,
+    indentasi, lebar halaman, tema kertas Gelap/Kertas/Sepia — berlaku di editor & mode Putar), **Pohon relasi**
+    (peta hubungan karakter dari Organize dengan React Flow, relasi berlabel), **Kanvas** (papan bebas: catatan
+    tempel berwarna & gambar, geser/ubah ukuran), **Map** (buka peta project di tab Map) dan **Model 3D** (segera).
+    Tile: **Kartu dunia** (cari karakter/lokasi/catatan, sisipkan namanya), **Kartu terdeteksi** (item Organize yang
+    disebut di chapter, diperbarui saat mengetik), **Catatan chapter**, **Papan suasana** (kumpulan gambar) dan
+    **Grafik dunia** (siapa/di mana muncul di chapter mana). Tile bisa ditutup & ditambah lagi, dan ada tab panel sendiri.
+  - Data cerita tersimpan di dalam project (ikut autosave & backup Google Drive); gambar diperkecil otomatis.
+- **Pengaturan Akun → Aksesibilitas:** **Ukuran teks** (Bawaan 100 % / Sedang 105 % / Besar 110 % / Sangat besar 120 %,
+  hanya memperbesar teks), **Font ramah disleksia** (OpenDyslexic, disimpan di `vendor/fonts/`) dan **Mode hemat
+  performa** (mematikan blur & transparansi; otomatis mengikuti pengaturan sistem sampai dipilih). Semua disimpan di
+  perangkat ini dan langsung berlaku sejak halaman dimuat (termasuk halaman login).
+- **Pengaturan Akun → Zona berbahaya → Hapus akun:** setelah mengetik `HAPUS`, folder Novelist di Google Drive
+  (project, backup, trash) dipindah ke **Sampah Google Drive** (masih bisa dipulihkan 30 hari), semua data Novelist di
+  perangkat ini dihapus, akses Google dicabut, lalu kembali ke halaman login. Kalau ada yang gagal, semuanya
+  dikembalikan dan kamu tetap login.
+- Tombol "Keluar dari akun" di halaman akun dihapus (logout tetap ada di sidebar & menu pengaturan).
+- Perbaikan tata letak kecil: topbar project di lebar 701–860 px tidak lagi meluber, judul project di HP tidak
+  menabrak status "Tersimpan", panel Scene Settings tidak lagi tertutup topbar.
+
+### v0.9.8
+
+- **Map 2D kini tampil seperti Map 3D:** warna & pola tiap bioma memakai palet yang sama dengan 3D (rumput, ladang
+  berpagar semak, retakan, genangan rawa, bukit pasir, tundra berawan, gunung berbatu berkaki rumput, salju di puncak
+  tertinggi), pencahayaan bukit dari arah matahari yang sama, laut dengan bercak awan terang, cincin air dangkal
+  toska, buih putih & garis tinta pantai. **Pohon & puncak gunung** kini memakai model kartun yang sama dengan 3D
+  (digambar sebagai sprite bergaris tepi, sedikit dari atas) di posisi yang sama. Contoh warna di panel kuas juga
+  dibuat dari renderer 2D yang baru. Menggambar ulang malah sedikit lebih cepat; format data peta tidak berubah.
+- **Perbaikan Map 3D:** bintik-bintik cyan di bioma gurun hilang (warna bukit pasir yang terlalu terang tidak lagi
+  "melingkar").
+- **Ganti background dashboard (Pengaturan Akun → Tampilan):** pilih gambar sendiri ("Ganti background…" atau
+  seret-lepas gambar ke baris Background) untuk menggantikan foto ngarai di dashboard. Tampilannya tetap seperti
+  sebelumnya: di-blur, dengan vignette & dot-grid di atasnya. Ada slider **Blur** (0–30 px, bawaan 6 px) dan **Redup**
+  (0–80 %, bawaan 30 %), plus "Kembalikan bawaan". Project tanpa sampul juga memakai background ini. Di tema terang,
+  background custom tetap tampil dengan lapisan terang supaya teks terbaca. Gambar diperkecil otomatis (maks.
+  2560 px) dan disimpan di perangkat ini (IndexedDB), jadi tetap ada setelah halaman dibuka ulang.
+- **Sidebar kiri dashboard bisa dibuka-tutup:** klik **logo di kiri atas** untuk membuka/menutup rail ikon, atau
+  arahkan kursor ke **tepi kiri layar** sebentar untuk membukanya otomatis. Setelah terbuka, sidebar tetap terbuka
+  (tidak menutup sendiri) sampai logo diklik lagi. Status buka/tutup diingat. Pengguna baru melihat petunjuk kecil di
+  samping logo. Di HP (≤ 700 px) bar bawah tetap selalu tampil seperti sebelumnya.
+
+### v0.9.7
 
 - **Semua ikon diganti ke Tabler Icons** ([tabler.io/icons](https://tabler.io/icons), MIT) — ikon lama (SVG gaya lama,
   emoji, dan karakter seperti `+ ← ⋮ × ☁ 🗑 📄`) diganti ikon garis yang modern dan sesuai fungsinya, di semua
@@ -528,9 +584,10 @@ nama-repo/
 ├── logo-anim-poster.webp
 ├── login-logo.webm, login-logo.mp4, login-logo-poster.webp
 ├── timeline.js
+├── quill.js, quill.css, quill-tiles.js   (fitur Quill di tab Write: cerita, buku 3D, editor chapter, panel alat)
 ├── map-core.js, map2d.js, map3d.js, map-ui.js   (fitur Map: data, editor 2D, tampilan 3D, UI tab)
 ├── vendor/   (react, react-dom, reactflow, three.js r169 + OrbitControls, motion 13.4.3, base-ui 1.8.0,
-│              radix-ui 1.6.7, shadcn-ui, tailwind.css, tabler-icons.js (sprite ikon) + lisensinya)
+│              radix-ui 1.6.7, shadcn-ui, tailwind.css, tabler-icons.js (sprite ikon), fonts/ (OpenDyslexic) + lisensinya)
 ├── components/ui/*.tsx, lib/utils.ts, components.json   (kode sumber shadcn/ui)
 ├── tools/   (package.json, tailwind.input.css, build-vendor.mjs, build-icons.mjs — hanya untuk membangun ulang vendor/: cd tools && npm install && npm run build)
 ├── config.js

@@ -490,6 +490,8 @@
   // pratinjau tekstur kecil tiap bioma (digambar sekali ke kanvas -> data URL)
   function biomeSwatch(b, idx) {
     const W = 72, H = 30, k = 2, cv = document.createElement("canvas");
+    const live = window.NovelMap2D && window.NovelMap2D.swatch && window.NovelMap2D.swatch(idx, W * k, H * k);   // tampilan sama dengan peta 2D/3D
+    if (live) return live;
     cv.width = W * k; cv.height = H * k;
     const g = cv.getContext("2d");
     g.scale(k, k);

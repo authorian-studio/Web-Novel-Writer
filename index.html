@@ -9,6 +9,8 @@
      Juga berisi gaya komponen shadcn/ui. Bangun ulang: npm run build:css -->
 <link rel="stylesheet" href="vendor/tailwind.css" />
 <link rel="stylesheet" href="style.css" />
+<!-- Quill (mode menulis cerita di tab Write): gaya tombol Scene | Quill + seluruh tampilan quill.js -->
+<link rel="stylesheet" href="quill.css" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
@@ -17,6 +19,21 @@
 <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+<!-- Aksesibilitas (Pengaturan Akun): ukuran teks, font ramah disleksia & mode hemat performa dipasang SEBELUM halaman
+     pertama kali tampil (juga di halaman login). Versi lengkapnya = applyA11y() di bagian AKSESIBILITAS app.js;
+     kunci localStorage & nilai di sini harus sama dengan di sana. -->
+<script>
+(function () {
+  try {
+    var a = JSON.parse(localStorage.getItem("novelist_a11y") || "null") || {};
+    var s = Number(a.scale);
+    if ([1.05, 1.1, 1.2].indexOf(s) >= 0) document.documentElement.style.setProperty("--fs-scale", String(s));
+    if (a.dyslexic === true) document.body.classList.add("a11y-dyslexic");
+    var sys = !!(window.matchMedia && window.matchMedia("(prefers-reduced-transparency: reduce)").matches);
+    if (a.boost === "on" || (a.boost !== "off" && sys)) document.body.classList.add("perf-boost");
+  } catch (e) { /* storage diblokir / data rusak: pakai bawaan */ }
+})();
+</script>
 <!-- Tabler Icons (tabler.io/icons): menyisipkan sprite <symbol id="ti-..."> ke awal body; harus dimuat sebelum markup ikon dipakai JS -->
 <script src="vendor/tabler-icons.js"></script>
 <div id="app">
@@ -112,17 +129,18 @@
 
   <!-- ============ DASHBOARD VIEW ============ -->
   <section id="dashboardView" class="view hidden">
-    <!-- Background: foto ngarai bersalju + aurora (bg-canyon.jpg, di-blur) + vignette + dot-grid ala React Flow (di-blur tipis) -->
+    <!-- Background: foto ngarai bersalju + aurora (bg-canyon.jpg, di-blur) + vignette + dot-grid ala React Flow (di-blur tipis).
+         Foto bisa diganti pengguna di Pengaturan Akun → Tampilan (bagian BACKGROUND di app.js: inline background-image). -->
     <div class="galaxy-bg" aria-hidden="true">
-      <div class="galaxy-photo"></div>
+      <div class="galaxy-photo" id="dashBgPhoto"></div>
       <!-- cover project yang sedang di-hover memudar masuk ke sini (2 lapisan bergantian supaya bisa crossfade) -->
       <div class="galaxy-cover" id="dashCoverBgA"></div>
       <div class="galaxy-cover" id="dashCoverBgB"></div>
       <div class="galaxy-dots"></div>
     </div>
 
-    <!-- Rail ikon di kiri -->
-    <nav class="dash-rail" aria-label="Menu utama">
+    <!-- Rail ikon di kiri — bisa disembunyikan (layar lebar): klik logo kiri atas / arahkan kursor ke tepi kiri. Diatur bagian RAIL SIDEBAR di app.js -->
+    <nav class="dash-rail" id="dashRail" aria-label="Menu utama">
       <div class="dash-rail-top">
         <!-- halaman: daftar project (default) & Pengaturan Akun — yang aktif diberi kelas is-active -->
         <button class="dash-rail-btn is-active" id="btnRailProjects" aria-label="Project" aria-current="page">
@@ -157,12 +175,15 @@
     </nav>
 
     <!-- Logo animasi Novelist (logo-anim.mp4, looping, tanpa suara). Diletakkan DI LUAR rail supaya mix-blend-mode
-         bisa menyatu dengan foto background (latar hitam videonya jadi transparan). -->
-    <div class="rail-logo" title="Novelist">
+         bisa menyatu dengan foto background (latar hitam videonya jadi transparan). Sekaligus tombol buka/tutup rail. -->
+    <button type="button" class="rail-logo" id="btnRailLogo" aria-label="Buka sidebar" aria-expanded="false" aria-controls="dashRail">
       <video id="railLogoVideo" muted loop playsinline preload="auto" poster="logo-anim-poster.webp" aria-hidden="true" tabindex="-1">
         <source src="logo-anim.mp4" type="video/mp4">
       </video>
-    </div>
+    </button>
+    <!-- petunjuk sekali tampil (sampai rail pertama kali dibuka) & tooltip logo; di luar tombol supaya tidak ikut di-blend -->
+    <div id="railHint" class="rail-hint" aria-hidden="true">Klik logo atau arahkan kursor ke tepi kiri untuk membuka menu</div>
+    <span id="railLogoTip" class="rail-logo-tip" aria-hidden="true">Buka sidebar</span>
 
     <span id="syncIndicator" class="sync-indicator"><svg class="ti" width="14" height="14" aria-hidden="true"><use href="#ti-cloud-check"></use></svg><span>Tersinkron</span></span>
 
@@ -230,6 +251,70 @@
           </div>
         </section>
 
+        <!-- Tampilan: background dashboard pilihan sendiri (di-blur seperti bawaan) + slider blur & redup. Diisi bagian BACKGROUND di app.js -->
+        <section class="acc-section acc-anim" aria-labelledby="accLblLook">
+          <h2 id="accLblLook" class="acc-section-label">Tampilan</h2>
+          <div class="acc-card">
+            <div id="accBgRow" class="acc-row is-static acc-bg-row">
+              <span id="accBgThumb" class="acc-bg-thumb" title="Ganti background" aria-hidden="true"></span>
+              <div class="acc-bg-main">
+                <span class="acc-row-text"><span class="acc-row-label">Background</span><span id="accBgSub" class="acc-row-sub">Bawaan — foto ngarai bersalju</span></span>
+                <div class="acc-bg-actions">
+                  <button id="accBgPick" class="acc-pill acc-bg-btn"><svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-photo"></use></svg><span id="accBgPickLabel">Ganti background…</span></button>
+                  <button id="accBgReset" class="acc-pill acc-bg-btn hidden"><svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-restore"></use></svg>Kembalikan bawaan</button>
+                </div>
+              </div>
+              <input type="file" id="accBgInput" accept="image/*" hidden />
+              <span class="acc-bg-drop" aria-hidden="true"><svg class="ti" width="18" height="18"><use href="#ti-photo-up"></use></svg>Lepaskan gambar untuk dijadikan background</span>
+            </div>
+            <div id="accBgBlurRow" class="acc-row is-static acc-range-row">
+              <svg class="ti acc-method-ic" width="18" height="18" aria-hidden="true"><use href="#ti-blur"></use></svg>
+              <label class="acc-row-label" for="accBgBlur">Blur</label>
+              <input id="accBgBlur" class="acc-range" type="range" min="0" max="30" step="1" value="6" aria-describedby="accBgBlurVal" />
+              <output id="accBgBlurVal" class="acc-range-val" for="accBgBlur">6 px</output>
+            </div>
+            <div id="accBgDimRow" class="acc-row is-static acc-range-row">
+              <svg class="ti acc-method-ic" width="18" height="18" aria-hidden="true"><use href="#ti-brightness-half"></use></svg>
+              <label class="acc-row-label" for="accBgDim">Redup</label>
+              <input id="accBgDim" class="acc-range" type="range" min="0" max="80" step="1" value="30" aria-describedby="accBgDimVal" />
+              <output id="accBgDimVal" class="acc-range-val" for="accBgDim">30%</output>
+            </div>
+            <p id="accBgNote" class="acc-bg-note hidden">Tema terang memakai latar polos — pilih background sendiri supaya blur &amp; redup terlihat.</p>
+            <p class="acc-bg-note acc-bg-boost-note">Mode hemat performa aktif — foto background disembunyikan &amp; blur dimatikan. Atur di Aksesibilitas.</p>
+          </div>
+        </section>
+
+        <!-- Aksesibilitas: ukuran teks, font ramah disleksia & mode hemat performa. Disimpan di perangkat ini (localStorage
+             "novelist_a11y") dan sudah dipasang sebelum halaman tampil (skrip awal di <body>). Diisi bagian AKSESIBILITAS di app.js -->
+        <section class="acc-section acc-anim" aria-labelledby="accLblA11y">
+          <h2 id="accLblA11y" class="acc-section-label">Aksesibilitas</h2>
+          <div class="acc-card">
+            <div class="acc-row is-static acc-size-row">
+              <span class="acc-row-text"><span class="acc-row-label" id="accLblFontSize">Ukuran teks</span><span class="acc-row-sub" id="accFontSizeSub">Pilih ukuran teks yang nyaman, 5% sampai 20% lebih besar. Disimpan di perangkat ini.</span></span>
+              <div id="accFontSizeSeg" class="acc-size-grid" role="radiogroup" aria-labelledby="accLblFontSize" aria-describedby="accFontSizeSub">
+                <button type="button" role="radio" data-scale="1" aria-checked="true"><span class="acc-size-aa" aria-hidden="true">Aa</span><span class="acc-size-name">Bawaan</span></button>
+                <button type="button" role="radio" data-scale="1.05" aria-checked="false"><span class="acc-size-aa" aria-hidden="true">Aa</span><span class="acc-size-name">Sedang</span></button>
+                <button type="button" role="radio" data-scale="1.1" aria-checked="false"><span class="acc-size-aa" aria-hidden="true">Aa</span><span class="acc-size-name">Besar</span></button>
+                <button type="button" role="radio" data-scale="1.2" aria-checked="false"><span class="acc-size-aa" aria-hidden="true">Aa</span><span class="acc-size-name">Sangat besar</span></button>
+              </div>
+            </div>
+            <div id="accDysRow" class="acc-row is-static acc-switch-row">
+              <svg class="ti acc-method-ic" width="18" height="18" aria-hidden="true"><use href="#ti-letter-a"></use></svg>
+              <span class="acc-row-text"><span class="acc-row-label" id="accLblDys">Font ramah disleksia</span><span class="acc-row-sub" id="accSubDys">Pakai huruf OpenDyslexic di seluruh aplikasi</span></span>
+              <button id="accDysSwitch" type="button" class="acc-switch" role="switch" aria-checked="false" aria-labelledby="accLblDys" aria-describedby="accSubDys"></button>
+            </div>
+            <div id="accBoostRow" class="acc-row is-static acc-switch-row">
+              <svg class="ti acc-method-ic" width="18" height="18" aria-hidden="true"><use href="#ti-bolt"></use></svg>
+              <span class="acc-row-text">
+                <span class="acc-row-label" id="accLblBoost">Mode hemat performa</span>
+                <span class="acc-row-sub" id="accSubBoost">Matikan efek blur &amp; transparansi di seluruh aplikasi. Lebih mudah dibaca dan lebih ringan di perangkat lambat. Mengikuti pengaturan sistem sampai kamu memilih di sini.</span>
+                <span class="acc-boost-state"><span id="accBoostState" aria-live="polite">Mengikuti sistem</span><button id="accBoostAuto" type="button" class="acc-text-btn hidden">Ikuti sistem lagi</button></span>
+              </span>
+              <button id="accBoostSwitch" type="button" class="acc-switch" role="switch" aria-checked="false" aria-labelledby="accLblBoost" aria-describedby="accSubBoost accBoostState"></button>
+            </div>
+          </div>
+        </section>
+
         <section class="acc-section acc-anim" aria-labelledby="accLblMethods">
           <h2 id="accLblMethods" class="acc-section-label">Metode masuk</h2>
           <div class="acc-card">
@@ -292,9 +377,18 @@
           </div>
         </section>
 
-        <div class="acc-foot acc-anim">
-          <button id="accLogout" class="acc-logout"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-logout"></use></svg>Keluar dari akun</button>
-        </div>
+        <!-- Zona berbahaya: hapus akun (folder Novelist di Drive -> Trash Drive, data lokal dihapus, akses Google dicabut).
+             Tombol keluar sengaja tidak ada di halaman ini — sudah ada di rail & menu gear. Bagian HAPUS AKUN di app.js -->
+        <section class="acc-section acc-anim acc-danger" aria-labelledby="accLblDanger">
+          <h2 id="accLblDanger" class="acc-section-label">Zona berbahaya</h2>
+          <div class="acc-card">
+            <div class="acc-row is-static">
+              <svg class="ti acc-method-ic acc-danger-ic" width="18" height="18" aria-hidden="true"><use href="#ti-alert-triangle"></use></svg>
+              <span class="acc-row-text"><span class="acc-row-label">Hapus akun</span><span class="acc-row-sub acc-row-sub-wrap">Hapus semua project Novelist di Google Drive-mu dan semua pengaturan di perangkat ini.</span></span>
+              <button id="accDeleteBtn" type="button" class="acc-pill acc-pill-danger">Hapus akun</button>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -427,6 +521,16 @@
 
         <!-- ============ WRITE TAB ============ -->
         <div id="tabWrite" class="tab-panel hidden">
+          <!-- QUILL: pilih mode menulis. Scene = editor scene seperti biasa; Quill = cerita bergaya buku (quill.js dimuat saat pertama dibuka) -->
+          <div id="writeModeSwitch" class="write-mode-switch" role="tablist" aria-label="Mode menulis">
+            <button type="button" class="wms-btn is-active" data-mode="scene" role="tab" aria-selected="true" title="Editor scene">
+              <svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-file-text"></use></svg><span>Scene</span>
+            </button>
+            <button type="button" class="wms-btn" data-mode="quill" role="tab" aria-selected="false" title="Quill: tulis cerita bergaya buku">
+              <svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-feather"></use></svg><span>Quill</span>
+            </button>
+          </div>
+          <div id="quillRoot" class="quill-root hidden" aria-label="Quill"></div>
           <div class="scenes-col">
             <div class="scenes-header">
               <span>SCENES</span>
@@ -957,6 +1061,39 @@
   </div>
 </div>
 <input type="file" id="accAvatarInput" accept="image/*" hidden />
+
+<!-- ============ AKUN: HAPUS AKUN (Zona berbahaya) ============ -->
+<!-- Nama folder, jumlah project & pesan progres diisi bagian HAPUS AKUN di app.js. Tombol merah aktif setelah mengetik HAPUS. -->
+<div id="accDeleteModal" class="modal acc-modal acc-del-modal hidden" role="alertdialog" aria-modal="true" aria-labelledby="accDeleteTitle" aria-describedby="accDeleteDesc">
+  <div class="modal-box">
+    <div class="acc-del-head">
+      <span class="acc-del-badge" aria-hidden="true"><svg class="ti" width="20" height="20"><use href="#ti-alert-triangle"></use></svg></span>
+      <h3 id="accDeleteTitle">Hapus akun Novelist?</h3>
+    </div>
+    <p id="accDeleteDesc" class="acc-del-lead">Novelist tidak punya server — akunmu adalah folder Novelist di Google Drive-mu dan pengaturan di perangkat ini. Semuanya akan dihapus:</p>
+    <ul class="acc-del-list">
+      <li>
+        <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-brand-google-drive"></use></svg>
+        <span><b>Folder Novelist di Google Drive-mu dipindah ke Trash Drive</b> — <span id="accDelFolders"></span>, berisi <b id="accDelCount">0 project</b>, semua backup otomatis &amp; project yang sudah dihapus. Masih bisa dipulihkan dari Trash Google Drive selama 30 hari, setelah itu dihapus permanen oleh Google.</span>
+      </li>
+      <li>
+        <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-device-laptop"></use></svg>
+        <span><b>Semua pengaturan Novelist di perangkat ini</b> — profil, username &amp; foto, tema, background, gambar halaman login, aksesibilitas, status sidebar &amp; preferensi lainnya.</span>
+      </li>
+      <li>
+        <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-logout"></use></svg>
+        <span>Kamu akan <b>keluar</b> dan <b>akses Google Drive untuk Novelist dicabut</b>.</span>
+      </li>
+    </ul>
+    <label class="field-label acc-del-label" for="accDeleteInput">Ketik <b>HAPUS</b> untuk konfirmasi</label>
+    <input id="accDeleteInput" class="field-input" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="accDeleteMsg" />
+    <p id="accDeleteMsg" class="acc-field-msg" role="status" aria-live="polite"></p>
+    <div class="modal-buttons">
+      <button id="accDeleteCancel" class="btn-secondary">Batal</button>
+      <button id="accDeleteConfirm" class="btn-danger" disabled><svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-trash"></use></svg><span id="accDeleteConfirmLabel">Hapus akun</span></button>
+    </div>
+  </div>
+</div>
 
 <input type="file" id="coverInputHidden" accept="image/*" style="display:none" />
 

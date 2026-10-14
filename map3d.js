@@ -657,7 +657,7 @@ export function createMap3D(container, opts) {
     // tekstur permukaan (dipakai ulang selama ukuran sama)
     if (!surfTex || surfTex.image.width !== W) {
       if (surfTex) surfTex.dispose();
-      surfData = new Uint8Array(W * W * 4);
+      surfData = new Uint8ClampedArray(W * W * 4);   // Clamped: piksel bukit pasir yang terlalu terang tidak "melingkar" jadi bintik cyan
       surfTex = new THREE.DataTexture(surfData, W, W, THREE.RGBAFormat, THREE.UnsignedByteType);
       surfTex.colorSpace = THREE.SRGBColorSpace;
       surfTex.magFilter = THREE.LinearFilter; surfTex.minFilter = THREE.LinearMipmapLinearFilter;

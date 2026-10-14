@@ -138,7 +138,7 @@ function toast(msg, icon) {
   const text = document.createElement("span");
   text.textContent = msg;   // teks selalu lewat textContent (aman dari HTML di judul project / pesan error)
   t.appendChild(text);
-  t.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;max-width:calc(100vw - 32px);background:var(--bg-panel);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:8px;box-shadow:var(--shadow);z-index:500;font-size:13px;animation:fadeIn .2s ease;";
+  t.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;max-width:calc(100vw - 32px);background:var(--bg-panel);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:8px;box-shadow:var(--shadow);z-index:500;font-size:calc(13px * var(--fs-scale, 1));animation:fadeIn .2s ease;";
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 2600);
 }
@@ -165,6 +165,7 @@ function driveSignOut() {
   mainFolderIdCache = backupFolderIdCache = trashFolderIdCache = null;
   stopBackupInterval();
   if (window.NovelMap) window.NovelMap.hide();
+  if (window.NovelQuill) window.NovelQuill.hide();
   muteTimelineKeys(true);
   el("dashboardView").classList.add("hidden");
   el("editorView").classList.add("hidden");
@@ -596,6 +597,7 @@ function backToLibrary() {
   closeProjSidebar();
   flushCurrentEdits();
   if (window.NovelMap) window.NovelMap.hide();
+  if (window.NovelQuill) window.NovelQuill.hide();
   muteTimelineKeys(true);
   const p = getProject(currentProjectId);
   if (p) { p.title = el("projectTitle").value; p.data.title = p.title; p.updatedAt = new Date().toISOString(); }
@@ -610,18 +612,91 @@ function flushCurrentEdits() {
   syncSceneFromDetail();
   syncOrganizeFromDetail();
   if (window.NovelMap) window.NovelMap.flush();
+  if (window.NovelQuill) window.NovelQuill.flush();   // Quill: isi editor chapter
 }
 
 function switchTab(tab) {
   if (tab === "home") { flushCurrentEdits(); renderProjectHome(); }
+  if (tab !== "write" && window.NovelQuill) window.NovelQuill.hide();   // Quill: simpan + bersihkan sebelum tab lain tampil
   document.querySelectorAll(".rail-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   ["home", "write", "organize", "timeline", "map", "plot", "schedule", "tools"].forEach((t) => el("tab" + capitalize(t)).classList.toggle("hidden", t !== tab));
   el("editorView").dataset.tab = tab;
+  if (tab === "write") applyWriteMode();   // Quill: tampilkan mode Scene / Quill milik project ini
   updateSceneDrawerVisibility();
   muteTimelineKeys(tab !== "timeline");
   if (tab !== "map" && window.NovelMap) window.NovelMap.hide();   // hentikan render loop 3D
   if (tab === "timeline") openTimelineTab();
   if (tab === "map") openMapTab();
+}
+
+// ---- QUILL (tab Write → tombol "Scene | Quill"): quill.js baru dimuat saat Quill pertama kali dibuka.
+// Pilihan mode disimpan per project di p.data.quill.mode ("scene" | "quill"); data cerita di p.data.quill.stories.
+let quillLibPromise = null;
+function ensureQuillLib() {
+  if (!quillLibPromise) {
+    // quill-tiles.js = isi panel kanan (alat & tile). Kalau gagal dimuat, Quill tetap jalan tanpa panel.
+    quillLibPromise = loadScriptOnce("quill.js").then(() => loadScriptOnce("quill-tiles.js").catch((e) => console.warn("[Quill]", e.message)));
+    quillLibPromise.catch(() => { quillLibPromise = null; });   // boleh dicoba lagi
+  }
+  return quillLibPromise;
+}
+function writeMode(p) { return p && p.data && p.data.quill && p.data.quill.mode === "quill" ? "quill" : "scene"; }
+function applyWriteMode() {
+  const p = getProject(currentProjectId);
+  const quill = writeMode(p) === "quill";
+  el("tabWrite").classList.toggle("is-quill", quill);
+  el("quillRoot").classList.toggle("hidden", !quill);
+  el("writeModeSwitch").querySelectorAll(".wms-btn").forEach((b) => {
+    const on = b.dataset.mode === (quill ? "quill" : "scene");
+    b.classList.toggle("is-active", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  if (quill) openQuillMode();
+  else if (window.NovelQuill) window.NovelQuill.hide();
+}
+function setWriteMode(mode) {
+  const p = getProject(currentProjectId);
+  if (!p || writeMode(p) === mode) return;
+  flushCurrentEdits();
+  if (mode === "quill" && !p.data.quill) p.data.quill = { mode: "quill", stories: [] };
+  if (p.data.quill) p.data.quill.mode = mode;
+  markDirtyAndSchedule();
+  applyWriteMode();
+  updateSceneDrawerVisibility();
+}
+async function openQuillMode() {
+  const root = el("quillRoot");
+  if (!window.NovelQuill) root.innerHTML = '<div class="quill-loading">Memuat Quill…</div>';
+  try { await ensureQuillLib(); }
+  catch (e) { root.innerHTML = '<div class="quill-loading">Quill gagal dimuat. Periksa koneksi lalu buka lagi.</div>'; return; }
+  const p = getProject(currentProjectId);
+  if (el("tabWrite").classList.contains("hidden") || !p || writeMode(p) !== "quill") return;   // pengguna sudah pindah
+  window.NovelQuill.show({
+    project: p,
+    container: root,
+    onChange: markDirtyAndSchedule,
+    getUser: () => ({ name: quillUserName() }),
+    openTab: (tab) => switchTab(tab),
+    getOrganize: () => getProject(currentProjectId)?.data.organize || null,
+    getMaps: () => getProject(currentProjectId)?.data.maps || null,
+    escapeHtml,
+  });
+}
+// nama penulis untuk Quill: username / nama tampilan akun (bagian AKUN) → bagian depan email Google → "Penulis"
+function quillUserName() {
+  try {
+    if (typeof accountInfo !== "undefined" && accountInfo) {
+      const n = (typeof accountUsername === "function" && accountUsername()) || (typeof accountDisplayName === "function" && accountDisplayName());
+      if (n) return n;
+    }
+  } catch (e) { /* abaikan */ }
+  return "Penulis";
+}
+// dari Home/Timeline/Map ke scene tertentu: selalu buka editor Scene
+function openSceneInWrite(id) {
+  if (writeMode(getProject(currentProjectId)) === "quill") setWriteMode("scene");
+  switchTab("write");
+  selectScene(id);
 }
 
 // React Flow (Timeline) tetap mendengar Delete/Backspace di document walau tabnya tersembunyi, jadi event timeline
@@ -677,7 +752,7 @@ async function openTimelineTab() {
     project: getProject(currentProjectId),
     onChange: markDirtyAndSchedule,
     getScenes: () => flattenScenes(getProject(currentProjectId).data.scenes),
-    openScene: (id) => { switchTab("write"); selectScene(id); },
+    openScene: (id) => openSceneInWrite(id),
   });
 }
 
@@ -702,14 +777,14 @@ async function openMapTab() {
     project: getProject(currentProjectId),
     onChange: markDirtyAndSchedule,
     getScenes: () => flattenScenes(getProject(currentProjectId).data.scenes),
-    openScene: (id) => { switchTab("write"); selectScene(id); },
+    openScene: (id) => openSceneInWrite(id),
   });
 }
 
 // ---- HOME TAB: canvas berisi titik-titik scene ----
 // Background project = cover-nya (di-blur); kalau belum ada cover pakai foto default dashboard.
 function applyProjectLook(p) {
-  const bg = p.cover ? `url("${p.cover}")` : `url("bg-canyon.jpg")`;
+  const bg = p.cover ? `url("${p.cover}")` : dashBgImageCss();   // tanpa cover: background dashboard (bawaan / pilihan sendiri)
   el("projBgPhoto").style.backgroundImage = bg;
   el("projChipCover").style.backgroundImage = p.cover ? `url("${p.cover}")` : `linear-gradient(135deg, ${p.colorA}, ${p.colorB})`;
   el("projChipCover").textContent = p.cover ? "" : (p.title || "?").charAt(0).toUpperCase();
@@ -737,7 +812,7 @@ function renderProjectHome() {
   canvas.innerHTML = `<div class="home-canvas-area"><svg class="home-links" aria-hidden="true">${lines}</svg>` +
     pts.map((pt) => `<button class="home-node${pt.s.id === currentSceneId ? " is-current" : ""}" data-id="${pt.s.id}" style="left:${pt.x * 100}%;top:${pt.y * 100}%">` +
       `<span class="home-node-dot ${pt.s.status || "todo"}"></span><span class="home-node-label">${escapeHtml(pt.s.title || "(tanpa judul)")}</span></button>`).join("") + `</div>`;
-  canvas.querySelectorAll(".home-node").forEach((b) => b.onclick = () => { switchTab("write"); selectScene(b.dataset.id); });
+  canvas.querySelectorAll(".home-node").forEach((b) => b.onclick = () => openSceneInWrite(b.dataset.id));
 }
 
 // jam kecil di pojok kanan atas (seperti vvd)
@@ -955,7 +1030,7 @@ function renderSceneDetail() {
       <div class="breadcrumb-bar">
         <span class="breadcrumb-path">${tiPx(tiIcon("file-text"), 15)}<span class="breadcrumb-title">${escapeHtml(s.title || "(tanpa judul)")}</span></span>
       </div>
-      <div id="sceneEditor" class="obsidian-editor" contenteditable="true" spellcheck="false" style="font-size:${16 * currentZoom / 100}px">${s.content || ""}</div>
+      <div id="sceneEditor" class="obsidian-editor" contenteditable="true" spellcheck="false" style="font-size:calc(${16 * currentZoom / 100}px * var(--fs-scale, 1))">${s.content || ""}</div>
     </div>
 
     <div class="obsidian-statusbar">
@@ -978,7 +1053,7 @@ function renderSceneDetail() {
   el("zoomSlider").oninput = () => {
     currentZoom = parseInt(el("zoomSlider").value, 10);
     el("zoomLabel").textContent = currentZoom + "%";
-    el("sceneEditor").style.fontSize = (16 * currentZoom / 100) + "px";
+    el("sceneEditor").style.fontSize = `calc(${16 * currentZoom / 100}px * var(--fs-scale, 1))`;   // ikut Aksesibilitas → Ukuran teks
   };
 
   renderSceneDrawerBody(s);
@@ -1079,7 +1154,8 @@ function renderSceneDrawerBody(s) {
 function updateSceneDrawerVisibility() {
   const tabWrite = el("tabWrite");
   const writeActive = tabWrite && !tabWrite.classList.contains("hidden");
-  const show = !!(writeActive && currentSceneId && findScene(currentSceneId));
+  const quill = writeMode(getProject(currentProjectId)) === "quill";   // mode Quill: tombol panel scene disembunyikan
+  const show = !!(writeActive && !quill && currentSceneId && findScene(currentSceneId));
   el("sceneDrawerToggle").classList.toggle("hidden", !show);
   if (!show) closeSceneDrawer();
 }
@@ -1942,6 +2018,7 @@ function animateAccountIn() {
 function closeAccountModals() {
   el("accUsernameModal").classList.add("hidden");
   el("accProfileModal").classList.add("hidden");
+  closeAccountDeleteModal();   // tidak menutup saat penghapusan sedang berjalan
 }
 function usernameError(v) {
   if (v.length < 3) return "Minimal 3 karakter.";
@@ -2067,7 +2144,9 @@ function initAccount() {
   el("accRowProfile").onclick = openProfileModal;
   el("accThemeSeg").querySelectorAll("button").forEach((b) => b.onclick = () => document.body.classList.toggle("light", b.dataset.theme === "light"));
   el("accGoogleDisconnect").onclick = () => { if (confirm("Putuskan Google dari Novelist? Kamu akan keluar dan perlu login lagi untuk membuka project-mu.")) driveSignOut(); };
-  el("accLogout").onclick = () => { if (confirm("Keluar dari akun Google?")) driveSignOut(); };
+  // (tombol "Keluar dari akun" dihapus dari halaman ini — keluar lewat rail & menu gear)
+  initA11y();            // Aksesibilitas: ukuran teks, font disleksia, mode hemat performa
+  initAccountDelete();   // Zona berbahaya: hapus akun
 
   const uInput = el("accUsernameInput");
   uInput.addEventListener("input", () => {
@@ -2089,6 +2168,544 @@ function initAccount() {
   // Esc menutup menu gear (di halaman mana pun)
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !el("settingsMenu").classList.contains("hidden")) { e.preventDefault(); closeAllDropdowns(); el("btnSettings").focus(); }
+  });
+}
+
+// ================= AKSESIBILITAS (Pengaturan Akun → Aksesibilitas) =================
+// Tiga setelan, disimpan HANYA di perangkat ini (localStorage "novelist_a11y" = { scale, dyslexic, boost }), berlaku juga
+// di halaman login:
+// - Ukuran teks: variabel --fs-scale di <html> (1 / 1.05 / 1.1 / 1.2). Semua font-size di style.css ditulis
+//   calc(Npx * var(--fs-scale, 1)), jadi hanya TEKS yang membesar — 1rem, ikon berukuran tetap & label kanvas peta tidak.
+// - Font ramah disleksia: body.a11y-dyslexic -> OpenDyslexic (vendor/fonts, baru diunduh browser saat dipakai).
+// - Mode hemat performa: body.perf-boost -> tanpa backdrop-filter & blur, panel kaca jadi solid, foto background disembunyikan.
+//   "auto" (bawaan) mengikuti prefers-reduced-transparency sistem sampai pengguna memilih sendiri ("on" / "off").
+// Skrip kecil di awal <body> (index.html) sudah memasang semuanya sebelum halaman pertama kali tampil; applyA11y() di sini
+// menyamakan ulang + memberi tahu modul lain lewat event window "novelist:a11y".
+const A11Y_KEY = "novelist_a11y";
+const A11Y_SCALES = [1, 1.05, 1.1, 1.2];
+const A11Y_DEFAULT = { scale: 1, dyslexic: false, boost: "auto" };
+const a11yBoostMq = window.matchMedia ? window.matchMedia("(prefers-reduced-transparency: reduce)") : null;
+let a11yPrefs = { ...A11Y_DEFAULT };
+
+function loadA11yPrefs() {
+  let p = null;
+  try { p = JSON.parse(localStorage.getItem(A11Y_KEY) || "null"); } catch (e) { p = null; }
+  if (!p || typeof p !== "object") p = {};
+  return {
+    scale: A11Y_SCALES.includes(Number(p.scale)) ? Number(p.scale) : 1,
+    dyslexic: p.dyslexic === true,
+    boost: p.boost === "on" || p.boost === "off" ? p.boost : "auto",
+  };
+}
+function saveA11yPrefs() {
+  const d = A11Y_DEFAULT;
+  try {
+    if (a11yPrefs.scale === d.scale && a11yPrefs.dyslexic === d.dyslexic && a11yPrefs.boost === d.boost) localStorage.removeItem(A11Y_KEY);
+    else localStorage.setItem(A11Y_KEY, JSON.stringify(a11yPrefs));
+  } catch (e) { /* storage diblokir: setelan tetap berlaku selama sesi ini */ }
+}
+function a11ySystemBoost() { return !!(a11yBoostMq && a11yBoostMq.matches); }
+function a11yBoostOn() { return a11yPrefs.boost === "on" || (a11yPrefs.boost === "auto" && a11ySystemBoost()); }
+function applyA11y() {
+  const root = document.documentElement;
+  if (a11yPrefs.scale === 1) root.style.removeProperty("--fs-scale"); else root.style.setProperty("--fs-scale", String(a11yPrefs.scale));
+  document.body.classList.toggle("a11y-dyslexic", a11yPrefs.dyslexic);
+  document.body.classList.toggle("perf-boost", a11yBoostOn());
+  syncA11yControls();
+  try { window.dispatchEvent(new CustomEvent("novelist:a11y", { detail: { ...a11yPrefs, boostOn: a11yBoostOn() } })); } catch (e) { /* abaikan */ }
+}
+function setA11y(patch) {
+  a11yPrefs = { ...a11yPrefs, ...patch };
+  saveA11yPrefs();
+  applyA11y();
+}
+function syncA11yControls() {
+  const seg = el("accFontSizeSeg");
+  if (!seg) return;
+  seg.querySelectorAll("button").forEach((b) => {
+    const on = Number(b.dataset.scale) === a11yPrefs.scale;
+    b.classList.toggle("is-on", on);
+    b.setAttribute("aria-checked", String(on));
+    b.tabIndex = on ? 0 : -1;   // radiogroup: Tab masuk ke pilihan aktif, panah untuk pindah
+  });
+  el("accDysSwitch").setAttribute("aria-checked", String(a11yPrefs.dyslexic));
+  const boost = a11yBoostOn();
+  el("accBoostSwitch").setAttribute("aria-checked", String(boost));
+  el("accBoostState").textContent = a11yPrefs.boost === "auto"
+    ? `Mengikuti sistem — sekarang ${boost ? "aktif" : "nonaktif"}`
+    : `Dipilih manual — ${boost ? "aktif" : "nonaktif"}`;
+  el("accBoostAuto").classList.toggle("hidden", a11yPrefs.boost === "auto");
+}
+
+function initA11y() {
+  a11yPrefs = loadA11yPrefs();
+  applyA11y();
+  if (a11yBoostMq) {
+    const onSys = () => { if (a11yPrefs.boost === "auto") applyA11y(); };
+    if (a11yBoostMq.addEventListener) a11yBoostMq.addEventListener("change", onSys); else if (a11yBoostMq.addListener) a11yBoostMq.addListener(onSys);
+  }
+  const seg = el("accFontSizeSeg");
+  const tiles = [...seg.querySelectorAll("button")];
+  tiles.forEach((b) => b.onclick = () => setA11y({ scale: Number(b.dataset.scale) }));
+  seg.addEventListener("keydown", (e) => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (!step && e.key !== "Home" && e.key !== "End") return;
+    e.preventDefault();
+    const i = tiles.findIndex((b) => Number(b.dataset.scale) === a11yPrefs.scale);
+    const next = e.key === "Home" ? 0 : e.key === "End" ? tiles.length - 1 : (i + step + tiles.length) % tiles.length;
+    setA11y({ scale: Number(tiles[next].dataset.scale) });
+    tiles[next].focus();
+  });
+  el("accDysSwitch").onclick = () => setA11y({ dyslexic: !a11yPrefs.dyslexic });
+  el("accBoostSwitch").onclick = () => setA11y({ boost: a11yBoostOn() ? "off" : "on" });
+  el("accBoostAuto").onclick = () => { setA11y({ boost: "auto" }); el("accBoostSwitch").focus(); };   // tombolnya hilang -> fokus pindah
+  // klik di teks baris = klik saklarnya (tombol lain di baris itu tetap bekerja sendiri)
+  [["accDysRow", "accDysSwitch"], ["accBoostRow", "accBoostSwitch"]].forEach(([rowId, swId]) => {
+    el(rowId).addEventListener("click", (e) => { if (!e.target.closest("button")) el(swId).click(); });
+  });
+}
+
+// ================= HAPUS AKUN (Pengaturan Akun → Zona berbahaya) =================
+// Novelist tidak punya server, jadi "akun" = 3 folder buatan Novelist di Google Drive pengguna (project, backup, trash —
+// nama dari config.js) + data di perangkat ini. Hapus akun:
+//  1. hentikan autosave & backup berkala (supaya tidak ada yang membuat folder baru),
+//  2. cari folder lewat nama (TANPA membuat — beda dengan getOrCreateFolder) lalu PATCH { trashed: true } satu per satu
+//     -> masuk Trash Google Drive (bisa dipulihkan 30 hari). Gagal -> folder yang sudah dibuang dikembalikan, tetap login,
+//  3. hapus semua key localStorage/sessionStorage "novelist*" (+ key lama tanpa awalan) & IndexedDB "novelist",
+//  4. cabut token Google (driveSignOut), lalu muat ulang halaman supaya semua setelan kembali ke bawaan;
+//     halaman login menampilkan pemberitahuan (flag sementara di sessionStorage).
+const ACCOUNT_DELETE_WORD = "HAPUS";
+const ACCOUNT_DELETED_FLAG = "novelist_account_deleted";   // sessionStorage, dibaca sekali setelah reload
+const LEGACY_LOCAL_KEYS = ["dashTitleLast"];                 // key lama Novelist tanpa awalan "novelist"
+let accountDeleteBusy = false;
+
+function openAccountDeleteModal() {
+  if (accountDeleteBusy) return;
+  const names = [DRIVE_FOLDER_NAME, DRIVE_BACKUP_FOLDER_NAME, DRIVE_TRASH_FOLDER_NAME];
+  el("accDelFolders").innerHTML = names.map((n) => `<b>${escapeHtml(n)}</b>`).join(", ");
+  el("accDelCount").textContent = projects.length + " project";
+  const input = el("accDeleteInput");
+  input.value = "";
+  input.disabled = false;
+  setAccountDeleteMsg("", false);
+  syncAccountDeleteConfirm();
+  el("accDeleteModal").classList.remove("hidden");
+  input.focus();
+}
+function closeAccountDeleteModal(force = false) {
+  if (accountDeleteBusy && !force) return;
+  el("accDeleteModal").classList.add("hidden");
+}
+function setAccountDeleteMsg(text, isError) {
+  const m = el("accDeleteMsg");
+  m.textContent = text;
+  m.classList.toggle("is-error", !!isError);
+}
+function syncAccountDeleteConfirm() {
+  const ok = el("accDeleteInput").value.trim().toUpperCase() === ACCOUNT_DELETE_WORD;
+  el("accDeleteConfirm").disabled = !ok || accountDeleteBusy;
+}
+function setAccountDeleteBusy(on) {
+  accountDeleteBusy = on;
+  const btn = el("accDeleteConfirm");
+  btn.classList.toggle("is-busy", on);
+  btn.setAttribute("aria-busy", String(on));
+  btn.querySelector("use").setAttribute("href", on ? "#ti-loader-2" : "#ti-trash");
+  el("accDeleteConfirmLabel").textContent = on ? "Menghapus…" : "Hapus akun";
+  el("accDeleteInput").disabled = on;
+  el("accDeleteCancel").disabled = on;
+  syncAccountDeleteConfirm();
+}
+
+// folder Novelist (dicari lewat nama, tidak pernah dibuat dari sini). Bisa lebih dari satu dengan nama yang sama.
+async function findNovelistDriveFolders() {
+  const found = [];
+  for (const name of [DRIVE_FOLDER_NAME, DRIVE_BACKUP_FOLDER_NAME, DRIVE_TRASH_FOLDER_NAME]) {
+    const safe = name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const q = encodeURIComponent(`mimeType='application/vnd.google-apps.folder' and name='${safe}' and trashed=false`);
+    const data = await (await driveFetch(`${DRIVE_API}/files?q=${q}&fields=files(id,name)&pageSize=100`)).json();
+    (data.files || []).forEach((f) => { if (f && f.id && !found.some((x) => x.id === f.id)) found.push({ id: f.id, name }); });
+  }
+  return found;
+}
+function driveSetTrashed(id, trashed) {
+  return driveFetch(`${DRIVE_API}/files/${encodeURIComponent(id)}?fields=id,trashed`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ trashed }),
+  });
+}
+// semua data Novelist di perangkat ini: localStorage & sessionStorage "novelist*" + key lama, IndexedDB "novelist"
+async function clearNovelistLocalData() {
+  [() => window.localStorage, () => window.sessionStorage].forEach((getStore) => {
+    try {
+      const store = getStore();   // mengakses storage saja bisa melempar error bila diblokir browser
+      const keys = [];
+      for (let i = 0; i < store.length; i++) keys.push(store.key(i));
+      keys.forEach((k) => { if (k && (/^novelist/i.test(k) || LEGACY_LOCAL_KEYS.includes(k))) store.removeItem(k); });
+    } catch (e) { /* storage diblokir: tidak ada yang tersimpan */ }
+  });
+  await new Promise((resolve) => {
+    let req;
+    try { req = window.indexedDB.deleteDatabase("novelist"); } catch (e) { resolve(); return; }
+    const t = setTimeout(resolve, 2500);   // onblocked (tab lain masih membuka db): penghapusan tetap terjadi setelah tab itu menutup
+    req.onsuccess = req.onerror = req.onblocked = () => { clearTimeout(t); resolve(); };
+  });
+}
+// cabut token Google lalu tunggu sebentar (maks. 3 dtk) supaya permintaan revoke selesai sebelum halaman dimuat ulang
+function revokeGoogleAccess() {
+  return new Promise((resolve) => {
+    const token = accessToken;
+    const oauth2 = window.google && window.google.accounts && window.google.accounts.oauth2;
+    if (!token || !oauth2 || !oauth2.revoke) { resolve(); return; }
+    const t = setTimeout(resolve, 3000);
+    try { oauth2.revoke(token, () => { clearTimeout(t); resolve(); }); } catch (e) { clearTimeout(t); resolve(); }
+  });
+}
+
+async function runAccountDelete() {
+  if (accountDeleteBusy || el("accDeleteInput").value.trim().toUpperCase() !== ACCOUNT_DELETE_WORD) return;
+  if (!accessToken) { setAccountDeleteMsg("Sesi Google berakhir — login lagi dulu, lalu ulangi.", true); return; }
+  setAccountDeleteBusy(true);
+  // 1. hentikan semua penyimpanan otomatis
+  const hadBackup = !!backupIntervalHandle;
+  clearTimeout(saveDebounceTimer);
+  stopBackupInterval();
+  const trashed = [];
+  try {
+    // 2. folder Drive -> Trash
+    setAccountDeleteMsg("Mencari folder Novelist di Google Drive…");
+    const folders = await findNovelistDriveFolders();
+    for (let i = 0; i < folders.length; i++) {
+      setAccountDeleteMsg(`Memindahkan folder ke Trash Google Drive (${i + 1}/${folders.length}): ${folders[i].name}…`);
+      await driveSetTrashed(folders[i].id, true);
+      trashed.push(folders[i]);
+    }
+  } catch (e) {
+    console.error("Hapus akun gagal:", e);
+    let restored = true;
+    for (const f of trashed.reverse()) { try { await driveSetTrashed(f.id, false); } catch (e2) { restored = false; } }
+    setAccountDeleteBusy(false);
+    if (hadBackup && accessToken) startBackupInterval();
+    // "Drive API error 403: {json}" -> "Drive API error 403: <pesan dari Google>"
+    let why = (e && e.message) || String(e);
+    const m = /^(Drive API error \d+): ([\s\S]*)$/.exec(why);
+    if (m) { try { const j = JSON.parse(m[2]); why = m[1] + ((j && j.error && j.error.message) ? " — " + j.error.message : ""); } catch (e2) { why = m[1]; } }
+    setAccountDeleteMsg(`Gagal menghapus akun: ${why}.` + (trashed.length
+      ? (restored ? " Folder yang sudah dipindah ke Trash sudah dikembalikan." : " Sebagian folder sudah ada di Trash Google Drive — pulihkan dari sana bila perlu.")
+      : "") + (accessToken ? " Kamu masih login; coba lagi nanti." : " Login lagi, lalu coba lagi."), true);
+    syncAccountDeleteConfirm();   // (tanpa toast: pesannya sudah di modal, toast malah menutupi tombolnya)
+    return;
+  }
+  // 3. data di perangkat ini, 4. keluar + cabut akses Google, lalu mulai bersih
+  setAccountDeleteMsg("Menghapus data Novelist di perangkat ini…");
+  hasUnsyncedChanges = false;   // jangan ada peringatan "perubahan belum tersimpan" / autosave saat halaman dimuat ulang
+  await clearNovelistLocalData();
+  setAccountDeleteMsg("Keluar & mencabut akses Google…");
+  await revokeGoogleAccess();
+  accessToken = null;   // sudah dicabut di atas — driveSignOut tidak perlu mencabut lagi
+  closeAccountDeleteModal(true);
+  setAccountDeleteBusy(false);
+  a11yPrefs = { ...A11Y_DEFAULT };   // setelan aksesibilitas langsung kembali ke bawaan (tanpa menyimpan apa pun)
+  applyA11y();
+  driveSignOut();
+  showAccountDeletedNotice(trashed.length);
+  // muat ulang supaya tema, background, gambar login, sidebar, aksesibilitas, dll. kembali ke bawaan; notice ditampilkan
+  // lagi setelah reload lewat flag. sessionStorage diblokir -> tidak reload (notice di atas tetap terlihat).
+  let flagged = false;
+  try { sessionStorage.setItem(ACCOUNT_DELETED_FLAG, String(trashed.length)); flagged = true; } catch (e) { flagged = false; }
+  if (flagged) setTimeout(() => { hasUnsyncedChanges = false; clearTimeout(saveDebounceTimer); location.reload(); }, 60);   // (modul yang ditutup driveSignOut bisa menandai "belum tersimpan")
+}
+function showAccountDeletedNotice(folderCount) {
+  showLoginNotice("Akun Novelist-mu sudah dihapus. " + (Number(folderCount) > 0
+    ? "Folder Novelist dipindah ke Trash Google Drive dan masih bisa dipulihkan dari sana selama 30 hari. "
+    : "") + "Semua pengaturan di perangkat ini sudah dihapus dan akses Google sudah dicabut.");
+  clearTimeout(loginNoticeTimer);   // pesan penting: tampil lebih lama dari notice biasa (4 dtk)
+  loginNoticeTimer = setTimeout(() => el("loginNotice").classList.add("hidden"), 15000);
+}
+
+function initAccountDelete() {
+  el("accDeleteBtn").onclick = openAccountDeleteModal;
+  el("accDeleteCancel").onclick = () => closeAccountDeleteModal();
+  el("accDeleteConfirm").onclick = runAccountDelete;
+  const input = el("accDeleteInput");
+  input.addEventListener("input", () => { syncAccountDeleteConfirm(); if (!accountDeleteBusy) setAccountDeleteMsg("", false); });
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") runAccountDelete(); });
+  // setelah reload karena hapus akun: tampilkan pemberitahuan sekali di halaman login
+  let flag = null;
+  try { flag = sessionStorage.getItem(ACCOUNT_DELETED_FLAG); sessionStorage.removeItem(ACCOUNT_DELETED_FLAG); } catch (e) { flag = null; }
+  if (flag !== null) showAccountDeletedNotice(flag);
+}
+
+// ================= BACKGROUND (Pengaturan Akun → Tampilan) =================
+// Foto background dashboard (bawaan bg-canyon.jpg) bisa diganti gambar sendiri. Tampilannya tetap sama dengan bawaan:
+// gambarnya cuma dipasang sebagai inline background-image di #dashBgPhoto (.galaxy-photo), jadi blur, vignette, dot-grid
+// kaca buram & crossfade cover project yang di-hover tetap dari CSS .galaxy-*. Project tanpa cover juga memakainya.
+// Slider Blur & Redup = variabel CSS --dash-bg-blur / --dash-bg-dim di #dashboardView (default = tampilan bawaan).
+// Disimpan HANYA di perangkat ini (tidak ikut akun/Drive, tetap ada setelah logout): gambar (Blob) di IndexedDB
+// "novelist"/"kv" lewat loginArtKv() (helper key-value yang sama dengan login art), setelan slider di localStorage.
+// Storage diblokir -> background tetap dipakai selama sesi ini.
+const DASH_BG_KEY = "dashBgCustom";              // key di IndexedDB novelist/kv
+const DASH_BG_PREFS_KEY = "novelist_dash_bg";    // localStorage: { blur, dim }
+const DASH_BG_MAX_BYTES = 20 * 1024 * 1024;      // batas ukuran file masukan
+const DASH_BG_MAX_SIDE = 2560;                   // sisi terpanjang setelah diperkecil (layar penuh, tapi di-blur -> cukup)
+const DASH_BG_DEFAULT = { blur: 6, dim: 30 };    // = .galaxy-dots bawaan: blur(6px) + tint gelap .3
+const DASH_BG_LIMITS = { blur: [0, 30], dim: [0, 80] };
+
+let dashBg = null;               // { url, objectUrl, w, h, saved } gambar aktif; null = foto bawaan
+let dashBgPrefs = { ...DASH_BG_DEFAULT };
+let dashBgTouched = false;       // pengguna sudah ganti/reset sebelum gambar tersimpan selesai dibaca -> abaikan hasil bacaan
+let dashBgBusy = false;
+
+// url("...") yang aman untuk CSS (object URL / data URI / path)
+function cssUrl(u) { return 'url("' + String(u).replace(/[\\"]/g, "\\$&").replace(/[\n\r]/g, "") + '")'; }
+// background project tanpa cover = background dashboard yang sedang aktif
+function dashBgImageCss() { return dashBg ? cssUrl(dashBg.url) : 'url("bg-canyon.jpg")'; }
+function dashBgPrefsIsDefault() { return dashBgPrefs.blur === DASH_BG_DEFAULT.blur && dashBgPrefs.dim === DASH_BG_DEFAULT.dim; }
+
+function loadDashBgPrefs() {
+  let p = null;
+  try { p = JSON.parse(localStorage.getItem(DASH_BG_PREFS_KEY) || "null"); } catch (e) { p = null; }
+  const out = { ...DASH_BG_DEFAULT };
+  if (p && typeof p === "object") Object.keys(DASH_BG_LIMITS).forEach((k) => {
+    const v = Number(p[k]), [lo, hi] = DASH_BG_LIMITS[k];
+    if (p[k] != null && Number.isFinite(v)) out[k] = Math.round(Math.min(hi, Math.max(lo, v)));
+  });
+  return out;
+}
+function saveDashBgPrefs() {
+  try {
+    if (dashBgPrefsIsDefault()) localStorage.removeItem(DASH_BG_PREFS_KEY);
+    else localStorage.setItem(DASH_BG_PREFS_KEY, JSON.stringify(dashBgPrefs));
+  } catch (e) { /* storage diblokir: setelan tetap berlaku selama sesi ini */ }
+}
+function applyDashBgPrefs() {
+  const s = el("dashboardView").style;
+  if (dashBgPrefs.blur === DASH_BG_DEFAULT.blur) s.removeProperty("--dash-bg-blur"); else s.setProperty("--dash-bg-blur", dashBgPrefs.blur + "px");
+  if (dashBgPrefs.dim === DASH_BG_DEFAULT.dim) s.removeProperty("--dash-bg-dim"); else s.setProperty("--dash-bg-dim", String(dashBgPrefs.dim / 100));
+}
+function applyDashBg() {
+  el("dashBgPhoto").style.backgroundImage = dashBg ? cssUrl(dashBg.url) : "";   // "" = kembali ke bg-canyon.jpg dari CSS
+  el("dashboardView").classList.toggle("has-custom-bg", !!dashBg);
+  const p = currentProjectId && getProject(currentProjectId);
+  if (p && !p.cover) el("projBgPhoto").style.backgroundImage = dashBgImageCss();
+  renderDashBgControls();
+}
+// ganti gambar aktif; object URL lama dilepas sedikit belakangan (transisi background-image project masih memakainya)
+function setDashBg(next) {
+  const prev = dashBg;
+  dashBg = next;
+  applyDashBg();
+  if (prev && prev.objectUrl && (!next || next.url !== prev.url)) setTimeout(() => URL.revokeObjectURL(prev.url), 1500);
+}
+
+function renderDashBgControls() {
+  const thumb = el("accBgThumb");
+  if (!thumb) return;
+  const plain = document.body.classList.contains("light") && !dashBg;   // tema terang bawaan: tanpa foto
+  thumb.classList.toggle("is-plain", plain);
+  thumb.style.backgroundImage = dashBg ? cssUrl(dashBg.url) : "";
+  el("accBgSub").textContent = dashBg
+    ? `Gambar sendiri · ${dashBg.w}×${dashBg.h}` + (dashBg.saved ? " · tersimpan di perangkat ini" : " · hanya sesi ini")
+    : plain ? "Bawaan — tema terang memakai latar polos" : "Bawaan — foto ngarai bersalju";
+  el("accBgReset").classList.toggle("hidden", !dashBg && dashBgPrefsIsDefault());
+  [["blur", "accBgBlur", "accBgBlurVal", (v) => v + " px"], ["dim", "accBgDim", "accBgDimVal", (v) => v + "%"]].forEach(([k, id, valId, fmt]) => {
+    const input = el(id), v = dashBgPrefs[k], [lo, hi] = DASH_BG_LIMITS[k];
+    input.value = String(v);
+    input.style.setProperty("--fill", ((v - lo) / (hi - lo)) * 100 + "%");
+    input.setAttribute("aria-valuetext", fmt(v));
+    input.disabled = plain;
+    input.closest(".acc-range-row").classList.toggle("is-off", plain);
+    el(valId).textContent = fmt(v);
+  });
+  el("accBgNote").classList.toggle("hidden", !plain);
+}
+function setDashBgBusy(on) {
+  dashBgBusy = on;
+  const pick = el("accBgPick");
+  pick.classList.toggle("is-busy", on);
+  pick.setAttribute("aria-busy", String(on));
+  pick.querySelector("use").setAttribute("href", on ? "#ti-loader-2" : "#ti-photo");
+  el("accBgPickLabel").textContent = on ? "Memproses…" : "Ganti background…";
+  el("accBgReset").disabled = on;
+}
+
+function dashBgDecodes(url) {
+  const img = new Image();
+  img.src = url;
+  return img.decode().then(() => img.naturalWidth > 0, () => false);
+}
+// File -> Blob kecil: decode, perkecil (sisi terpanjang <= DASH_BG_MAX_SIDE), encode WebP 0.9.
+// Browser yang tidak bisa encode WebP (Safari) dapat JPEG di atas latar gelap.
+async function prepareDashBgImage(file) {
+  let source = null, url = null;
+  try {
+    if (window.createImageBitmap) { try { source = await createImageBitmap(file); } catch (e) { source = null; } }
+    if (!source) {   // mis. SVG / browser lama: lewat <img>
+      url = URL.createObjectURL(file);
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      source = img;
+    }
+    const w0 = source.naturalWidth || source.width, h0 = source.naturalHeight || source.height;
+    if (!w0 || !h0) throw new Error("ukuran gambar 0");
+    const vector = /svg/i.test(file.type || "") || /\.svg$/i.test(file.name || "");   // SVG boleh diperbesar
+    const scale = vector ? 1920 / Math.max(w0, h0) : Math.min(1, DASH_BG_MAX_SIDE / Math.max(w0, h0));
+    const w = Math.max(1, Math.round(w0 * scale)), h = Math.max(1, Math.round(h0 * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(source, 0, 0, w, h);
+    const encode = (type, q) => new Promise((resolve) => canvas.toBlob(resolve, type, q));
+    let blob = await encode("image/webp", 0.9);
+    if (!blob || blob.type !== "image/webp") {
+      ctx.globalCompositeOperation = "destination-over";   // JPEG tanpa alpha: isi bagian transparan dengan warna latar
+      ctx.fillStyle = "#0a0a0c";
+      ctx.fillRect(0, 0, w, h);
+      blob = await encode("image/jpeg", 0.9);
+    }
+    if (!blob || !blob.size) throw new Error("encode gagal");
+    return { blob, w, h, at: Date.now() };
+  } finally {
+    if (source && source.close) source.close();   // ImageBitmap
+    if (url) URL.revokeObjectURL(url);
+  }
+}
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error || new Error("FileReader gagal"));
+    r.readAsDataURL(blob);
+  });
+}
+
+// ---- simpan / baca di IndexedDB (perangkat ini) ----
+async function saveDashBgCustom(rec) {
+  try { await loginArtKv("readwrite", (s) => s.put(rec, DASH_BG_KEY)); return true; } catch (e) { /* coba sebagai data URI */ }
+  try {   // browser yang menolak Blob di IndexedDB: simpan sebagai data URI
+    const src = await blobToDataUrl(rec.blob);
+    await loginArtKv("readwrite", (s) => s.put({ src, w: rec.w, h: rec.h, at: rec.at }, DASH_BG_KEY));
+    return true;
+  } catch (e) { /* lanjut */ }
+  // gagal total: jangan sampai gambar LAMA yang tersimpan muncul lagi setelah reload
+  try { await loginArtKv("readwrite", (s) => s.delete(DASH_BG_KEY)); } catch (e) { /* abaikan */ }
+  return false;
+}
+async function clearDashBgCustom() {
+  try { await loginArtKv("readwrite", (s) => s.delete(DASH_BG_KEY)); } catch (e) { /* abaikan */ }
+}
+async function loadDashBgCustom() {
+  let rec = null;
+  try { rec = await loginArtKv("readonly", (s) => s.get(DASH_BG_KEY)); } catch (e) { return null; }
+  if (!rec || typeof rec !== "object") return null;
+  const size = (v) => (Number.isFinite(v) && v > 0 ? Math.round(v) : "?");
+  let bg = null;
+  if (rec.blob instanceof Blob && /^image\//.test(rec.blob.type)) bg = { url: URL.createObjectURL(rec.blob), objectUrl: true };
+  else if (typeof rec.src === "string" && /^data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/]+=*$/i.test(rec.src)) bg = { url: rec.src, objectUrl: false };
+  if (!bg) return null;
+  Object.assign(bg, { w: size(rec.w), h: size(rec.h), saved: true });
+  if (!(await dashBgDecodes(bg.url))) {   // data rusak -> buang supaya background tidak kosong terus
+    if (bg.objectUrl) URL.revokeObjectURL(bg.url);
+    clearDashBgCustom();
+    return null;
+  }
+  return bg;
+}
+
+// ---- ganti / kembalikan ----
+function pickDashBg() {
+  if (dashBgBusy) return;
+  const input = el("accBgInput");
+  input.value = "";
+  input.click();
+}
+async function changeDashBg(file) {
+  if (dashBgBusy || !file) return;
+  // file.type kadang kosong (mis. .webp di sistem lama) -> cek ekstensinya
+  const isImage = /^image\//i.test(file.type || "") || (!file.type && /\.(png|jpe?g|webp|gif|bmp|avif|svg)$/i.test(file.name || ""));
+  if (!isImage) { toast("File itu bukan gambar — pilih file JPG, PNG atau WebP", tiIcon("alert-triangle")); return; }
+  if (file.size > DASH_BG_MAX_BYTES) { toast("Gambar terlalu besar (maks. 20 MB)", tiIcon("alert-triangle")); return; }
+  setDashBgBusy(true);
+  try {
+    let rec = null;
+    try { rec = await prepareDashBgImage(file); } catch (e) { console.warn("[background] gambar gagal diproses:", e); }
+    const url = rec ? URL.createObjectURL(rec.blob) : null;
+    if (!url || !(await dashBgDecodes(url))) {
+      if (url) URL.revokeObjectURL(url);
+      toast("Gambar tidak bisa dibaca — coba file lain (JPG, PNG atau WebP)", tiIcon("alert-triangle"));
+      return;
+    }
+    dashBgTouched = true;
+    setDashBg({ url, objectUrl: true, w: rec.w, h: rec.h, saved: false });
+    const saved = await saveDashBgCustom(rec);
+    if (dashBg && dashBg.url === url) { dashBg.saved = saved; renderDashBgControls(); }
+    if (saved) toast("Background diganti", tiIcon("circle-check"));
+    else toast("Background dipakai untuk sesi ini saja — penyimpanan browser diblokir", tiIcon("alert-triangle"));
+  } finally {
+    setDashBgBusy(false);
+  }
+}
+async function resetDashBg() {
+  if (dashBgBusy) return;
+  dashBgTouched = true;
+  dashBgPrefs = { ...DASH_BG_DEFAULT };
+  saveDashBgPrefs();
+  applyDashBgPrefs();
+  setDashBg(null);
+  toast("Background dikembalikan ke bawaan", tiIcon("restore"));
+  await clearDashBgCustom();
+}
+
+function initDashBg() {
+  dashBgPrefs = loadDashBgPrefs();
+  applyDashBgPrefs();
+  renderDashBgControls();
+  // gambar tersimpan dibaca sedini mungkin (login butuh klik + popup Google, jadi biasanya sudah siap sebelum dashboard tampil)
+  loadDashBgCustom().then((bg) => {
+    if (!bg) return;
+    if (dashBgTouched) { if (bg.objectUrl) URL.revokeObjectURL(bg.url); return; }
+    setDashBg(bg);
+  }, () => {});
+
+  el("accBgPick").onclick = pickDashBg;
+  el("accBgThumb").onclick = pickDashBg;
+  el("accBgReset").onclick = () => { el("accBgPick").focus(); resetDashBg(); };   // tombolnya hilang setelah reset -> fokus pindah
+  el("accBgInput").addEventListener("change", (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) changeDashBg(f); });
+  [["blur", "accBgBlur"], ["dim", "accBgDim"]].forEach(([k, id]) => {
+    const input = el(id);
+    input.addEventListener("input", () => { dashBgPrefs[k] = Number(input.value); applyDashBgPrefs(); renderDashBgControls(); });   // pratinjau langsung
+    input.addEventListener("change", saveDashBgPrefs);
+  });
+  // tema berubah: thumbnail & slider ikut (tema terang bawaan tidak memakai foto)
+  let lastLight = document.body.classList.contains("light");
+  new MutationObserver(() => {
+    const light = document.body.classList.contains("light");
+    if (light !== lastLight) { lastLight = light; renderDashBgControls(); }
+  }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+
+  // seret-lepas gambar ke baris Background; file yang dilepas di tempat lain di halaman akun diabaikan
+  // (jangan sampai browser membuka file itu & meninggalkan aplikasi). Counter karena dragenter/leave ikut anak elemen.
+  const view = el("accountView"), row = el("accBgRow");
+  const hasFiles = (e) => !!e.dataTransfer && [...(e.dataTransfer.types || [])].includes("Files");
+  let depth = 0;
+  const endDrag = () => { depth = 0; view.classList.remove("is-file-drag"); row.classList.remove("is-drop"); };
+  view.addEventListener("dragenter", (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth++; view.classList.add("is-file-drag"); });
+  view.addEventListener("dragleave", (e) => { if (!hasFiles(e)) return; depth = Math.max(0, depth - 1); if (!depth) endDrag(); });
+  view.addEventListener("dragover", (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    const inRow = row.contains(e.target);
+    row.classList.toggle("is-drop", inRow);
+    e.dataTransfer.dropEffect = inRow ? "copy" : "none";
+  });
+  view.addEventListener("drop", (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    const inRow = row.contains(e.target);
+    endDrag();
+    const f = inRow && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) changeDashBg(f);
   });
 }
 
@@ -2391,11 +3008,106 @@ function initRailLogo() {
   document.addEventListener("visibilitychange", sync);
 }
 
+// ================= RAIL SIDEBAR (rail kiri dashboard bisa dibuka/ditutup) =================
+// Layar lebar (>700px): klik logo kiri atas = buka/tutup rail. Saat tertutup, kursor yang diam sebentar di tepi kiri layar
+// membukanya otomatis. Sekali terbuka, rail TETAP terbuka (tidak menutup sendiri saat kursor pergi, Esc juga tidak)
+// sampai logo diklik lagi. Status diingat di perangkat ini; pengguna baru mulai dengan rail tertutup + petunjuk kecil.
+// HP (<=700px): rail = bar bawah yang selalu tampil; logo kembali jadi hiasan saja.
+const RAIL_OPEN_KEY = "novelist_rail_open";
+const RAIL_HINT_KEY = "novelist_rail_hint_seen";
+const RAIL_EDGE_PX = 10;            // lebar zona tepi kiri
+const RAIL_EDGE_DWELL_MS = 120;     // kursor harus bertahan di zona tepi selama ini (hindari terbuka tanpa sengaja)
+const RAIL_HINT_DELAY_MS = 900;     // petunjuk muncul sebentar setelah dashboard tampil...
+const RAIL_HINT_SHOW_MS = 9000;     // ...lalu memudar sendiri (tampil lagi di kunjungan berikutnya sampai rail pernah dibuka)
+const railMobileMq = window.matchMedia("(max-width: 700px)");
+let railOpen = false, railHintDone = false, railHintTimer = 0, railEdgeTimer = 0;
+
+function railIsMobile() { return railMobileMq.matches; }
+function railDashVisible() { return !el("dashboardView").classList.contains("hidden"); }
+function setRailOpen(open, { save = true } = {}) {
+  railOpen = !!open;
+  el("dashboardView").classList.toggle("rail-closed", !railOpen);
+  syncRailLogo();
+  if (save) { try { localStorage.setItem(RAIL_OPEN_KEY, railOpen ? "1" : "0"); } catch (e) { /* abaikan */ } }
+  if (railOpen) { markRailHintSeen(); return; }
+  cancelRailEdge();
+  // tutup: menu gear ikut ditutup; fokus yang masih di dalam rail dipindah ke logo (rail jadi visibility:hidden)
+  if (!el("settingsMenu").classList.contains("hidden")) closeAllDropdowns();
+  if (el("dashRail").contains(document.activeElement)) el("btnRailLogo").focus({ preventScroll: true });
+}
+function syncRailLogo() {
+  const btn = el("btnRailLogo");
+  if (railIsMobile()) {   // bar bawah HP: tidak ada yang dibuka/ditutup
+    btn.setAttribute("tabindex", "-1");
+    btn.setAttribute("aria-hidden", "true");
+    btn.removeAttribute("aria-expanded");
+    hideRailHint();
+    return;
+  }
+  const label = railOpen ? "Tutup sidebar" : "Buka sidebar";
+  btn.removeAttribute("tabindex");
+  btn.removeAttribute("aria-hidden");
+  btn.setAttribute("aria-label", label);
+  btn.setAttribute("aria-expanded", String(railOpen));
+  el("railLogoTip").textContent = label;
+}
+
+// ---- petunjuk sekali tampil di samping logo ----
+function railHintSeen() {
+  if (railHintDone) return true;
+  try { return localStorage.getItem(RAIL_HINT_KEY) === "1"; } catch (e) { return false; }
+}
+function hideRailHint() { clearTimeout(railHintTimer); el("railHint").classList.remove("is-on"); }
+function markRailHintSeen() {
+  hideRailHint();
+  if (railHintDone) return;
+  railHintDone = true;
+  try { localStorage.setItem(RAIL_HINT_KEY, "1"); } catch (e) { /* abaikan */ }
+}
+function maybeShowRailHint() {
+  hideRailHint();
+  if (railOpen || railIsMobile() || railHintSeen()) return;
+  railHintTimer = setTimeout(() => {
+    if (railOpen || railIsMobile() || !railDashVisible()) return;
+    el("railHint").classList.add("is-on");
+    railHintTimer = setTimeout(hideRailHint, RAIL_HINT_SHOW_MS);
+  }, RAIL_HINT_DELAY_MS);
+}
+
+// ---- buka otomatis saat kursor bertahan di tepi kiri (mouse/pen saja; tidak saat tombol ditekan / menyeret) ----
+function cancelRailEdge() { clearTimeout(railEdgeTimer); railEdgeTimer = 0; }
+function railEdgeAllowed() {
+  return !railOpen && !railIsMobile() && railDashVisible() && !document.querySelector(".modal:not(.hidden)");
+}
+function onRailEdgePointer(e) {
+  if (e.clientX > RAIL_EDGE_PX || e.pointerType === "touch" || e.buttons || !railEdgeAllowed()) { cancelRailEdge(); return; }
+  if (railEdgeTimer) return;   // sudah menunggu: bergerak di dalam zona tepi tidak mengulang hitungan
+  railEdgeTimer = setTimeout(() => { railEdgeTimer = 0; if (railEdgeAllowed()) setRailOpen(true); }, RAIL_EDGE_DWELL_MS);
+}
+
+function initRailSidebar() {
+  let saved = null;
+  try { saved = localStorage.getItem(RAIL_OPEN_KEY); } catch (e) { /* abaikan */ }
+  setRailOpen(saved === "1", { save: false });   // default pengguna baru: tertutup
+  el("btnRailLogo").addEventListener("click", () => { if (!railIsMobile()) setRailOpen(!railOpen); });
+  el("railHint").addEventListener("click", () => setRailOpen(true));
+  document.addEventListener("pointermove", onRailEdgePointer, { passive: true });
+  document.addEventListener("pointerdown", cancelRailEdge, true);
+  document.documentElement.addEventListener("mouseleave", cancelRailEdge);
+  window.addEventListener("blur", cancelRailEdge);
+  railMobileMq.addEventListener("change", () => { syncRailLogo(); if (!railIsMobile()) maybeShowRailHint(); });
+  // petunjuk hanya saat dashboard benar-benar tampil (setelah login / kembali dari project)
+  new IntersectionObserver((entries) => {
+    if (entries.some((e) => e.isIntersecting)) maybeShowRailHint(); else hideRailHint();
+  }).observe(el("btnRailLogo"));
+}
+
 // ================= EVENT BINDING =================
 window.addEventListener("DOMContentLoaded", () => {
   initLoginArt();
   initLoginFooter();
   initRailLogo();
+  initRailSidebar();   // rail kiri dashboard: buka/tutup lewat logo & tepi kiri layar
   pickDashTitle();
   el("btnLoginGoogle").onclick = handleLogin;
   document.querySelectorAll("#loginView .btn-oauth.is-soon").forEach((b) => b.onclick = () => handleSoonProvider(b.dataset.provider));
@@ -2429,6 +3141,7 @@ window.addEventListener("DOMContentLoaded", () => {
   el("menuCloudLibrary").onclick = openCloudLibrary;
   el("menuDriveLogout").onclick = () => { if (confirm("Logout dari Google?")) driveSignOut(); };
   initAccount();   // rail Project/Akun, menu Pengaturan Akun & Bantuan, halaman akun + modalnya
+  initDashBg();    // background dashboard pilihan sendiri (Pengaturan Akun → Tampilan), dibaca dari IndexedDB sedini mungkin
 
   // ---- Ikon aksi di rail kiri dashboard ----
   el("btnQuickTheme").addEventListener("click", () => document.body.classList.toggle("light"));
@@ -2486,6 +3199,11 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   document.querySelectorAll(".rail-btn").forEach((btn) => btn.onclick = () => switchTab(btn.dataset.tab));
+  // Quill: tombol "Scene | Quill" di atas tab Write (panah kiri/kanan berpindah antar-tombol)
+  el("writeModeSwitch").querySelectorAll(".wms-btn").forEach((btn) => {
+    btn.onclick = () => setWriteMode(btn.dataset.mode);
+    btn.onkeydown = (e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); const m = btn.dataset.mode === "scene" ? "quill" : "scene"; setWriteMode(m); el("writeModeSwitch").querySelector(`[data-mode="${m}"]`).focus(); } };
+  });
   el("btnProjectTheme").onclick = () => document.body.classList.toggle("light");
 
   // Write tab
