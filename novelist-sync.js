@@ -740,6 +740,9 @@
       };
       ind.addEventListener("click", act);
       ind.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); act(); } });
+      // di editor: status "… login untuk sinkron" / "gagal sinkron" juga bisa diketuk
+      const status = el("saveStatus");
+      if (status) status.addEventListener("click", () => { if (S.needLogin || S.state === "error" || !accessToken) act(); });
     }
   });
 
