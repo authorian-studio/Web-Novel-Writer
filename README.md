@@ -1,6 +1,31 @@
-# Novelist Web — v0.9.9
+# Novelist Web — v0.10.0
 
-## Riwayat perubahan terbaru (v0.9.9) — paling baru di atas
+## Riwayat perubahan terbaru (v0.10.0) — paling baru di atas
+
+- **Tab project bisa ditutup & dibuka (tidak bertumpuk lagi):** topbar project kini hanya menampilkan tab yang
+  sedang terbuka. Tab aktif berupa pil berikon + label (diwarnai warna project), tab lain berupa ikon bulat. Tutup tab
+  dengan × (muncul saat disorot), klik tengah, atau Delete; urutkan dengan seret atau Alt+Shift+←/→. Project baru
+  dibuka dengan Beranda, Tulis & Organize. Bila tab penuh, deretannya bisa digeser.
+  - **Tombol +** membuka jendela **"Tambah tab"** di tengah layar: kotak cari + kartu fitur (Beranda, Tulis, Quill,
+    Organize, Timeline, Map, Plot, Schedule, Tools) dengan deskripsi singkat & tanda "Terbuka"; bisa pakai panah + Enter.
+  - Kalau semua tab ditutup, tampil halaman "Kamu ada di <project>" dengan chip fitur & kotak "Cari fitur…".
+  - Fitur lain yang membuka tab tertutup (mis. buka scene dari Timeline) otomatis menambahkan tabnya lagi.
+  - Pilihan Scene | Quill di tab Tulis tersinkron dengan tab Tulis & Quill.
+- **Sidebar tab (kiri):** dibuka/ditutup lewat tombol paling kiri di topbar. Berisi pencarian "Cari tab…", daftar
+  **Terbuka** (tab beserta dokumen yang sedang dibuka di dalamnya; klik untuk pindah, × untuk menutup, seret untuk
+  mengurutkan) dan **Riwayat** (scene, item Organize, timeline, peta & cerita Quill yang pernah dibuka, dengan waktu
+  "baru saja", "5 menit lalu"; klik untuk membuka lagi, × untuk menghapus, "Bersihkan riwayat"), plus deretan ikon
+  cepat di bawah. Di layar lebar menempel di kiri, di HP/tablet (≤ 900 px) muncul sebagai laci. Status tab & riwayat
+  disimpan di perangkat ini (tidak memicu simpan ke Drive).
+- **Scrollbar modern + scroll halus (Lenis 1.3.26):** scrollbar abu-abu bawaan browser diganti scrollbar ramping
+  yang melayang di tepi area (muncul saat menggulir, menebal & berwarna aksen saat disorot, bisa diseret, klik jalur
+  untuk lompat, hilang sendiri saat diam). Gulir roda mouse/trackpad kini halus berkat [Lenis](https://lenis.dev)
+  di Quill (termasuk halaman Terbitkan), Pengaturan Akun, Tulis/Organize, daftar Timeline & Map, Cloud Library,
+  dashboard, sidebar & modal. Timeline, Map & kanvas tetap memakai gulir/zoom asli. Lenis otomatis mati di "Mode hemat
+  performa" & "kurangi gerakan" (scrollbar baru tetap ada); di HP gulir sentuh tetap asli. Area lain memakai
+  scrollbar tipis bergaya baru. File: `smooth-scroll.js`, `smooth-scroll.css`, `vendor/lenis-1.3.26.min.js`.
+
+### v0.9.9
 
 - **Quill — fitur menulis cerita di dalam tab Write.** Di atas tab Write ada pilihan **Scene | Quill** (diingat per
   project); "Scene" tetap editor lama.
@@ -584,10 +609,11 @@ nama-repo/
 ├── logo-anim-poster.webp
 ├── login-logo.webm, login-logo.mp4, login-logo-poster.webp
 ├── timeline.js
+├── smooth-scroll.js, smooth-scroll.css   (scrollbar custom + Lenis smooth scroll)
 ├── quill.js, quill.css, quill-tiles.js   (fitur Quill di tab Write: cerita, buku 3D, editor chapter, panel alat)
 ├── map-core.js, map2d.js, map3d.js, map-ui.js   (fitur Map: data, editor 2D, tampilan 3D, UI tab)
 ├── vendor/   (react, react-dom, reactflow, three.js r169 + OrbitControls, motion 13.4.3, base-ui 1.8.0,
-│              radix-ui 1.6.7, shadcn-ui, tailwind.css, tabler-icons.js (sprite ikon), fonts/ (OpenDyslexic) + lisensinya)
+│              radix-ui 1.6.7, shadcn-ui, tailwind.css, tabler-icons.js (sprite ikon), lenis 1.3.26, fonts/ (OpenDyslexic) + lisensinya)
 ├── components/ui/*.tsx, lib/utils.ts, components.json   (kode sumber shadcn/ui)
 ├── tools/   (package.json, tailwind.input.css, build-vendor.mjs, build-icons.mjs — hanya untuk membangun ulang vendor/: cd tools && npm install && npm run build)
 ├── config.js

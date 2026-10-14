@@ -11,6 +11,8 @@
 <link rel="stylesheet" href="style.css" />
 <!-- Quill (mode menulis cerita di tab Write): gaya tombol Scene | Quill + seluruh tampilan quill.js -->
 <link rel="stylesheet" href="quill.css" />
+<!-- Scrollbar modern overlay + scroll halus (smooth-scroll.js) -->
+<link rel="stylesheet" href="smooth-scroll.css" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
@@ -455,9 +457,14 @@
     </aside>
 
     <header id="projectTopbar">
-      <button id="btnProjSidebar" class="proj-logo-btn" title="Buka sidebar" aria-label="Buka sidebar" aria-controls="projSidebar" aria-expanded="false">
+      <button id="btnProjSidebar" class="proj-logo-btn" title="Menu project" aria-label="Buka menu project" aria-controls="projSidebar" aria-expanded="false">
         <img src="icon-192.png" alt="" draggable="false" />
-        <svg class="ti proj-logo-back" width="18" height="18" aria-hidden="true"><use href="#ti-layout-sidebar-left-expand"></use></svg>
+        <svg class="ti proj-logo-back" width="18" height="18" aria-hidden="true"><use href="#ti-menu-2"></use></svg>
+      </button>
+      <!-- TAB PROJECT: buka/tutup sidebar tab (daftar tab terbuka + riwayat) -->
+      <button id="btnTabSidebar" class="tsb-toggle" data-tip="Sidebar tab" aria-label="Buka sidebar tab" aria-controls="tabSidebar" aria-expanded="false">
+        <svg class="ti tsb-ic-open" width="18" height="18" aria-hidden="true"><use href="#ti-layout-sidebar-left-expand"></use></svg>
+        <svg class="ti tsb-ic-close" width="18" height="18" aria-hidden="true"><use href="#ti-layout-sidebar-left-collapse"></use></svg>
       </button>
       <div class="proj-chip">
         <span class="proj-chip-cover" id="projChipCover"></span>
@@ -466,32 +473,12 @@
           <svg class="ti" width="14" height="14" aria-hidden="true"><use href="#ti-chevron-down"></use></svg>
         </button>
       </div>
-      <nav id="railNav" aria-label="Bagian project">
-        <button data-tab="home" class="rail-btn active" title="Home" aria-label="Home">
-          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-home"></use></svg>
-        </button>
-        <button data-tab="write" class="rail-btn" title="Write" aria-label="Write">
-          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-pencil"></use></svg>
-        </button>
-        <button data-tab="organize" class="rail-btn" title="Organize" aria-label="Organize">
-          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-folders"></use></svg>
-        </button>
-        <button data-tab="plot" class="rail-btn" title="Plot" aria-label="Plot">
-          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-git-branch"></use></svg>
-        </button>
-        <button data-tab="schedule" class="rail-btn" title="Schedule" aria-label="Schedule">
-          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-calendar-time"></use></svg>
-        </button>
-        <button data-tab="tools" class="rail-btn" title="Tools" aria-label="Tools">
-          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-tool"></use></svg>
-        </button>
-        <button data-tab="timeline" class="rail-btn rail-btn-wide" title="Timeline" aria-label="Timeline">
-          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-timeline"></use></svg>
-          <span>Timeline</span>
-        </button>
-        <button data-tab="map" class="rail-btn rail-btn-wide" title="Map" aria-label="Map">
-          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-map"></use></svg>
-          <span>Map</span>
+      <!-- TAB PROJECT: hanya tab yang terbuka (diisi app.js, bagian TAB PROJECT). Tab aktif = pill berlabel, lainnya ikon
+           bulat; × muncul saat hover/fokus (klik tengah juga menutup), seret untuk mengurutkan. "+" membuka jendela "Tambah tab". -->
+      <nav id="railNav" aria-label="Tab project">
+        <div id="tabStrip" class="ptab-strip" role="tablist" aria-label="Tab terbuka" data-lenis-prevent></div>
+        <button id="btnAddTab" class="ptab-add" data-tip="Tambah tab" aria-label="Tambah tab" aria-haspopup="dialog" aria-controls="tabPicker">
+          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-plus"></use></svg>
         </button>
       </nav>
       <div class="project-top-actions">
@@ -513,6 +500,32 @@
     <span id="saveStatus" class="save-status">Tersimpan</span>
 
     <div id="editorBody">
+      <!-- TAB PROJECT: sidebar tab (kiri). Desktop: menempel & konten bergeser; <= 900 px: laci di atas konten + scrim -->
+      <div id="tabSidebarScrim" class="tsb-scrim" aria-hidden="true"></div>
+      <aside id="tabSidebar" class="tab-sidebar" aria-label="Sidebar tab" aria-hidden="true">
+        <div class="tsb-panel">
+          <div class="tsb-top">
+            <label class="tsb-search">
+              <svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-search"></use></svg>
+              <input id="tsbSearch" type="search" placeholder="Cari tab…" aria-label="Cari tab &amp; riwayat" autocomplete="off" spellcheck="false" />
+            </label>
+            <button id="tsbCollapse" class="tsb-icon-btn" data-tip="Tutup sidebar" aria-label="Tutup sidebar tab">
+              <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-layout-sidebar-left-collapse"></use></svg>
+            </button>
+          </div>
+          <div id="tsbScroll" class="tsb-scroll">
+            <section class="tsb-sec" aria-labelledby="tsbOpenHead">
+              <div class="tsb-sec-head"><span id="tsbOpenHead">Terbuka</span><span id="tsbOpenCount" class="tsb-count"></span></div>
+              <div id="tsbOpenList" class="tsb-list" role="list"></div>
+            </section>
+            <section class="tsb-sec" aria-labelledby="tsbHistHead">
+              <div class="tsb-sec-head"><span id="tsbHistHead">Riwayat</span><button id="tsbClearHist" class="tsb-link" type="button">Bersihkan riwayat</button></div>
+              <div id="tsbHistList" class="tsb-list" role="list"></div>
+            </section>
+          </div>
+          <div id="tsbQuick" class="tsb-quick" role="group" aria-label="Buka cepat"></div>
+        </div>
+      </aside>
       <div id="tabContent">
         <!-- ============ HOME TAB (canvas berisi titik-titik scene) ============ -->
         <div id="tabHome" class="tab-panel home-panel">
@@ -828,9 +841,48 @@
         <div id="tabPlot" class="tab-panel hidden placeholder-panel"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-git-branch"></use></svg>Fitur Plot akan segera hadir.</div>
         <div id="tabSchedule" class="tab-panel hidden placeholder-panel"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-calendar-time"></use></svg>Fitur Schedule akan segera hadir.</div>
         <div id="tabTools" class="tab-panel hidden placeholder-panel"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-tool"></use></svg>Fitur Tools akan segera hadir.</div>
+
+        <!-- TAB PROJECT: semua tab ditutup -> "Kamu ada di <project>" + chip fitur + pencarian (diisi app.js) -->
+        <div id="tabEmpty" class="tab-panel tab-empty hidden">
+          <div class="te-center">
+            <p class="te-kicker">Kamu ada di</p>
+            <div class="te-proj"><span id="teCover" class="te-proj-cover" aria-hidden="true"></span><span id="teTitle" class="te-proj-title"></span></div>
+            <div id="teChips" class="te-chips" role="group" aria-label="Buka fitur"></div>
+            <label class="te-search">
+              <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-search"></use></svg>
+              <input id="teSearch" type="search" placeholder="Cari fitur…" aria-label="Cari fitur" autocomplete="off" spellcheck="false" />
+            </label>
+          </div>
+        </div>
       </div>
     </div>
   </section>
+
+  <!-- TAB PROJECT: jendela "Tambah tab" (dibuka tombol +): cari & pilih fitur untuk ditambahkan ke urutan tab -->
+  <div id="tabPicker" class="tp-overlay hidden">
+    <div class="tp-dialog" role="dialog" aria-modal="true" aria-labelledby="tpTitle" aria-describedby="tpSub">
+      <div class="tp-head">
+        <span class="tp-head-ic" aria-hidden="true"><svg class="ti" width="20" height="20"><use href="#ti-layout-grid-add"></use></svg></span>
+        <div class="tp-head-text">
+          <h2 id="tpTitle" class="tp-title">Tambah tab</h2>
+          <p id="tpSub" class="tp-sub">Pilih fitur yang ingin dibuka di urutan tab</p>
+        </div>
+        <button id="tpClose" class="tp-close" type="button" aria-label="Tutup">
+          <svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-x"></use></svg>
+        </button>
+      </div>
+      <label class="tp-search">
+        <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-search"></use></svg>
+        <input id="tpSearch" type="search" placeholder="Cari fitur…" autocomplete="off" spellcheck="false"
+          role="combobox" aria-expanded="true" aria-controls="tpGrid" aria-autocomplete="list" aria-label="Cari fitur" />
+      </label>
+      <div id="tpGrid" class="tp-grid" role="listbox" aria-label="Fitur"></div>
+      <p id="tpEmpty" class="tp-empty hidden">Tidak ada fitur yang cocok.</p>
+      <div class="tp-foot" aria-hidden="true">
+        <span><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> pilih</span><span><kbd>Enter</kbd> buka</span><span><kbd>Esc</kbd> tutup</span>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ============ FOCUS / FULL WRITER OVERLAY ============ -->
@@ -1104,6 +1156,9 @@
 <script src="config.js"></script>
 <script src="halftone-reveal.js"></script>
 <script src="login-art-data.js"></script>
+<!-- Lenis 1.3.26 (lenis.dev, MIT) -> window.Lenis; smooth-scroll.js memasang scroll halus + scrollbar overlay (window.NovelScroll) -->
+<script src="vendor/lenis-1.3.26.min.js"></script>
+<script src="smooth-scroll.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
