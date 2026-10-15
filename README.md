@@ -1,21 +1,93 @@
-# Novelist Web — v0.9.10
+# Novelist Web — v0.11.1
 
-## Riwayat perubahan terbaru (v0.9.10) — paling baru di atas
+## Riwayat perubahan terbaru (v0.11.1) — paling baru di atas
 
 - **Simpan di perangkat dulu + sinkron dengan deteksi konflik** (`novelist-sync.js`, dimuat setelah `app.js`; file yang
-  sama dipakai aplikasi Android, repo Web-Novel-Writer-Android). Tidak ada kode `app.js` yang diubah — fungsi simpan/muat Drive
-  dibungkus dari file itu.
+  sama dipakai aplikasi Android, repo Web-Novel-Writer-Android). Tidak ada kode `app.js` yang diubah — fungsi simpan/muat
+  Drive dibungkus dari file itu.
   - Setiap simpan langsung ditulis ke IndexedDB `novelist-sync` (per akun Google), baru dikirim ke Drive. Koneksi putus /
     sesi Google habis: tulisan tetap aman di browser dan dikirim otomatis saat online / setelah login lagi (indikator
-    sinkron di dashboard bisa diklik untuk sinkron sekarang atau login ulang).
+    sinkron di dashboard — atau status simpan di editor — bisa diklik untuk sinkron sekarang atau login ulang).
   - Sebelum mengunggah, `modifiedTime` file di Drive dicek. Diubah dari perangkat lain (mis. HP) sementara di sini tidak
-    ada perubahan → versi Drive langsung dimuat (tetap di tab yang sama). Dua-duanya berubah → dialog **Versi project
+    ada suntingan → versi Drive langsung dimuat (tab yang aktif tetap). Dua-duanya disunting → dialog **Versi project
     berbeda**: *Simpan keduanya* / *Pakai versi web* / *Pakai versi Drive*; versi yang tidak dipakai disimpan dulu ke
     folder backup Drive. Tab yang dibiarkan terbuka tidak lagi menimpa tulisan dari perangkat lain.
+  - "Disunting" = ada perubahan lewat `markDirtyAndSchedule` (mengetik, Organize, Quill, Map, Timeline, Beranda, Jejaring,
+    …). Sekadar membuka tab Beranda/Jejaring/Timeline/Map (yang menambahkan struktur bawaannya ke project) tidak dihitung.
   - Project yang terbuka dicek ke Drive saat tab kembali aktif dan tiap 2 menit; dashboard ikut menampilkan project baru
-    / menghapus project yang dipindah ke Trash dari perangkat lain.
-  - Mengetik di **mode fokus** kini ikut autosave (sebelumnya baru tersimpan saat mode fokus ditutup).
+    / menghapus project yang dipindah ke Trash dari perangkat lain. Hapus project saat offline diproses begitu online.
   - Hapus akun ikut menghapus IndexedDB `novelist-sync`.
+
+### v0.11.0
+
+- **Fitur baru: Jejaring Tokoh** (tab baru, tambahkan lewat tombol + → "Jejaring Tokoh") — pohon/jejaring hubungan
+  antar-tokoh.
+  - **Wizard 2 langkah:** pilih jenis — **Keluarga**, **Perusahaan**, **Militer**, **Istana Kerajaan** atau
+    **Mulai kosong** — dengan pratinjau langsung; lalu atur jenis hubungan (ikon, nama, garis lurus/putus-putus,
+    warna, arah, tambah/hapus) → "Buat jejaring".
+  - **Kanvas kartu tokoh:** kartu potret (foto + nama) dengan tombol **+** di keempat sisi → menu hubungan (atas =
+    orang tua, bawah = anak, samping = pasangan/saudara), "Buat kustom", "Tautkan tokoh yang ada…" (dari Organize),
+    "Lewati dulu". Garis penghubung berlabel ikon + nama; klik garis untuk ganti jenis, balik arah, atau hapus.
+  - **Toolbar kartu:** Buat kartu (jadikan tokoh di Organize), Tautkan kartu, Foto, Emoji, Label, Hapus.
+    **Toolbar bawah:** Pilih, Geser, Tambah tokoh, Catatan, Teks, Label. **Lembar** ("Utama" + tambah lembar),
+    **Rapikan** (tata otomatis per generasi), undo/redo, duplikat, zoom & geser seperti Beranda.
+  - Beberapa jejaring per project (dropdown judul), tersimpan di project (`data.jejaring`) & tampil di riwayat sidebar
+    tab. File: `jejaring.js`, `jejaring.css`.
+- **Tab Tulis dirombak jadi lebih nyaman:**
+  - **Halaman tulis di tengah** (lebar bisa diatur): label "Bab · Scene i dari n", judul besar dengan ornamen,
+    chip status (klik untuk ganti Todo/Draft/Done), jumlah kata & waktu baca, sinopsis yang bisa diedit, toolbar
+    format yang menempel di atas (paragraf/judul, tebal/miring/garis bawah/coret, daftar, rata, pemisah adegan ✦ ✦ ✦,
+    undo/redo) + gelembung format saat memilih teks; tempel dari Word/Docs dibersihkan.
+  - **Daftar scene "Naskah":** titik status, jumlah kata, cari (dengan sorotan), bab yang bisa dilipat, tombol
+    "+ Scene" & "+ Bab", seret untuk mengurutkan (juga Alt+↑/↓), pratinjau saat hover, bar progres status; bisa
+    disembunyikan (Ctrl+\) dan jadi laci di HP.
+  - **Bar bawah:** statistik, kata per sesi / **target harian** (disimpan di project), zoom, mode fokus, status simpan.
+  - **Pengaturan scene** dirapikan (info scene + pindah bab, tampilan editor: Serif/Sans/Mono, lebar halaman, jarak
+    baris, ukuran) dan menempel di samping halaman di layar lebar.
+  - Perbaikan: jumlah kata saat pertama dibuka kini benar; scene aktif langsung tersorot saat project dibuka.
+
+### v0.10.1
+
+- **Beranda jadi kanvas yang bisa digeser & di-zoom** (React Flow, seperti kanvas di vvd): tampil di panel kaca
+  berbingkai dengan dot-grid.
+  - **Navigasi:** seret area kosong = geser (Shift+seret = kotak pilihan), alat Geser / Spasi+seret selalu menggeser,
+    roda mouse / dua jari = geser, Ctrl/⌘+roda atau cubit = zoom (20–250 %). Posisi tampilan diingat per papan.
+  - **Scene** tampil sebagai titik bernama yang bisa diseret (posisinya disimpan); klik = buka di Tulis, hover =
+    status, folder, sinopsis & jumlah kata. Garis putus-putus antar-scene tetap ada (bisa disembunyikan).
+  - **Toolbar bawah:** Pilih (V), Geser (H), Bentuk (S), Catatan tempel (N), Gambar (I), Penghubung/panah (C),
+    Teks (T), Frame (F). Objek bisa diubah ukuran, diedit (klik dua kali), diwarnai, diduplikat (Ctrl+D), dihapus,
+    disalin-tempel, undo/redo (Ctrl+Z / Ctrl+Shift+Z), dipindah ke depan/belakang (Ctrl+] / Ctrl+[). Frame ikut
+    membawa objek di dalamnya.
+  - **Header panel:** dropdown papan (ganti, papan baru, ubah nama, hapus, tambah scene ke papan lain), zoom %,
+    daftar "Pintasan", menu "…" (pas ke layar, 100 %, minimap, ekspor PNG, bersihkan papan), perbesar & tutup;
+    tombol zoom/pas/minimap di tepi kanan.
+  - Data tersimpan di project (`data.canvas`, ikut autosave Drive); project lama otomatis memakai tata letak lama.
+    Tombol Delete hanya bekerja saat Beranda tampil & tidak sedang mengetik. File: `home-canvas.js`, `home-canvas.css`.
+
+### v0.10.0
+
+- **Tab project bisa ditutup & dibuka (tidak bertumpuk lagi):** topbar project kini hanya menampilkan tab yang
+  sedang terbuka. Tab aktif berupa pil berikon + label (diwarnai warna project), tab lain berupa ikon bulat. Tutup tab
+  dengan × (muncul saat disorot), klik tengah, atau Delete; urutkan dengan seret atau Alt+Shift+←/→. Project baru
+  dibuka dengan Beranda, Tulis & Organize. Bila tab penuh, deretannya bisa digeser.
+  - **Tombol +** membuka jendela **"Tambah tab"** di tengah layar: kotak cari + kartu fitur (Beranda, Tulis, Quill,
+    Organize, Timeline, Map, Plot, Schedule, Tools) dengan deskripsi singkat & tanda "Terbuka"; bisa pakai panah + Enter.
+  - Kalau semua tab ditutup, tampil halaman "Kamu ada di <project>" dengan chip fitur & kotak "Cari fitur…".
+  - Fitur lain yang membuka tab tertutup (mis. buka scene dari Timeline) otomatis menambahkan tabnya lagi.
+  - Pilihan Scene | Quill di tab Tulis tersinkron dengan tab Tulis & Quill.
+- **Sidebar tab (kiri):** dibuka/ditutup lewat tombol paling kiri di topbar. Berisi pencarian "Cari tab…", daftar
+  **Terbuka** (tab beserta dokumen yang sedang dibuka di dalamnya; klik untuk pindah, × untuk menutup, seret untuk
+  mengurutkan) dan **Riwayat** (scene, item Organize, timeline, peta & cerita Quill yang pernah dibuka, dengan waktu
+  "baru saja", "5 menit lalu"; klik untuk membuka lagi, × untuk menghapus, "Bersihkan riwayat"), plus deretan ikon
+  cepat di bawah. Di layar lebar menempel di kiri, di HP/tablet (≤ 900 px) muncul sebagai laci. Status tab & riwayat
+  disimpan di perangkat ini (tidak memicu simpan ke Drive).
+- **Scrollbar modern + scroll halus (Lenis 1.3.26):** scrollbar abu-abu bawaan browser diganti scrollbar ramping
+  yang melayang di tepi area (muncul saat menggulir, menebal & berwarna aksen saat disorot, bisa diseret, klik jalur
+  untuk lompat, hilang sendiri saat diam). Gulir roda mouse/trackpad kini halus berkat [Lenis](https://lenis.dev)
+  di Quill (termasuk halaman Terbitkan), Pengaturan Akun, Tulis/Organize, daftar Timeline & Map, Cloud Library,
+  dashboard, sidebar & modal. Timeline, Map & kanvas tetap memakai gulir/zoom asli. Lenis otomatis mati di "Mode hemat
+  performa" & "kurangi gerakan" (scrollbar baru tetap ada); di HP gulir sentuh tetap asli. Area lain memakai
+  scrollbar tipis bergaya baru. File: `smooth-scroll.js`, `smooth-scroll.css`, `vendor/lenis-1.3.26.min.js`.
 
 ### v0.9.9
 
@@ -601,10 +673,13 @@ nama-repo/
 ├── logo-anim-poster.webp
 ├── login-logo.webm, login-logo.mp4, login-logo-poster.webp
 ├── timeline.js
+├── jejaring.js, jejaring.css   (Jejaring Tokoh: wizard + kanvas pohon hubungan)
+├── home-canvas.js, home-canvas.css   (kanvas Beranda: papan React Flow + toolbar)
+├── smooth-scroll.js, smooth-scroll.css   (scrollbar custom + Lenis smooth scroll)
 ├── quill.js, quill.css, quill-tiles.js   (fitur Quill di tab Write: cerita, buku 3D, editor chapter, panel alat)
 ├── map-core.js, map2d.js, map3d.js, map-ui.js   (fitur Map: data, editor 2D, tampilan 3D, UI tab)
 ├── vendor/   (react, react-dom, reactflow, three.js r169 + OrbitControls, motion 13.4.3, base-ui 1.8.0,
-│              radix-ui 1.6.7, shadcn-ui, tailwind.css, tabler-icons.js (sprite ikon), fonts/ (OpenDyslexic) + lisensinya)
+│              radix-ui 1.6.7, shadcn-ui, tailwind.css, tabler-icons.js (sprite ikon), lenis 1.3.26, fonts/ (OpenDyslexic) + lisensinya)
 ├── components/ui/*.tsx, lib/utils.ts, components.json   (kode sumber shadcn/ui)
 ├── tools/   (package.json, tailwind.input.css, build-vendor.mjs, build-icons.mjs — hanya untuk membangun ulang vendor/: cd tools && npm install && npm run build)
 ├── config.js

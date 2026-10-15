@@ -70,7 +70,11 @@
   // isi file .novj persis seperti yang ditulis app.js: { ...data, cover }
   function payloadJson(p) { return JSON.stringify({ ...p.data, cover: p.cover || null }); }
   function localHash(p) { return hash(payloadJson(p)); }
-  function isChanged(p) { return !p.driveFileId || localHash(p) !== p._syncedHash; }
+  // "Berubah di perangkat ini" = benar-benar ada suntingan sejak sinkron terakhir (ditandai lewat markDirtyAndSchedule),
+  // BUKAN sekadar isi yang berbeda: membuka tab Beranda/Jejaring/Timeline/Map menambahkan struktur bawaan ke data project
+  // tanpa ada yang diketik, dan itu tidak boleh dianggap perubahan (kalau dianggap, setiap pindah perangkat jadi konflik).
+  function isChanged(p) { return !p.driveFileId || !!p._edited; }
+  function markEdited(p) { p._edited = true; p._editSeq = (p._editSeq || 0) + 1; }
   function parseRemote(text) {
     const raw = JSON.parse(text);
     const cover = raw.cover || null;
@@ -133,7 +137,7 @@
       key: recKey(p.id), account: S.account || "local", id: p.id,
       title: p.title, description: p.description || "", template: p.template || "standard",
       colorA: p.colorA, colorB: p.colorB, driveFileId: p.driveFileId || null, updatedAt: p.updatedAt,
-      base: p._base || null, syncedHash: p._syncedHash || null, json: payloadJson(p),
+      base: p._base || null, syncedHash: p._syncedHash || null, edited: !!p._edited, json: payloadJson(p),
       pendingTrash: false, savedAt: Date.now(), ...(extra || {}),
     };
     return tx(STORE, "readwrite", (s) => s.put(rec));
@@ -144,12 +148,14 @@
   }
   function recordToProject(r) {
     const parsed = JSON.parse(r.json);
+    // data lama (sebelum ada tanda "edited"): anggap berubah kalau isinya beda dari versi yang terakhir disinkron
+    const edited = typeof r.edited === "boolean" ? r.edited : (!!r.syncedHash && hash(r.json) !== r.syncedHash);
     const cover = parsed.cover || null;
     const data = migrateOldData(parsed);
     return {
       id: r.id, title: r.title || data.title || "Tanpa Judul", description: r.description || "", template: r.template || "standard",
       cover, colorA: r.colorA, colorB: r.colorB, driveFileId: r.driveFileId || null, updatedAt: r.updatedAt || new Date().toISOString(),
-      data, _base: r.base || null, _syncedHash: r.syncedHash || null,
+      data, _base: r.base || null, _syncedHash: r.syncedHash || null, _edited: edited,
     };
   }
   async function loadLocalProjects() {
@@ -348,6 +354,7 @@
         }
       }
       const json = payloadJson(p);
+      const seq = p._editSeq || 0;
       const result = await driveUpload(p.title + ".novj", json, p.driveFileId, folderId);
       if (p._deleted) {
         // dihapus saat upload ini berjalan: jangan biarkan file-nya tertinggal di folder utama
@@ -357,6 +364,7 @@
       p.driveFileId = result.id;
       p._base = result.modifiedTime;
       p._syncedHash = hash(json);
+      if ((p._editSeq || 0) === seq) p._edited = false;   // ada ketikan baru selama upload -> tetap ditandai berubah
       p.updatedAt = new Date().toISOString();
       S.state = "idle";
       await persistLocal(p).catch((e) => console.warn("[Sync]", e));
@@ -375,11 +383,11 @@
     const remote = parseRemote(await driveGetContent(p.driveFileId));
     const lh = localHash(p);
     if (remote.hash === lh) {                       // isinya sudah sama
-      p._base = meta.modifiedTime; p._syncedHash = lh;
+      p._base = meta.modifiedTime; p._syncedHash = lh; p._edited = false;
       await persistLocal(p);
       return "same";
     }
-    if (lh === p._syncedHash) {                     // di sini tidak ada perubahan -> ambil versi Drive
+    if (!p._edited) {                               // di sini tidak ada suntingan -> ambil versi Drive
       await applyRemote(p, remote, meta.modifiedTime);
       toast(`"${p.title}" diperbarui dengan versi terbaru dari perangkat lain`, tiIcon("cloud-download"));
       return "pulled";
@@ -392,27 +400,27 @@
   }
 
   // ganti isi project dengan versi Drive; kalau project sedang terbuka, tampilannya dimuat ulang di tab yang sama
+  // modul yang memegang tampilan/isi project sendiri: ditutup dulu sebelum data project diganti
+  const PROJECT_MODULES = ["NovelMap", "NovelQuill", "NovelHome", "NovelJejaring"];
   async function applyRemote(p, remote, modifiedTime) {
     const open = isOpen(p);
-    const tab = open ? (el("editorView").dataset.tab || "home") : null;
     const sceneId = open ? currentSceneId : null;
     if (open) {
-      if (window.NovelMap) window.NovelMap.hide();
-      if (window.NovelQuill) window.NovelQuill.hide();
-      el("focusOverlay").classList.add("hidden");   // isinya sudah ikut dibandingkan (flushCurrentEdits di bawah)
+      PROJECT_MODULES.forEach((m) => { if (window[m] && typeof window[m].hide === "function") window[m].hide(); });
+      el("focusOverlay").classList.add("hidden");   // isinya sudah ikut dibandingkan (flushCurrentEdits di reconcile)
     }
     p.data = remote.data;
     p.cover = remote.cover;
     p.title = remote.data.title || p.title;
     p._base = modifiedTime;
     p._syncedHash = remote.hash;
+    p._edited = false;
     p.updatedAt = modifiedTime || new Date().toISOString();
     await persistLocal(p);
     if (open && currentProjectId === p.id) {
       closeSceneDrawer();
-      openProject(p.id);
+      openProject(p.id);                                  // tab yang sedang aktif dipulihkan sendiri oleh app.js
       if (sceneId && findScene(sceneId)) selectScene(sceneId);
-      if (tab && tab !== "home") switchTab(tab);
     } else if (dashVisible()) renderDashboard();
   }
 
@@ -596,8 +604,17 @@
   }
 
   // ------------------------------------------------------------------ pengganti fungsi app.js
+  // Semua suntingan (editor, judul, Organize, Quill, Map, Timeline, Beranda, Jejaring, …) lewat markDirtyAndSchedule.
+  const origMarkDirty = markDirtyAndSchedule;
+  window.markDirtyAndSchedule = function () {
+    const p = getProject(currentProjectId);
+    if (p && editorVisible()) markEdited(p);
+    return origMarkDirty.apply(this, arguments);
+  };
   window.saveProjectToDriveMain = async function (p) {
     if (!p || p._deleted || S.wiped) return;
+    // dipanggil dari dashboard (ganti sampul, edit project, "kirim ke cloud"): isi yang berbeda = suntingan
+    if (!isOpen(p) && p.driveFileId && localHash(p) !== p._syncedHash) markEdited(p);
     try { await persistLocal(p); }
     catch (e) { console.error("[Sync] simpan lokal gagal", e); }
     if (!isOnline()) { editorSaved(p, "Tersimpan di perangkat (offline)", tiIcon("device-floppy")); refreshState(); return; }
@@ -634,7 +651,7 @@
   window.pullFromCloud = async function (f) {
     await origPull(f);
     const p = projects.find((x) => x.driveFileId === f.id);
-    if (p) { p._base = f.modifiedTime; p._syncedHash = localHash(p); await persistLocal(p).catch(() => {}); }
+    if (p) { p._base = f.modifiedTime; p._syncedHash = localHash(p); p._edited = false; await persistLocal(p).catch(() => {}); }
   };
 
   const origRestore = restoreFromTrash;
@@ -642,7 +659,7 @@
     await origRestore(f);
     const p = projects.find((x) => x.driveFileId === f.id);
     // base sengaja dikosongkan: cek berikutnya membandingkan isi dan langsung cocok tanpa upload ulang
-    if (p) { p._base = null; p._syncedHash = localHash(p); await persistLocal(p).catch(() => {}); }
+    if (p) { p._base = null; p._syncedHash = localHash(p); p._edited = false; await persistLocal(p).catch(() => {}); }
     for (const [key, rec] of Array.from(S.pendingTrash.entries())) if (rec.driveFileId === f.id) S.pendingTrash.delete(key);
   };
 
@@ -683,8 +700,8 @@
     return origClearLocal();
   };
 
-  // Mode fokus: app.js baru menulis isinya ke scene saat mode fokus ditutup, jadi ketikan di sana tidak ikut autosave
-  // (di HP aplikasi bisa ditutup sistem kapan saja). Isi mode fokus ikut di-flush & mengetik di sana memicu autosave.
+  // Mode fokus: isinya ikut di-flush sebelum dibandingkan/diunggah (jaring pengaman; app.js v0.11+ juga menyimpannya
+  // langsung saat diketik).
   const origFlush = flushCurrentEdits;
   window.flushCurrentEdits = function () {
     origFlush();
@@ -710,8 +727,6 @@
   window.addEventListener("focus", onResume);
 
   document.addEventListener("DOMContentLoaded", () => {
-    el("focusEditor").addEventListener("input", () => markDirtyAndSchedule());
-    el("focusTitle").addEventListener("input", () => markDirtyAndSchedule());
     const css = document.createElement("style");
     css.textContent = `
       .sync-indicator.ns-spin .ti { animation: spin .8s linear infinite; }

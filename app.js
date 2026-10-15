@@ -166,6 +166,8 @@ function driveSignOut() {
   stopBackupInterval();
   if (window.NovelMap) window.NovelMap.hide();
   if (window.NovelQuill) window.NovelQuill.hide();
+  if (window.NovelHome) window.NovelHome.hide();
+  if (window.NovelJejaring) window.NovelJejaring.hide();
   muteTimelineKeys(true);
   el("dashboardView").classList.add("hidden");
   el("editorView").classList.add("hidden");
@@ -544,7 +546,7 @@ function openProject(id) {
   currentOrgItemId = null;
   renderOrganizeDetail();
   markSaved();
-  switchTab("home");
+  restoreProjectTabs(p);   // TAB PROJECT: tab terbuka + tab aktif project ini (bawaan: Beranda)
   el("dashboardView").classList.add("hidden");
   el("editorView").classList.remove("hidden");
   startProjClock();
@@ -598,6 +600,8 @@ function backToLibrary() {
   flushCurrentEdits();
   if (window.NovelMap) window.NovelMap.hide();
   if (window.NovelQuill) window.NovelQuill.hide();
+  if (window.NovelHome) window.NovelHome.hide();
+  if (window.NovelJejaring) window.NovelJejaring.hide();
   muteTimelineKeys(true);
   const p = getProject(currentProjectId);
   if (p) { p.title = el("projectTitle").value; p.data.title = p.title; p.updatedAt = new Date().toISOString(); }
@@ -613,20 +617,729 @@ function flushCurrentEdits() {
   syncOrganizeFromDetail();
   if (window.NovelMap) window.NovelMap.flush();
   if (window.NovelQuill) window.NovelQuill.flush();   // Quill: isi editor chapter
+  if (window.NovelHome) window.NovelHome.flush();     // Beranda: teks catatan/bentuk yang sedang diedit
+  if (window.NovelJejaring) window.NovelJejaring.flush();   // Jejaring Tokoh: nama / teks yang sedang diedit
+}
+
+// ================= TAB PROJECT =================
+// Bar atas hanya berisi tab yang TERBUKA: tab aktif = pill berlabel, lainnya ikon bulat; × (hover/fokus) atau klik
+// tengah menutup, seret untuk mengurutkan, "+" membuka jendela "Tambah tab". Sidebar tab (kiri) berisi tab terbuka +
+// riwayat (tab & dokumen yang dibuka: scene, item Organize, timeline, peta, cerita Quill).
+// Disimpan per project DI PERANGKAT INI (status tampilan, tidak memicu simpan ke Drive):
+//   novelist_tabs_<id>    = { open: ["home", "write", ...], active: "write" | null }   (null = semua tab ditutup)
+//   novelist_tabhist_<id> = [{ k, tab, doc, kind, title, t }]  (terbaru di depan, maks. 30)
+//   novelist_tabsidebar   = true/false  (sidebar menempel di desktop)
+// "quill" = panel Write dalam mode Quill (tab sendiri). switchTab(x) dari mana pun (Timeline "buka scene", alat Map di
+// Quill, Home, riwayat, ...) otomatis membuka tab x kalau sedang tertutup (disisipkan setelah tab aktif).
+const TAB_DEFS = [
+  { id: "home", panel: "home", name: "Beranda", icon: tiIcon("home"), desc: "Kanvas scene & papan ide — geser, susun, hubungkan" },
+  { id: "write", panel: "write", name: "Tulis", icon: tiIcon("pencil"), desc: "Editor scene: bab & adegan bertingkat" },
+  { id: "quill", panel: "write", name: "Quill", icon: tiIcon("feather"), desc: "Tulis cerita bergaya buku, lalu terbitkan" },
+  { id: "organize", panel: "organize", name: "Organize", icon: tiIcon("folders"), desc: "Karakter, lokasi & catatan dunia cerita" },
+  { id: "jejaring", panel: "jejaring", name: "Jejaring Tokoh", icon: tiIcon("affiliate"), desc: "Pohon relasi tokoh: keluarga, kantor, militer, istana" },
+  { id: "timeline", panel: "timeline", name: "Timeline", icon: tiIcon("timeline"), desc: "Garis waktu peristiwa, terhubung ke scene" },
+  { id: "map", panel: "map", name: "Map", icon: tiIcon("map"), desc: "Lukis peta dunia & lihat sebagai diorama 3D" },
+  { id: "plot", panel: "plot", name: "Plot", icon: tiIcon("git-branch"), desc: "Susun alur & konflik cerita (segera hadir)" },
+  { id: "schedule", panel: "schedule", name: "Schedule", icon: tiIcon("calendar-time"), desc: "Jadwal & target menulis (segera hadir)" },
+  { id: "tools", panel: "tools", name: "Tools", icon: tiIcon("tool"), desc: "Alat bantu menulis (segera hadir)" },
+];
+const TAB_BY_ID = Object.fromEntries(TAB_DEFS.map((d) => [d.id, d]));
+const TAB_PANELS = ["home", "write", "organize", "jejaring", "timeline", "map", "plot", "schedule", "tools"];
+const TAB_DEFAULT = ["home", "write", "organize"];
+const TAB_QUICK = ["home", "write", "quill", "timeline", "map"];          // baris ikon bawah sidebar
+const TAB_EMPTY_MAIN = ["home", "write", "quill", "organize", "timeline"]; // chip utama saat semua tab ditutup
+const TAB_HIST_MAX = 30;
+const TAB_DOC_ICONS = { scene: tiIcon("file-text"), characters: tiIcon("user"), locations: tiIcon("map-pin"), notes: tiIcon("note"), timeline: tiIcon("timeline"), map: tiIcon("map"), story: tiIcon("book-2"), board: tiIcon("layout-board"), jejaring: tiIcon("affiliate") };
+const tabNarrowMq = window.matchMedia("(max-width: 900px)");
+const tabReduceMq = window.matchMedia("(prefers-reduced-motion: reduce)");
+let projTabs = { open: [], active: null };   // tab project yang sedang dibuka
+let tabHist = [];                            // riwayat project ini
+let tabLastDoc = {};                         // dokumen terakhir per tab (timeline/map/quill) untuk label & riwayat
+let tabPendingDoc = null;                    // { tab, id }: timeline/peta dari riwayat, dibuka setelah modulnya tampil
+let tabVisitPending = null, tabVisitTimer = null;
+let tabSbDocked = false, tabSbDrawer = false; // sidebar: menempel (desktop, diingat) / laci (<= 900 px)
+let tabHistRows = [];                        // baris riwayat yang sedang tampil (indeks = data-i)
+let quillNav = null, quillScreen = null;     // buka cerita Quill dari riwayat (lewat tombol di layar Quill)
+let teMore = false;                          // layar kosong: chip "Lainnya" dibuka
+
+function tabStoreGet(key) { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (e) { return null; } }
+function tabStoreSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* storage diblokir: cukup di memori */ } }
+function saveProjectTabs() { if (currentProjectId) tabStoreSet("novelist_tabs_" + currentProjectId, { open: projTabs.open, active: projTabs.active }); }
+function saveTabHist() { if (currentProjectId) tabStoreSet("novelist_tabhist_" + currentProjectId, tabHist); }
+
+// dipanggil openProject: pulihkan tab project ini (bawaan: Beranda, Tulis, Organize) lalu tampilkan tab aktifnya
+function restoreProjectTabs(p) {
+  const s = tabStoreGet("novelist_tabs_" + p.id);
+  let open = s && Array.isArray(s.open) ? s.open.filter((t, i, a) => TAB_BY_ID[t] && a.indexOf(t) === i) : null;
+  if (!open) {
+    open = TAB_DEFAULT.slice();
+    if (writeMode(p) === "quill") open.splice(2, 0, "quill");   // project yang dulu ditulis di mode Quill: tab Quill ikut terbuka
+  }
+  projTabs = { open, active: s && open.includes(s.active) ? s.active : (open[0] || null) };
+  const h = tabStoreGet("novelist_tabhist_" + p.id);
+  tabHist = Array.isArray(h) ? h.filter((x) => x && TAB_BY_ID[x.tab] && typeof x.k === "string" && typeof x.t === "number").slice(0, TAB_HIST_MAX) : [];
+  tabLastDoc = {}; tabPendingDoc = null; quillNav = null; quillScreen = null; teMore = false;
+  el("tsbSearch").value = ""; el("teSearch").value = "";
+  const v = el("editorView");
+  v.style.setProperty("--ptab-tint", p.colorA || "#d7a86e");   // warna pill tab aktif mengikuti warna project
+  el("tabPicker").style.setProperty("--ptab-tint", p.colorA || "#d7a86e");
+  v.classList.add("tsb-no-anim");                               // ganti project: tanpa animasi buka sidebar/tab
+  el("tabStrip").innerHTML = "";
+  v.dataset.ptab = "";   // ganti project: panel tab aktif selalu dibangun ulang walau id tabnya sama (mis. Beranda -> Beranda)
+  tabSbDrawer = false;
+  applyTabSidebar();
+  if (projTabs.active) switchTab(projTabs.active);
+  else { saveProjectTabs(); showTabPanel(null); renderProjectTabs(); }
+  requestAnimationFrame(() => requestAnimationFrame(() => v.classList.remove("tsb-no-anim")));
 }
 
 function switchTab(tab) {
-  if (tab === "home") { flushCurrentEdits(); renderProjectHome(); }
-  if (tab !== "write" && window.NovelQuill) window.NovelQuill.hide();   // Quill: simpan + bersihkan sebelum tab lain tampil
-  document.querySelectorAll(".rail-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
-  ["home", "write", "organize", "timeline", "map", "plot", "schedule", "tools"].forEach((t) => el("tab" + capitalize(t)).classList.toggle("hidden", t !== tab));
-  el("editorView").dataset.tab = tab;
-  if (tab === "write") applyWriteMode();   // Quill: tampilkan mode Scene / Quill milik project ini
+  if (!TAB_BY_ID[tab] || !currentProjectId) return;
+  if (!projTabs.open.includes(tab)) insertProjectTab(tab, false);   // tab tertutup dipanggil fitur lain -> buka otomatis
+  const same = projTabs.active === tab && el("editorView").dataset.ptab === tab;
+  projTabs.active = tab;
+  saveProjectTabs();
+  if (same) { consumeTabPendingDoc(tab); stepQuillNav(); }   // tab yang sama: panel tidak dibangun ulang
+  else showTabPanel(tab);
+  renderProjectTabs();
+  noteTabVisit(tab);
+}
+function insertProjectTab(tab, atEnd) {
+  const i = projTabs.open.indexOf(projTabs.active);
+  if (atEnd || i < 0) projTabs.open.push(tab); else projTabs.open.splice(i + 1, 0, tab);
+}
+// tampilkan panel milik tab (null = semua ditutup -> layar kosong). Isi lama switchTab().
+function showTabPanel(tab) {
+  const panel = tab ? TAB_BY_ID[tab].panel : null;
+  if (panel !== "home" && window.NovelHome) window.NovelHome.hide();   // Beranda: simpan teks yang diedit + lepas kanvas
+  if (panel === "home") { flushCurrentEdits(); renderProjectHome(); }
+  if (panel !== "jejaring" && window.NovelJejaring) window.NovelJejaring.hide();   // Jejaring: simpan nama yang diedit + lepas kanvas
+  if (panel === "jejaring") { flushCurrentEdits(); renderJejaringTab(); }
+  if (panel === "write") setWriteModeQuiet(tab === "quill" ? "quill" : "scene");
+  else if (window.NovelQuill) window.NovelQuill.hide();   // Quill: simpan + bersihkan sebelum tab lain tampil
+  TAB_PANELS.forEach((t) => el("tab" + capitalize(t)).classList.toggle("hidden", t !== panel));
+  el("tabEmpty").classList.toggle("hidden", !!panel);
+  el("editorView").dataset.tab = panel || "empty";
+  el("editorView").dataset.ptab = tab || "";
+  if (panel === "write") applyWriteMode();   // Quill: tampilkan mode Scene / Quill sesuai tabnya
   updateSceneDrawerVisibility();
-  muteTimelineKeys(tab !== "timeline");
-  if (tab !== "map" && window.NovelMap) window.NovelMap.hide();   // hentikan render loop 3D
-  if (tab === "timeline") openTimelineTab();
-  if (tab === "map") openMapTab();
+  muteTimelineKeys(panel !== "timeline");
+  if (panel !== "map" && window.NovelMap) window.NovelMap.hide();   // hentikan render loop 3D
+  if (panel === "timeline") openTimelineTab();
+  if (panel === "map") openMapTab();
+  if (!panel) renderTabEmpty();
+}
+// mode Scene/Quill kini mengikuti tab (Tulis / Quill) — tidak menandai project berubah (bukan isi cerita)
+function setWriteModeQuiet(mode) {
+  const p = getProject(currentProjectId);
+  if (!p || writeMode(p) === mode) return;
+  flushCurrentEdits();
+  if (mode === "quill" && !p.data.quill) p.data.quill = { mode: "quill", stories: [] };
+  if (p.data.quill) p.data.quill.mode = mode;
+}
+function closeProjectTab(tab) {
+  const i = projTabs.open.indexOf(tab);
+  if (i < 0) return;
+  projTabs.open.splice(i, 1);
+  if (projTabs.active !== tab) { saveProjectTabs(); renderProjectTabs(); return; }
+  const next = projTabs.open[i] || projTabs.open[i - 1] || null;   // tab aktif ditutup -> tetangga kanan, lalu kiri
+  if (next) { switchTab(next); return; }
+  projTabs.active = null;
+  saveProjectTabs();
+  showTabPanel(null);
+  renderProjectTabs();
+}
+function moveProjectTab(tab, delta) {
+  const i = projTabs.open.indexOf(tab), j = i + delta;
+  if (i < 0 || j < 0 || j >= projTabs.open.length) return;
+  projTabs.open.splice(i, 1);
+  projTabs.open.splice(j, 0, tab);
+  saveProjectTabs();
+  renderProjectTabs();
+}
+function renderProjectTabs() {
+  renderTabStrip();
+  if (tabSidebarVisible()) renderTabSidebar();
+}
+
+// ---- bar tab (atas; bar bawah di HP) ----
+function buildTabNode(id) {
+  const d = TAB_BY_ID[id];
+  const n = document.createElement("div");
+  n.className = "ptab";
+  n.dataset.tab = id;
+  n.innerHTML = `<button type="button" class="ptab-btn" role="tab" id="ptab-${id}" aria-controls="tabContent" aria-keyshortcuts="Delete">` +
+    `<span class="ptab-ic">${tiPx(d.icon, 17)}</span><span class="ptab-lw"><span class="ptab-label"><span class="ptab-text">${d.name}</span></span></span></button>` +
+    `<button type="button" class="ptab-x" tabindex="-1" aria-hidden="true" title="Tutup (klik tengah juga bisa)">${tiPx(tiIcon("x"), 12)}</button>`;
+  return n;
+}
+function renderTabStrip() {
+  const strip = el("tabStrip");
+  const anim = !tabReduceMq.matches && !el("editorView").classList.contains("tsb-no-anim");
+  const nodes = new Map();
+  strip.querySelectorAll(".ptab").forEach((n) => { if (!n.classList.contains("is-leaving")) nodes.set(n.dataset.tab, n); });
+  nodes.forEach((n, id) => { if (!projTabs.open.includes(id)) leaveTabNode(n, anim); });
+  let prev = null;
+  projTabs.open.forEach((id) => {
+    let n = nodes.get(id);
+    const fresh = !n;
+    if (fresh) n = buildTabNode(id);
+    const want = prev ? prev.nextSibling : strip.firstChild;
+    if (n !== want) strip.insertBefore(n, want);
+    const on = id === projTabs.active, b = n.firstElementChild;
+    n.classList.toggle("is-active", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+    b.tabIndex = on ? 0 : -1;
+    if (on) delete b.dataset.tip; else b.dataset.tip = TAB_BY_ID[id].name;
+    if (fresh && anim) enterTabNode(n);
+    prev = n;
+  });
+  if (!projTabs.active) { const f = strip.querySelector(".ptab:not(.is-leaving) .ptab-btn"); if (f) f.tabIndex = 0; }
+  el("btnAddTab").classList.toggle("is-alone", !projTabs.open.length);
+  revealActiveTab();
+  setTimeout(revealActiveTab, 340);   // setelah pill aktif selesai melebar
+}
+// tab baru: melebar dari 0 sampai lebar aslinya; tab ditutup: menyusut lalu dilepas
+function enterTabNode(n) {
+  const w = n.scrollWidth;
+  n.classList.add("is-entering");
+  n.style.maxWidth = "0px";
+  void n.offsetWidth;
+  n.classList.remove("is-entering");
+  n.style.maxWidth = w + 40 + "px";
+  setTimeout(() => { n.style.maxWidth = ""; }, 360);
+}
+function leaveTabNode(n, anim) {
+  if (!anim) { n.remove(); return; }
+  n.style.maxWidth = n.offsetWidth + "px";
+  void n.offsetWidth;
+  n.classList.add("is-leaving");
+  n.setAttribute("aria-hidden", "true");
+  n.inert = true;
+  n.style.maxWidth = "0px";
+  setTimeout(() => n.remove(), 300);
+}
+// tab aktif selalu terlihat walau bar tab digulir (banyak tab / layar sempit) + bayangan tepi saat bisa digulir
+function revealActiveTab() {
+  const strip = el("tabStrip");
+  const a = strip.querySelector(".ptab.is-active");
+  if (a && strip.scrollWidth > strip.clientWidth + 1) {
+    const l = a.offsetLeft, r = l + a.offsetWidth, sl = strip.scrollLeft, w = strip.clientWidth;
+    if (l < sl + 8) strip.scrollTo({ left: Math.max(0, l - 8), behavior: tabReduceMq.matches ? "auto" : "smooth" });
+    else if (r > sl + w - 8) strip.scrollTo({ left: r - w + 8, behavior: tabReduceMq.matches ? "auto" : "smooth" });
+  }
+  updateTabStripFade();
+}
+function updateTabStripFade() {
+  const s = el("tabStrip");
+  s.classList.toggle("fade-l", s.scrollLeft > 2);
+  s.classList.toggle("fade-r", s.scrollLeft + s.clientWidth < s.scrollWidth - 2);
+}
+
+// ---- seret untuk mengurutkan (mouse/pen; sentuhan dipakai untuk menggulir bar tab). axis "x" | "y" ----
+function makeTabSortable(container, itemSel, axis, onDrop, enabled) {
+  const X = axis === "x", T = X ? "translateX" : "translateY";
+  const pos = (e) => (X ? e.clientX : e.clientY);
+  const items = () => [...container.querySelectorAll(itemSel)].filter((n) => !n.classList.contains("is-leaving"));
+  let d = null;
+  container.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || e.pointerType === "touch" || (enabled && !enabled())) return;
+    const item = e.target.closest(itemSel);
+    if (!item || item.classList.contains("is-leaving") || e.target.closest(".ptab-x, .tsb-row-x")) return;
+    d = { item, id: e.pointerId, start: pos(e), on: false, grab: 0, tx: 0, order0: items().map((n) => n.dataset.tab) };
+  });
+  container.addEventListener("pointermove", (e) => {
+    if (!d || e.pointerId !== d.id) return;
+    if (!d.on) {
+      if (Math.abs(pos(e) - d.start) < 6) return;
+      const r = d.item.getBoundingClientRect();
+      d.on = true;
+      d.grab = d.start - (X ? r.left : r.top);
+      d.item.classList.add("is-dragging");
+      container.classList.add("is-sorting");
+      try { container.setPointerCapture(e.pointerId); } catch (err) { /* abaikan */ }
+      hideTabTip();
+    }
+    e.preventDefault();
+    const place = () => {
+      const r = d.item.getBoundingClientRect();
+      d.tx = pos(e) - d.grab - ((X ? r.left : r.top) - d.tx);
+      d.item.style.transform = `${T}(${d.tx}px)`;
+      return r;
+    };
+    const r = place();
+    const center = pos(e) - d.grab + (X ? r.width : r.height) / 2;
+    const sibs = items().filter((n) => n !== d.item);
+    const before = sibs.find((s) => { const sr = s.getBoundingClientRect(); return center < (X ? sr.left + sr.width / 2 : sr.top + sr.height / 2); }) || null;
+    const nextNow = items()[items().indexOf(d.item) + 1] || null;
+    if (before === nextNow) return;
+    const old = new Map(sibs.map((s) => [s, s.getBoundingClientRect()]));
+    if (before) container.insertBefore(d.item, before);
+    else if (sibs.length) container.insertBefore(d.item, sibs[sibs.length - 1].nextSibling);
+    place();
+    if (!tabReduceMq.matches) sibs.forEach((s) => {   // FLIP: tetangga meluncur ke tempat barunya
+      const a = old.get(s), b = s.getBoundingClientRect(), dd = X ? a.left - b.left : a.top - b.top;
+      if (Math.abs(dd) > 0.5) s.animate([{ transform: `${T}(${dd}px)` }, { transform: "none" }], { duration: 170, easing: "cubic-bezier(.2,.8,.2,1)" });
+    });
+  });
+  const end = (e) => {
+    if (!d || e.pointerId !== d.id) return;
+    const was = d;
+    d = null;
+    if (!was.on) return;
+    container.classList.remove("is-sorting");
+    was.item.classList.remove("is-dragging");
+    was.item.style.transform = "";
+    if (was.tx && !tabReduceMq.matches) was.item.animate([{ transform: `${T}(${was.tx}px)` }, { transform: "none" }], { duration: 180, easing: "cubic-bezier(.2,.8,.2,1)" });
+    container.dataset.dragged = "1";   // klik setelah seret tidak dihitung
+    setTimeout(() => { delete container.dataset.dragged; }, 0);
+    const order = items().map((n) => n.dataset.tab);
+    if (order.join() !== was.order0.join()) onDrop(order);
+  };
+  container.addEventListener("pointerup", end);
+  container.addEventListener("pointercancel", end);
+}
+
+// ---- tooltip kecil untuk tombol ber-data-tip (tab bulat, +, sidebar). Satu elemen, mengambang di #editorView ----
+let tabTipEl = null, tabTipFor = null;
+function showTabTip(t) {
+  const v = el("editorView");
+  if (!tabTipEl) { tabTipEl = document.createElement("div"); tabTipEl.className = "ptab-tip"; tabTipEl.setAttribute("aria-hidden", "true"); v.appendChild(tabTipEl); }
+  tabTipFor = t;
+  tabTipEl.textContent = t.dataset.tip;
+  const r = t.getBoundingClientRect(), vr = v.getBoundingClientRect();
+  const w = tabTipEl.offsetWidth, h = tabTipEl.offsetHeight;
+  const up = t.dataset.tipPos === "top" || r.bottom + h + 12 > vr.bottom;
+  const top = up ? r.top - vr.top - h - 8 : r.bottom - vr.top + 8;
+  const left = Math.max(6, Math.min(vr.width - w - 6, r.left - vr.left + r.width / 2 - w / 2));
+  tabTipEl.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
+  tabTipEl.classList.add("is-on");
+}
+function hideTabTip() { tabTipFor = null; if (tabTipEl) tabTipEl.classList.remove("is-on"); }
+
+// ---- jendela "Tambah tab" ----
+let tpItems = [], tpIndex = 0, tpPrevFocus = null, tpHideTimer = null;
+function openTabPicker(query) {
+  if (!currentProjectId) return;
+  if (tabSbDrawer) toggleTabSidebar(false);
+  hideTabTip();
+  tpPrevFocus = document.activeElement;
+  clearTimeout(tpHideTimer);
+  const o = el("tabPicker");
+  el("tpSearch").value = query || "";
+  o.classList.remove("hidden");
+  el("btnAddTab").setAttribute("aria-expanded", "true");
+  renderTabPicker(true);
+  void o.offsetWidth;
+  o.classList.add("is-open");
+  el("tpSearch").focus();
+  if (window.NovelScroll && typeof window.NovelScroll.attach === "function" && !el("tpGrid").dataset.scrollAttached) {
+    try { window.NovelScroll.attach(el("tpGrid")); el("tpGrid").dataset.scrollAttached = "1"; } catch (e) { /* opsional */ }
+  }
+  document.addEventListener("keydown", tabPickerKeys, true);
+}
+function closeTabPicker(restoreFocus = true) {
+  const o = el("tabPicker");
+  if (o.classList.contains("hidden")) return;
+  o.classList.remove("is-open");
+  document.removeEventListener("keydown", tabPickerKeys, true);
+  el("btnAddTab").setAttribute("aria-expanded", "false");
+  if (tabReduceMq.matches) o.classList.add("hidden");
+  else tpHideTimer = setTimeout(() => o.classList.add("hidden"), 200);
+  if (restoreFocus && tpPrevFocus && tpPrevFocus.isConnected) tpPrevFocus.focus();
+}
+function isTabPickerOpen() { return !el("tabPicker").classList.contains("hidden") && el("tabPicker").classList.contains("is-open"); }
+function renderTabPicker(reset) {
+  const q = el("tpSearch").value.trim().toLowerCase();
+  tpItems = TAB_DEFS.filter((d) => !q || (d.name + " " + d.desc + " " + d.id).toLowerCase().includes(q));
+  if (reset || tpIndex >= tpItems.length) tpIndex = 0;
+  el("tpGrid").innerHTML = tpItems.map((d, i) => {
+    const isOpen = projTabs.open.includes(d.id), on = i === tpIndex;
+    return `<div class="tp-card${on ? " is-active" : ""}${isOpen ? " is-open" : ""}" role="option" id="tp-opt-${d.id}" data-tab="${d.id}" aria-selected="${on}">` +
+      `<span class="tp-card-ic">${tiPx(d.icon, 20)}</span>` +
+      `<span class="tp-card-text"><span class="tp-card-name">${d.name}${isOpen ? '<span class="tp-badge">Terbuka</span>' : ""}</span><span class="tp-card-desc">${d.desc}</span></span></div>`;
+  }).join("");
+  el("tpEmpty").classList.toggle("hidden", tpItems.length > 0);
+  if (tpItems.length) el("tpSearch").setAttribute("aria-activedescendant", "tp-opt-" + tpItems[tpIndex].id);
+  else el("tpSearch").removeAttribute("aria-activedescendant");
+}
+function setTabPickerIndex(i) {
+  if (!tpItems.length) return;
+  tpIndex = Math.max(0, Math.min(tpItems.length - 1, i));
+  el("tpGrid").querySelectorAll(".tp-card").forEach((c, k) => { c.classList.toggle("is-active", k === tpIndex); c.setAttribute("aria-selected", k === tpIndex ? "true" : "false"); });
+  el("tpSearch").setAttribute("aria-activedescendant", "tp-opt-" + tpItems[tpIndex].id);
+  const c = el("tpGrid").children[tpIndex];
+  if (c) c.scrollIntoView({ block: "nearest" });
+}
+function tabPickerCols() {
+  const cards = el("tpGrid").children;
+  if (!cards.length) return 1;
+  let n = 0;
+  for (const c of cards) { if (c.offsetTop !== cards[0].offsetTop) break; n++; }
+  return Math.max(1, n);
+}
+function chooseTabPicker(id) {
+  if (!TAB_BY_ID[id]) return;
+  closeTabPicker(false);
+  if (!projTabs.open.includes(id)) insertProjectTab(id, true);   // dari "+": tab baru di ujung kanan
+  switchTab(id);
+  const b = el("ptab-" + id);
+  if (b) b.focus({ preventScroll: true });
+}
+function tabPickerKeys(e) {
+  if (!isTabPickerOpen()) return;
+  const k = e.key;
+  if (k === "Escape") { e.preventDefault(); e.stopPropagation(); closeTabPicker(); return; }
+  if (k === "Tab") {   // jebakan fokus: kolom cari <-> tombol tutup
+    const f = [el("tpSearch"), el("tpClose")];
+    const i = f.indexOf(document.activeElement);
+    e.preventDefault();
+    f[(i + (e.shiftKey ? f.length - 1 : 1) + f.length) % f.length].focus();
+    return;
+  }
+  if (document.activeElement !== el("tpSearch")) return;
+  const empty = !el("tpSearch").value;
+  if (k === "ArrowDown") { e.preventDefault(); setTabPickerIndex(tpIndex + tabPickerCols()); }
+  else if (k === "ArrowUp") { e.preventDefault(); setTabPickerIndex(tpIndex - tabPickerCols()); }
+  else if (k === "ArrowRight" && empty) { e.preventDefault(); setTabPickerIndex(tpIndex + 1); }
+  else if (k === "ArrowLeft" && empty) { e.preventDefault(); setTabPickerIndex(tpIndex - 1); }
+  else if (k === "Enter") { e.preventDefault(); if (tpItems[tpIndex]) chooseTabPicker(tpItems[tpIndex].id); }
+}
+
+// ---- layar kosong (semua tab ditutup) ----
+function renderTabEmpty() {
+  const p = getProject(currentProjectId);
+  if (!p) return;
+  el("teTitle").textContent = el("projectTitle").value || p.title || "";
+  el("teCover").style.backgroundImage = el("projChipCover").style.backgroundImage;
+  el("teCover").textContent = el("projChipCover").textContent;
+  const q = el("teSearch").value.trim().toLowerCase();
+  const list = TAB_DEFS.filter((d) => (q ? (d.name + " " + d.desc).toLowerCase().includes(q) : teMore || TAB_EMPTY_MAIN.includes(d.id)));
+  el("teChips").innerHTML = list.map((d) => `<button type="button" class="te-chip" data-tab="${d.id}">${tiPx(d.icon, 16)}<span>${d.name}</span></button>`).join("") +
+    (q && !list.length ? '<p class="te-none">Tidak ada fitur yang cocok.</p>' : "") +
+    (q ? "" : `<div class="te-more-row"><button type="button" class="te-chip te-more" data-act="more" aria-expanded="${teMore}">${tiPx(tiIcon(teMore ? "chevron-up" : "chevron-down"), 16)}<span>${teMore ? "Lebih sedikit" : "Lainnya"}</span></button></div>`);
+}
+function openTabFromEmpty(id) {
+  if (!projTabs.open.includes(id)) insertProjectTab(id, true);
+  el("teSearch").value = "";
+  switchTab(id);
+}
+
+// ---- sidebar tab: daftar tab terbuka + riwayat ----
+function tabSidebarVisible() { return tabNarrowMq.matches ? tabSbDrawer : tabSbDocked; }
+function applyTabSidebar() {
+  const v = el("editorView"), narrow = tabNarrowMq.matches, open = tabSidebarVisible();
+  v.classList.toggle("tsb-docked", !narrow && tabSbDocked);
+  v.classList.toggle("tsb-drawer-open", narrow && tabSbDrawer);
+  el("tabSidebar").setAttribute("aria-hidden", open ? "false" : "true");
+  el("tabSidebar").inert = !open;
+  el("tabSidebarScrim").classList.toggle("is-open", narrow && tabSbDrawer);
+  const b = el("btnTabSidebar");
+  b.setAttribute("aria-expanded", open ? "true" : "false");
+  b.setAttribute("aria-label", open ? "Tutup sidebar tab" : "Buka sidebar tab");
+  b.dataset.tip = open ? "Tutup sidebar" : "Buka sidebar";
+  b.classList.toggle("is-open", open);
+  if (open) {
+    renderTabSidebar();
+    if (window.NovelScroll && typeof window.NovelScroll.attach === "function" && !el("tsbScroll").dataset.scrollAttached) {
+      try { window.NovelScroll.attach(el("tsbScroll")); el("tsbScroll").dataset.scrollAttached = "1"; } catch (e) { /* opsional */ }
+    }
+  }
+}
+function toggleTabSidebar(force) {
+  const narrow = tabNarrowMq.matches;
+  const next = typeof force === "boolean" ? force : !tabSidebarVisible();
+  const hadFocus = el("tabSidebar").contains(document.activeElement);
+  if (narrow) tabSbDrawer = next;
+  else { tabSbDocked = next; tabStoreSet("novelist_tabsidebar", next); }
+  hideTabTip();
+  applyTabSidebar();
+  if (!next && hadFocus) el("btnTabSidebar").focus();
+  if (next && narrow) { const f = el("tabSidebar").querySelector(".tsb-row-main") || el("tsbCollapse"); setTimeout(() => f.focus({ preventScroll: true }), 30); }
+}
+// label dokumen yang sedang dibuka di sebuah tab (baris "Terbuka" di sidebar)
+function tabCurrentDoc(tab) {
+  const p = getProject(currentProjectId);
+  if (!p) return null;
+  if (tab === "write") { const s = currentSceneId ? findScene(currentSceneId) : null; return s && s.type !== "folder" ? { doc: s.id, kind: "scene", title: s.title } : null; }
+  if (tab === "organize") {
+    const it = currentOrgItemId ? (p.data.organize[currentOrgCat] || []).find((x) => x.id === currentOrgItemId) : null;
+    return it ? { doc: it.id, kind: currentOrgCat, title: it.title } : null;
+  }
+  const last = tabLastDoc[tab];
+  return last && tabDocInfo(p, Object.assign({ tab }, last)) ? last : null;
+}
+// judul terkini dokumen di riwayat; null = dokumennya sudah dihapus
+function tabDocInfo(p, h) {
+  if (!h.doc) return { title: TAB_BY_ID[h.tab].name };
+  const d = p.data;
+  let x = null;
+  if (h.tab === "write") { x = findScene(h.doc); if (x && x.type === "folder") x = null; }
+  else if (h.tab === "organize") x = ((d.organize || {})[h.kind] || []).find((i) => i && i.id === h.doc);
+  else if (h.tab === "timeline") x = (d.timelines || []).find((t) => t && t.id === h.doc);
+  else if (h.tab === "map") x = (d.maps || []).find((m) => m && m.id === h.doc);
+  else if (h.tab === "quill") x = ((d.quill && d.quill.stories) || []).find((s) => s && s.id === h.doc);
+  else if (h.tab === "home") x = ((d.canvas && Array.isArray(d.canvas.boards) && d.canvas.boards) || []).find((b) => b && b.id === h.doc && b.id !== "home");
+  else if (h.tab === "jejaring") x = ((d.jejaring && Array.isArray(d.jejaring.docs) && d.jejaring.docs) || []).find((j) => j && j.id === h.doc);
+  if (!x) return null;
+  return { title: String(x.title || "").trim() || (h.tab === "quill" ? "Cerita tanpa judul" : "(tanpa judul)") };
+}
+function renderTabSidebar() {
+  const p = getProject(currentProjectId);
+  if (!p) return;
+  const q = el("tsbSearch").value.trim().toLowerCase();
+  const has = (s) => !q || String(s || "").toLowerCase().includes(q);
+  const x14 = tiPx(tiIcon("x"), 14);
+  // Terbuka
+  const open = projTabs.open.map((id) => ({ id, d: TAB_BY_ID[id], doc: tabCurrentDoc(id) })).filter((r) => has(r.d.name) || (r.doc && has(r.doc.title)));
+  el("tsbOpenCount").textContent = projTabs.open.length ? String(projTabs.open.length) : "";
+  el("tsbOpenList").innerHTML = open.map((r) => {
+    const on = r.id === projTabs.active;
+    return `<div class="tsb-row${on ? " is-active" : ""}" role="listitem" data-tab="${r.id}">` +
+      `<button type="button" class="tsb-row-main" data-act="tab"${on ? ' aria-current="true"' : ""}><span class="tsb-row-ic">${tiPx(r.d.icon, 16)}</span>` +
+      `<span class="tsb-row-text"><span class="tsb-row-name">${r.d.name}</span>${r.doc ? `<span class="tsb-row-sub">${escapeHtml(r.doc.title || "(tanpa judul)")}</span>` : ""}</span></button>` +
+      `<button type="button" class="tsb-row-x" data-act="close" aria-label="Tutup tab ${r.d.name}">${x14}</button></div>`;
+  }).join("") || (q ? '<p class="tsb-empty-line">Tidak ada yang cocok.</p>'
+    : `<div class="tsb-empty"><span class="tsb-empty-ic">${tiPx(tiIcon("layout-grid-add"), 20)}</span><p>Semua tab ditutup.</p><button type="button" class="tsb-empty-btn" data-act="add">${tiPx(tiIcon("plus"), 14)}<span>Tambah tab</span></button></div>`);
+  // Riwayat (dokumen yang sudah dihapus tidak ditampilkan)
+  tabHistRows = [];
+  tabHist.forEach((h) => {
+    const info = tabDocInfo(p, h);
+    if (!info) return;
+    const tabName = TAB_BY_ID[h.tab].name;
+    if (has(info.title) || has(tabName)) tabHistRows.push({ h, title: info.title, tabName });
+  });
+  el("tsbClearHist").hidden = !tabHist.length;
+  el("tsbHistList").innerHTML = tabHistRows.map((r, i) => {
+    const icon = r.h.doc ? TAB_DOC_ICONS[r.h.kind] || TAB_BY_ID[r.h.tab].icon : TAB_BY_ID[r.h.tab].icon;
+    return `<div class="tsb-row tsb-hist" role="listitem" data-i="${i}">` +
+      `<button type="button" class="tsb-row-main" data-act="hist"><span class="tsb-row-ic">${tiPx(icon, 16)}</span>` +
+      `<span class="tsb-row-text"><span class="tsb-row-name">${escapeHtml(r.title)}</span><span class="tsb-row-sub">${r.h.doc ? r.tabName + " · " : ""}<span class="tsb-time" data-t="${r.h.t}">${timeAgo(r.h.t)}</span></span></span></button>` +
+      `<button type="button" class="tsb-row-x" data-act="del" aria-label="Hapus dari riwayat">${x14}</button></div>`;
+  }).join("") || (q && tabHist.length ? '<p class="tsb-empty-line">Tidak ada yang cocok.</p>'
+    : `<div class="tsb-empty"><span class="tsb-empty-ic">${tiPx(tiIcon("history"), 20)}</span><p>Belum ada riwayat</p><span class="tsb-empty-hint">Tab, scene, timeline, peta &amp; cerita yang kamu buka akan muncul di sini.</span></div>`);
+  // baris ikon bawah
+  el("tsbQuick").querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("is-on", b.dataset.tab === projTabs.active));
+}
+function refreshTabHistTimes() {
+  if (!tabSidebarVisible() || el("editorView").classList.contains("hidden")) return;
+  el("tsbHistList").querySelectorAll(".tsb-time").forEach((s) => { s.textContent = timeAgo(Number(s.dataset.t)); });
+}
+
+// ---- riwayat ----
+// kunjungan tab ditunda sebentar: kalau dokumen di tab itu langsung dibuka (mis. Beranda -> scene), cukup dokumennya
+function noteTabVisit(tab) {
+  tabVisitPending = { tab, pid: currentProjectId };
+  clearTimeout(tabVisitTimer);
+  tabVisitTimer = setTimeout(() => {
+    const v = tabVisitPending;
+    tabVisitPending = null;
+    if (!v || v.pid !== currentProjectId || projTabs.active !== v.tab) return;
+    pushTabHist(Object.assign({ tab: v.tab }, tabCurrentDoc(v.tab) || {}));
+  }, 0);
+}
+// dokumen dibuka di dalam tab (scene, item Organize, timeline, peta, cerita Quill). doc = { doc, kind, title }
+function noteTabDoc(tab, doc) {
+  if (!currentProjectId || !doc || !doc.doc) return;
+  if (tab === "timeline" || tab === "map" || tab === "quill" || tab === "home" || tab === "jejaring") tabLastDoc[tab] = { doc: doc.doc, kind: doc.kind, title: doc.title };
+  if (projTabs.active !== tab) return;
+  if (tabVisitPending && tabVisitPending.tab === tab) tabVisitPending = null;
+  pushTabHist(Object.assign({ tab }, doc));
+}
+function pushTabHist(e) {
+  const k = e.tab + ":" + (e.doc || "");
+  if (e.doc && tabHist[0] && tabHist[0].tab === e.tab && !tabHist[0].doc) tabHist.shift();   // kunjungan tab polos -> diganti dokumennya
+  tabHist = tabHist.filter((h) => h.k !== k);
+  tabHist.unshift({ k, tab: e.tab, doc: e.doc || null, kind: e.kind || null, title: String(e.title || "").slice(0, 120), t: Date.now() });
+  if (tabHist.length > TAB_HIST_MAX) tabHist.length = TAB_HIST_MAX;
+  saveTabHist();
+  if (tabSidebarVisible()) renderTabSidebar();
+}
+function removeTabHist(k) { tabHist = tabHist.filter((h) => h.k !== k); saveTabHist(); renderTabSidebar(); }
+// buka lagi entri riwayat: tabnya (dibuka kalau tertutup) + dokumennya
+function openTabHist(h) {
+  const p = getProject(currentProjectId);
+  if (!p) return;
+  if (h.doc && !tabDocInfo(p, h)) { removeTabHist(h.k); switchTab(h.tab); return; }
+  if (!h.doc) { switchTab(h.tab); return; }
+  if (h.tab === "write") openSceneInWrite(h.doc);
+  else if (h.tab === "organize") {
+    switchTab("organize");
+    if (currentOrgCat !== h.kind) switchOrganizeCat(h.kind);
+    if (currentOrgItemId !== h.doc) { syncOrganizeFromDetail(); currentOrgItemId = h.doc; renderOrganizeList(); renderOrganizeDetail(); }
+  } else if (h.tab === "timeline" || h.tab === "map" || h.tab === "home" || h.tab === "jejaring") { tabPendingDoc = { tab: h.tab, id: h.doc }; switchTab(h.tab); }
+  else if (h.tab === "quill") { quillNav = { id: h.doc, steps: 0 }; switchTab("quill"); }
+}
+// timeline/peta dari riwayat: dibuka setelah modulnya tampil (openTimelineTab/openMapTab memanggil ini)
+function consumeTabPendingDoc(tab) {
+  const d = tabPendingDoc;
+  if (!d || d.tab !== tab) return;
+  const api = tab === "timeline" ? window.NovelTimeline : tab === "home" ? window.NovelHome : tab === "jejaring" ? window.NovelJejaring : window.NovelMap;
+  if (!api || typeof api.open !== "function" || el("tab" + capitalize(tab)).classList.contains("hidden")) return;
+  tabPendingDoc = null;
+  api.open(d.id);
+}
+// Quill: catat cerita yang dibuka (hook "screen") + jalankan navigasi dari riwayat langkah demi langkah
+function onQuillScreen(e) {
+  if (!e || !e.project || e.project.id !== currentProjectId) return;
+  quillScreen = { view: e.view, storyId: e.story ? e.story.id : null };
+  if (!e.view) return;   // Quill disembunyikan
+  if (e.story) noteTabDoc("quill", { doc: e.story.id, kind: "story", title: String(e.story.title || "").trim() || "Cerita tanpa judul" });
+  else if (e.view === "library") tabLastDoc.quill = null;
+  stepQuillNav();
+}
+function stepQuillNav() {
+  const nav = quillNav;
+  if (!nav || projTabs.active !== "quill" || !quillScreen || !quillScreen.view) return;
+  const v = quillScreen.view, host = el("quillRoot");
+  // sudah di cerita itu / form cerita baru (jangan buang isiannya) / terlalu banyak langkah -> selesai
+  if ((quillScreen.storyId === nav.id && v !== "create") || v === "create" || nav.steps++ > 6) { quillNav = null; return; }
+  const btn = v === "library" ? [...host.querySelectorAll('.qd-card[data-act="open"]')].find((b) => b.dataset.id === nav.id)
+    : host.querySelector('.qd-back[data-act="back"], [data-act="tostory"]');
+  if (!btn) { quillNav = null; return; }
+  setTimeout(() => { if (quillNav === nav && btn.isConnected) btn.click(); }, 0);   // klik setelah hook layar selesai
+}
+
+// ---- pasang semua event (dipanggil sekali saat halaman siap) ----
+function initProjectTabs() {
+  tabSbDocked = tabStoreGet("novelist_tabsidebar") === true;
+  const strip = el("tabStrip");
+  strip.addEventListener("click", (e) => {
+    if (strip.dataset.dragged) return;
+    const n = e.target.closest(".ptab");
+    if (!n || n.classList.contains("is-leaving")) return;
+    if (e.target.closest(".ptab-x")) closeProjectTab(n.dataset.tab);
+    else switchTab(n.dataset.tab);
+  });
+  strip.addEventListener("mousedown", (e) => { if (e.button === 1 && e.target.closest(".ptab")) e.preventDefault(); });   // tanpa autoscroll
+  strip.addEventListener("auxclick", (e) => {
+    const n = e.target.closest(".ptab");
+    if (e.button === 1 && n && !n.classList.contains("is-leaving")) { e.preventDefault(); closeProjectTab(n.dataset.tab); }
+  });
+  strip.addEventListener("keydown", (e) => {
+    const b = e.target.closest(".ptab-btn");
+    if (!b) return;
+    const id = b.parentElement.dataset.tab;
+    const btns = [...strip.querySelectorAll(".ptab:not(.is-leaving) .ptab-btn")];
+    const i = btns.indexOf(b);
+    if (e.altKey && e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {   // Alt+Shift+panah: pindahkan tab
+      e.preventDefault();
+      moveProjectTab(id, e.key === "ArrowLeft" ? -1 : 1);
+      const nb = el("ptab-" + id); if (nb) { nb.tabIndex = 0; nb.focus(); }
+      return;
+    }
+    if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      closeProjectTab(id);
+      const left = [...strip.querySelectorAll(".ptab:not(.is-leaving) .ptab-btn")];
+      const f = left[Math.min(i, left.length - 1)] || el("btnAddTab");
+      f.focus();
+      return;
+    }
+    let to = null;
+    if (e.key === "ArrowRight") to = btns[(i + 1) % btns.length];
+    else if (e.key === "ArrowLeft") to = btns[(i - 1 + btns.length) % btns.length];
+    else if (e.key === "Home") to = btns[0];
+    else if (e.key === "End") to = btns[btns.length - 1];
+    if (to) { e.preventDefault(); btns.forEach((x) => { x.tabIndex = x === to ? 0 : -1; }); to.focus(); }
+  });
+  strip.addEventListener("scroll", updateTabStripFade, { passive: true });
+  strip.addEventListener("wheel", (e) => {   // roda mouse vertikal menggulir bar tab ke samping
+    if (strip.scrollWidth <= strip.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    e.preventDefault();
+    strip.scrollLeft += e.deltaY;
+  }, { passive: false });
+  window.addEventListener("resize", () => { if (currentProjectId) updateTabStripFade(); });
+  makeTabSortable(strip, ".ptab", "x", (order) => { projTabs.open = order.filter((t) => TAB_BY_ID[t]); saveProjectTabs(); renderProjectTabs(); });
+
+  el("btnAddTab").onclick = () => openTabPicker();
+  el("btnTabSidebar").onclick = () => toggleTabSidebar();
+  el("tsbCollapse").onclick = () => toggleTabSidebar(false);
+  el("tabSidebarScrim").onclick = () => toggleTabSidebar(false);
+  tabNarrowMq.addEventListener("change", () => { tabSbDrawer = false; if (currentProjectId) applyTabSidebar(); });
+
+  // tooltip
+  const v = el("editorView");
+  v.addEventListener("pointerover", (e) => {
+    if (e.pointerType === "touch") return;
+    const t = e.target.closest("[data-tip]");
+    if (t && t !== tabTipFor && !document.querySelector(".is-sorting")) showTabTip(t);
+    else if (!t && tabTipFor) hideTabTip();
+  });
+  v.addEventListener("pointerout", (e) => { if (tabTipFor && !tabTipFor.contains(e.relatedTarget)) hideTabTip(); });
+  v.addEventListener("focusin", (e) => { const t = e.target.closest("[data-tip]"); if (t && t.matches(":focus-visible")) showTabTip(t); else hideTabTip(); });
+  v.addEventListener("focusout", hideTabTip);
+  v.addEventListener("pointerdown", hideTabTip, true);
+  strip.addEventListener("scroll", hideTabTip, { passive: true });
+
+  // jendela "Tambah tab"
+  el("tpSearch").addEventListener("input", () => renderTabPicker(true));
+  el("tpClose").onclick = () => closeTabPicker();
+  el("tabPicker").addEventListener("click", (e) => { if (e.target === el("tabPicker")) closeTabPicker(); });
+  el("tpGrid").addEventListener("click", (e) => { const c = e.target.closest(".tp-card"); if (c) chooseTabPicker(c.dataset.tab); });
+  el("tpGrid").addEventListener("pointermove", (e) => {
+    const c = e.target.closest(".tp-card");
+    if (c && e.pointerType !== "touch") { const i = [...el("tpGrid").children].indexOf(c); if (i !== tpIndex && i >= 0) setTabPickerIndex(i); }
+  });
+
+  // layar kosong
+  el("teChips").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.act === "more") { teMore = !teMore; renderTabEmpty(); const m = el("teChips").querySelector(".te-more"); if (m) m.focus(); return; }
+    if (b.dataset.tab) openTabFromEmpty(b.dataset.tab);
+  });
+  el("teSearch").addEventListener("input", renderTabEmpty);
+  el("teSearch").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { const c = el("teChips").querySelector(".te-chip[data-tab]"); if (c) { e.preventDefault(); openTabFromEmpty(c.dataset.tab); } }
+    else if (e.key === "Escape" && el("teSearch").value) { e.preventDefault(); el("teSearch").value = ""; renderTabEmpty(); }
+  });
+  el("projectTitle").addEventListener("input", () => { if (!projTabs.active) el("teTitle").textContent = el("projectTitle").value; });
+
+  // sidebar
+  el("tsbSearch").addEventListener("input", renderTabSidebar);
+  el("tabSidebar").addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (document.activeElement === el("tsbSearch") && el("tsbSearch").value) { e.preventDefault(); el("tsbSearch").value = ""; renderTabSidebar(); return; }
+    if (tabNarrowMq.matches && tabSbDrawer) { e.preventDefault(); e.stopPropagation(); toggleTabSidebar(false); }
+  });
+  document.addEventListener("keydown", (e) => {   // Esc menutup laci sidebar (layar sempit) dari mana pun
+    if (e.key === "Escape" && tabSbDrawer && tabNarrowMq.matches && !isTabPickerOpen() && !el("editorView").classList.contains("hidden")) toggleTabSidebar(false);
+  });
+  el("tsbOpenList").addEventListener("click", (e) => {
+    if (el("tsbOpenList").dataset.dragged) return;
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.act === "add") { openTabPicker(); return; }
+    const row = b.closest(".tsb-row");
+    if (!row) return;
+    if (b.dataset.act === "close") closeProjectTab(row.dataset.tab);
+    else { switchTab(row.dataset.tab); if (tabNarrowMq.matches) toggleTabSidebar(false); }
+  });
+  el("tsbOpenList").addEventListener("auxclick", (e) => { const row = e.target.closest(".tsb-row"); if (e.button === 1 && row) { e.preventDefault(); closeProjectTab(row.dataset.tab); } });
+  makeTabSortable(el("tsbOpenList"), ".tsb-row", "y", (order) => { projTabs.open = order.filter((t) => TAB_BY_ID[t]); saveProjectTabs(); renderProjectTabs(); }, () => !el("tsbSearch").value.trim());
+  el("tsbHistList").addEventListener("click", (e) => {
+    const b = e.target.closest("button"), row = b && b.closest(".tsb-row");
+    const r = row && tabHistRows[Number(row.dataset.i)];
+    if (!r) return;
+    if (b.dataset.act === "del") { removeTabHist(r.h.k); return; }
+    openTabHist(r.h);
+    if (tabNarrowMq.matches) toggleTabSidebar(false);
+  });
+  el("tsbClearHist").onclick = () => { tabHist = []; saveTabHist(); renderTabSidebar(); };
+  el("tsbQuick").innerHTML = TAB_QUICK.map((id) => `<button type="button" class="tsb-quick-btn" data-tab="${id}" data-tip="${TAB_BY_ID[id].name}" data-tip-pos="top" aria-label="Buka ${TAB_BY_ID[id].name}">${tiPx(TAB_BY_ID[id].icon, 17)}</button>`).join("") +
+    `<span class="tsb-quick-sep" aria-hidden="true"></span><button type="button" class="tsb-quick-btn" data-act="add" data-tip="Tambah tab" data-tip-pos="top" aria-label="Tambah tab" aria-haspopup="dialog">${tiPx(tiIcon("plus"), 17)}</button>`;
+  el("tsbQuick").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.act === "add") { openTabPicker(); return; }
+    switchTab(b.dataset.tab);
+    if (tabNarrowMq.matches) toggleTabSidebar(false);
+  });
+  setInterval(refreshTabHistTimes, 30000);   // "5 menit lalu" tetap akurat
+
+  // Quill (dimuat belakangan): catat cerita yang dibuka
+  (window.__novelQuillReady = window.__novelQuillReady || []).push((api) => { if (api && typeof api.on === "function") api.on("screen", onQuillScreen); });
 }
 
 // ---- QUILL (tab Write → tombol "Scene | Quill"): quill.js baru dimuat saat Quill pertama kali dibuka.
@@ -654,16 +1367,8 @@ function applyWriteMode() {
   if (quill) openQuillMode();
   else if (window.NovelQuill) window.NovelQuill.hide();
 }
-function setWriteMode(mode) {
-  const p = getProject(currentProjectId);
-  if (!p || writeMode(p) === mode) return;
-  flushCurrentEdits();
-  if (mode === "quill" && !p.data.quill) p.data.quill = { mode: "quill", stories: [] };
-  if (p.data.quill) p.data.quill.mode = mode;
-  markDirtyAndSchedule();
-  applyWriteMode();
-  updateSceneDrawerVisibility();
-}
+// tombol "Scene | Quill" = pindah ke tab Tulis / Quill (TAB PROJECT; tab dibuka otomatis kalau sedang tertutup)
+function setWriteMode(mode) { switchTab(mode === "quill" ? "quill" : "write"); }
 async function openQuillMode() {
   const root = el("quillRoot");
   if (!window.NovelQuill) root.innerHTML = '<div class="quill-loading">Memuat Quill…</div>';
@@ -694,8 +1399,7 @@ function quillUserName() {
 }
 // dari Home/Timeline/Map ke scene tertentu: selalu buka editor Scene
 function openSceneInWrite(id) {
-  if (writeMode(getProject(currentProjectId)) === "quill") setWriteMode("scene");
-  switchTab("write");
+  switchTab("write");   // tab Tulis = mode Scene
   selectScene(id);
 }
 
@@ -753,7 +1457,12 @@ async function openTimelineTab() {
     onChange: markDirtyAndSchedule,
     getScenes: () => flattenScenes(getProject(currentProjectId).data.scenes),
     openScene: (id) => openSceneInWrite(id),
+    onOpen: (id) => {   // TAB PROJECT: riwayat
+      const t = (getProject(currentProjectId).data.timelines || []).find((x) => x && x.id === id);
+      noteTabDoc("timeline", { doc: id, kind: "timeline", title: t ? t.title : "" });
+    },
   });
+  consumeTabPendingDoc("timeline");   // dibuka dari riwayat
 }
 
 // ---- MAP: map-core.js (data) + map2d.js (editor 2D) + map-ui.js (shell) baru dimuat saat tab ini pertama kali dibuka.
@@ -778,7 +1487,12 @@ async function openMapTab() {
     onChange: markDirtyAndSchedule,
     getScenes: () => flattenScenes(getProject(currentProjectId).data.scenes),
     openScene: (id) => openSceneInWrite(id),
+    onOpen: (id) => {   // TAB PROJECT: riwayat
+      const m = (getProject(currentProjectId).data.maps || []).find((x) => x && x.id === id);
+      noteTabDoc("map", { doc: id, kind: "map", title: m ? m.title : "" });
+    },
   });
+  consumeTabPendingDoc("map");   // dibuka dari riwayat
 }
 
 // ---- HOME TAB: canvas berisi titik-titik scene ----
@@ -795,24 +1509,94 @@ function flattenScenes(list, out = []) {
   (list || []).forEach((n) => { if (n.type === "folder") flattenScenes(n.children, out); else out.push(n); });
   return out;
 }
-function hashUnit(str, salt) {   // angka 0..1 yang tetap untuk id yang sama (posisi node di canvas tidak loncat-loncat)
-  let h = 2166136261 ^ salt;
-  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return ((h >>> 0) % 10000) / 10000;
+// Beranda = kanvas papan (home-canvas.js + home-canvas.css, dimuat saat tab ini pertama kali dibuka; React Flow dari
+// vendor/ dipakai bersama Timeline). Data: p.data.canvas (lihat komentar di awal home-canvas.js).
+let homeLibPromise = null;
+const stylePromises = {};
+function loadStyleOnce(href) {
+  if (!stylePromises[href]) {
+    stylePromises[href] = new Promise((resolve, reject) => {
+      const l = document.createElement("link");
+      l.rel = "stylesheet"; l.href = href; l.onload = resolve;
+      l.onerror = () => { delete stylePromises[href]; l.remove(); reject(new Error("Gagal memuat " + href)); };
+      document.head.appendChild(l);
+    });
+  }
+  return stylePromises[href];
 }
-function renderProjectHome() {
+function ensureHomeLib() {
+  if (!homeLibPromise) {
+    homeLibPromise = Promise.all([ensureReact().then(() => loadScriptOnce("vendor/reactflow-11.11.4.umd.js")), loadStyleOnce("home-canvas.css")])
+      .then(() => loadScriptOnce("home-canvas.js"));
+    homeLibPromise.catch(() => { homeLibPromise = null; });   // boleh dicoba lagi
+  }
+  return homeLibPromise;
+}
+async function renderProjectHome() {
+  const box = el("homeCanvas");
+  if (!window.NovelHome) box.innerHTML = `<div class="home-loading">${tiPx(tiIcon("loader-2"), 18)}<span>Memuat kanvas…</span></div>`;
+  try { await ensureHomeLib(); }
+  catch (e) { box.innerHTML = '<div class="home-loading">Kanvas gagal dimuat. Periksa koneksi lalu buka tab ini lagi.</div>'; return; }
+  if (el("tabHome").classList.contains("hidden") || el("editorView").classList.contains("hidden") || !currentProjectId) return;   // pengguna sudah pindah
+  window.NovelHome.show({
+    project: getProject(currentProjectId),
+    onChange: markDirtyAndSchedule,
+    getCurrentSceneId: () => currentSceneId,
+    openScene: (id) => openSceneInWrite(id),
+    closeTab: () => closeProjectTab("home"),
+    preview: () => el("btnPreview").click(),
+    toggleTheme: () => el("btnProjectTheme").click(),
+    onOpen: (id, title, isDefault) => {   // TAB PROJECT: riwayat (papan Beranda bawaan = kunjungan tab biasa)
+      if (isDefault) tabLastDoc.home = null;
+      else noteTabDoc("home", { doc: id, kind: "board", title });
+      if (tabSidebarVisible()) renderTabSidebar();
+    },
+  });
+  consumeTabPendingDoc("home");   // papan dibuka dari riwayat
+}
+// Jejaring Tokoh = pohon relasi tokoh (jejaring.js + jejaring.css, dimuat saat tab ini pertama kali dibuka; React Flow
+// dari vendor/ dipakai bersama). Data: p.data.jejaring (lihat komentar di awal jejaring.js). Kartu bisa ditautkan ke
+// karakter Organize (id karakter, nama diambil dari sana).
+let jejaringLibPromise = null;
+function ensureJejaringLib() {
+  if (!jejaringLibPromise) {
+    jejaringLibPromise = Promise.all([ensureReact().then(() => loadScriptOnce("vendor/reactflow-11.11.4.umd.js")), loadStyleOnce("jejaring.css")])
+      .then(() => loadScriptOnce("jejaring.js"));
+    jejaringLibPromise.catch(() => { jejaringLibPromise = null; });   // boleh dicoba lagi
+  }
+  return jejaringLibPromise;
+}
+async function renderJejaringTab() {
+  const box = el("jejaringCanvas");
+  if (!window.NovelJejaring) box.innerHTML = `<div class="home-loading">${tiPx(tiIcon("loader-2"), 18)}<span>Memuat Jejaring Tokoh…</span></div>`;
+  try { await ensureJejaringLib(); }
+  catch (e) { box.innerHTML = '<div class="home-loading">Jejaring Tokoh gagal dimuat. Periksa koneksi lalu buka tab ini lagi.</div>'; return; }
+  if (el("tabJejaring").classList.contains("hidden") || el("editorView").classList.contains("hidden") || !currentProjectId) return;   // pengguna sudah pindah
   const p = getProject(currentProjectId);
-  if (!p) return;
-  const scenes = flattenScenes(p.data.scenes);
-
-  // canvas: setiap scene = titik bercahaya + label, disambung garis tipis sesuai urutan
-  const canvas = el("homeCanvas");
-  const pts = scenes.map((s, i) => ({ s, x: 0.08 + hashUnit(s.id, 1) * 0.84, y: 0.12 + (scenes.length > 1 ? (i / (scenes.length - 1)) * 0.7 : 0.3) + (hashUnit(s.id, 2) - 0.5) * 0.08 }));
-  const lines = pts.slice(1).map((pt, i) => `<line x1="${pts[i].x * 100}%" y1="${pts[i].y * 100}%" x2="${pt.x * 100}%" y2="${pt.y * 100}%" />`).join("");
-  canvas.innerHTML = `<div class="home-canvas-area"><svg class="home-links" aria-hidden="true">${lines}</svg>` +
-    pts.map((pt) => `<button class="home-node${pt.s.id === currentSceneId ? " is-current" : ""}" data-id="${pt.s.id}" style="left:${pt.x * 100}%;top:${pt.y * 100}%">` +
-      `<span class="home-node-dot ${pt.s.status || "todo"}"></span><span class="home-node-label">${escapeHtml(pt.s.title || "(tanpa judul)")}</span></button>`).join("") + `</div>`;
-  canvas.querySelectorAll(".home-node").forEach((b) => b.onclick = () => openSceneInWrite(b.dataset.id));
+  window.NovelJejaring.show({
+    project: p,
+    onChange: markDirtyAndSchedule,
+    closeTab: () => closeProjectTab("jejaring"),
+    toggleTheme: () => el("btnProjectTheme").click(),
+    onOpen: (id, title) => {   // TAB PROJECT: riwayat jejaring yang dibuka
+      noteTabDoc("jejaring", { doc: id, kind: "jejaring", title });
+      if (tabSidebarVisible()) renderTabSidebar();
+    },
+    // kartu Organize dibuat / diganti namanya dari jejaring: daftar Organize ikut diperbarui (judul di detail juga,
+    // supaya syncOrganizeFromDetail tidak menimpa nama baru dengan yang lama)
+    onOrganizeChange: () => {
+      if (!p.data.organize || currentOrgCat !== "characters") return;
+      renderOrganizeList();
+      const it = currentOrgItemId && (p.data.organize.characters || []).find((x) => x.id === currentOrgItemId);
+      if (it && el("orgTitleField")) el("orgTitleField").value = it.title;
+    },
+    openCharacter: (cid) => {   // "Buka kartu" -> tab Organize › Karakter, item itu terpilih
+      switchTab("organize");
+      if (currentOrgCat !== "characters") switchOrganizeCat("characters");
+      if (currentOrgItemId !== cid) { syncOrganizeFromDetail(); currentOrgItemId = cid; renderOrganizeList(); renderOrganizeDetail(); }
+    },
+  });
+  consumeTabPendingDoc("jejaring");   // jejaring dibuka dari riwayat
 }
 
 // jam kecil di pojok kanan atas (seperti vvd)
@@ -829,7 +1613,41 @@ let sceneHistory = [];
 let sceneHistoryIndex = -1;
 let pendingSceneParentId = null;
 let pendingSceneType = "scene";
-let currentZoom = 100;
+let currentZoom = 100;   // ukuran tulisan editor (%) = twPrefs.zoom
+
+// ---- TULIS (mode Scene): tampilan per perangkat (localStorage, tidak memicu simpan ke Drive) ----
+//   novelist_tw_prefs         = { font, width, lh, para, zoom, side }  (huruf, lebar halaman, jarak baris, gaya paragraf, zoom %, daftar tampil)
+//   novelist_tw_day_<project> = { d: "YYYY-MM-DD", base: N }           (jumlah kata project di awal hari -> progres target harian)
+// Target harian per project ada di p.data.dailyGoal (ikut autosave Drive). Pemisah adegan = <hr class="scene-break">.
+const TW_PREFS_KEY = "novelist_tw_prefs";
+const TW_PREFS_DEFAULT = { font: "serif", width: "m", lh: "normal", para: "plain", zoom: 100, side: true };
+const TW_PREF_OPTS = {
+  font: [["serif", "Serif"], ["sans", "Sans"], ["mono", "Mono"]],
+  width: [["s", "Sempit"], ["m", "Sedang"], ["l", "Lebar"], ["full", "Penuh"]],
+  lh: [["tight", "Rapat"], ["normal", "Normal"], ["loose", "Lega"]],
+  para: [["plain", "Biasa"], ["space", "Berjarak"], ["indent", "Inden"]],
+};
+const TW_STATUS_NEXT = { todo: "draft", draft: "done", done: "todo" };
+const TW_RING = 2 * Math.PI * 8;   // keliling cincin progres target (r = 8)
+const TW_FLOURISH = `<svg class="tw-flourish" viewBox="0 0 120 18" aria-hidden="true" focusable="false"><path d="M4 10c14-7 28 5 44-1 4-1.5 7-4 12-4.5 5 .5 8 3 12 4.5 16 6 30-6 44 1" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M60 9.5l2.6 2.6L60 14.7l-2.6-2.6z" fill="currentColor"/></svg>`;
+const twNarrowMq = window.matchMedia("(max-width: 700px)");                 // HP: daftar scene jadi laci
+const twFineMq = window.matchMedia("(hover: hover) and (pointer: fine)");   // toolbar mengambang & pratinjau hanya untuk mouse
+let twPrefs = Object.assign({}, TW_PREFS_DEFAULT, tabStoreGet(TW_PREFS_KEY) || {});
+Object.keys(TW_PREF_OPTS).forEach((k) => { if (!TW_PREF_OPTS[k].some((o) => o[0] === twPrefs[k])) twPrefs[k] = TW_PREFS_DEFAULT[k]; });
+twPrefs.zoom = Math.min(160, Math.max(70, Math.round(Number(twPrefs.zoom) / 5) * 5 || 100));
+twPrefs.side = twPrefs.side !== false;
+currentZoom = twPrefs.zoom;
+let twSearchQ = "";                       // kata kunci pencarian daftar
+let twListPid = null;                     // project yang daftarnya tampil (ganti project -> pencarian dikosongkan)
+let twSideDrawer = false;                 // HP: laci daftar terbuka
+let twDrag = null;                        // { id } node yang sedang diseret
+let twRange = null;                       // seleksi terakhir di editor (dipulihkan sebelum perintah format)
+let twPointerSel = false;                 // sedang menyeleksi dengan mouse -> toolbar mengambang menunggu
+let twSession = { pid: null, base: 0 };   // jumlah kata project saat dibuka (kata sesi)
+let twLast = { total: 0, today: 0, sess: 0, goal: 0 };
+let twStatsTimer = 0, twSelRaf = 0, twPeekTimer = 0, twPeekRow = null;
+const twWordCache = new Map();            // id scene -> { c: isi, n: jumlah kata }
+const twScrollMem = new Map();            // id scene -> posisi gulir terakhir (selama halaman terbuka)
 
 // ikon tree binder (Tabler, ukuran sama dengan SVG lama)
 const TREE_ICONS = {
@@ -852,122 +1670,261 @@ function countAllNodes(list, isFolder) {
   return (list || []).filter((n) => (n.type === "folder") === isFolder).length;
 }
 
-function toggleFolder(id) {
-  if (expandedFolders.has(id)) expandedFolders.delete(id); else expandedFolders.add(id);
-  renderSceneList();
+// ---- helper Tulis ----
+function saveTwPrefs() { tabStoreSet(TW_PREFS_KEY, twPrefs); }
+function twAttr(s) { return escapeHtml(String(s == null ? "" : s)).replace(/"/g, "&quot;"); }
+function twFmt(n) { return Number(n || 0).toLocaleString("id-ID"); }
+function twShort(n) { return n >= 1000 ? (n / 1000).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + "k" : String(n); }
+function twStatusOf(s) { return s && STATUS_LABELS[s.status] ? s.status : "todo"; }
+// hitung kata dari HTML: tag blok = pemisah kata, tag inline (<b>, <span>) tidak memotong kata
+function twCountWords(html) {
+  if (!html) return 0;
+  const t = html.replace(/<\/?(?:p|div|h[1-6]|li|ul|ol|blockquote|hr|br|tr|td|th|section|article|figure)\b[^>]*>/gi, " ")
+    .replace(/<[^>]*>/g, "").replace(/&nbsp;|&#160;/g, " ").trim();
+  return t ? t.split(/\s+/).filter(Boolean).length : 0;
+}
+function twWords(s) {   // kata per scene, di-cache selama isinya sama
+  const c = s.content || "";
+  const hit = twWordCache.get(s.id);
+  if (hit && hit.c === c) return hit.n;
+  const n = twCountWords(c);
+  twWordCache.set(s.id, { c, n });
+  return n;
+}
+function twCountFolders(list) { return (list || []).reduce((a, n) => a + (n.type === "folder" ? 1 + twCountFolders(n.children) : 0), 0); }
+function twSceneOrder() { const p = getProject(currentProjectId); return p ? flattenScenes(p.data.scenes) : []; }
+// jalur [bab, ..., node] menuju id (null = tidak ada)
+function twPath(id, list, trail = []) {
+  for (const n of list || []) {
+    if (n.id === id) return trail.concat(n);
+    if (n.type === "folder") { const r = twPath(id, n.children, trail.concat(n)); if (r) return r; }
+  }
+  return null;
+}
+function twMatch(node, q) { return !q || (node.title || "").toLowerCase().includes(q) || (node.type !== "folder" && (node.synopsis || "").toLowerCase().includes(q)); }
+function twMark(text, q) {   // judul dengan kata kunci pencarian ditandai <mark>
+  const t = String(text || ""), lo = t.toLowerCase(), i = q ? lo.indexOf(q) : -1;
+  if (i < 0 || lo.length !== t.length) return escapeHtml(t);
+  return escapeHtml(t.slice(0, i)) + "<mark>" + escapeHtml(t.slice(i, i + q.length)) + "</mark>" + escapeHtml(t.slice(i + q.length));
+}
+function twToday() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+// baseline kata: sesi (sejak project dibuka) & hari ini (di perangkat ini). Mengembalikan total kata project.
+function twEnsureBaselines(p) {
+  const total = flattenScenes(p.data.scenes).reduce((a, s) => a + twWords(s), 0);
+  if (twSession.pid !== p.id) twSession = { pid: p.id, base: total };
+  const key = "novelist_tw_day_" + p.id, day = tabStoreGet(key);
+  if (!day || day.d !== twToday() || typeof day.base !== "number") tabStoreSet(key, { d: twToday(), base: total });
+  return total;
+}
+function twGoal(p) { const g = Math.round(Number(p && p.data && p.data.dailyGoal)); return g > 0 ? g : 0; }
+
+// ---- daftar scene: tampil / ciut (desktop) atau laci (HP) ----
+function twSideVisible() { return twNarrowMq.matches ? twSideDrawer : twPrefs.side; }
+function applyTwSide() {
+  const tw = el("tabWrite"), side = el("twSide");
+  if (!tw || !side) return;
+  const narrow = twNarrowMq.matches, vis = twSideVisible();
+  tw.classList.toggle("tw-side-collapsed", !narrow && !twPrefs.side);
+  tw.classList.toggle("tw-side-open", narrow && twSideDrawer);
+  el("twScrim").classList.toggle("is-on", narrow && twSideDrawer);
+  side.setAttribute("aria-hidden", vis ? "false" : "true");
+  side.inert = !vis;
+  el("twSideOpen").setAttribute("aria-expanded", vis ? "true" : "false");
+}
+function toggleTwSide(force) {
+  const next = typeof force === "boolean" ? force : !twSideVisible();
+  if (twNarrowMq.matches) twSideDrawer = next;
+  else { twPrefs.side = next; saveTwPrefs(); }
+  applyTwSide();
+  twHidePeek();
+  if (next && twNarrowMq.matches) setTimeout(() => { const r = el("sceneList").querySelector('.tw-row[tabindex="0"]') || el("twSearch"); r.focus({ preventScroll: true }); }, 60);
+  else if (!next && el("twSide").contains(document.activeElement)) el("twSideOpen").focus({ preventScroll: true });
+}
+function twClearSearch() { if (twSearchQ) { twSearchQ = ""; el("twSearch").value = ""; } }
+
+function toggleFolder(id, row) {
+  const open = !expandedFolders.has(id);
+  if (open) expandedFolders.add(id); else expandedFolders.delete(id);
+  row = row || el("sceneList").querySelector(`.tw-row[data-id="${CSS.escape(id)}"]`);
+  const group = row && row.parentElement.querySelector(":scope > .tree-group");
+  if (!row || !group || twSearchQ.trim()) { renderSceneList(); return; }
+  // buka/tutup di tempat (tanpa membangun ulang daftar) supaya animasinya terlihat
+  row.setAttribute("aria-expanded", open ? "true" : "false");
+  row.querySelector(".tw-caret").classList.toggle("open", open);
+  row.querySelector(".tw-folder-ic").innerHTML = open ? TREE_ICONS.folderOpen : TREE_ICONS.folder;
+  group.classList.toggle("open", open);
 }
 
 function renderSceneList() {
   const p = getProject(currentProjectId);
-  const container = el("sceneList");
-  container.innerHTML = "";
-  (p.data.scenes || []).forEach((node) => container.appendChild(buildTreeNode(node)));
+  const box = el("sceneList");
+  if (!p || !box) return;
+  if (twListPid !== p.id) { twListPid = p.id; twSearchQ = ""; el("twSearch").value = ""; twSideDrawer = false; twScrollMem.clear(); twWordCache.clear(); applyTwSide(); }
+  twHidePeek();
+  const q = twSearchQ.trim().toLowerCase();
+  const frag = document.createDocumentFragment();
+  (p.data.scenes || []).forEach((node) => { const n = buildTreeNode(node, q, 0); if (n) frag.appendChild(n); });
+  box.innerHTML = "";
+  box.classList.toggle("is-search", !!q);
+  if (frag.childNodes.length) {
+    box.appendChild(frag);
+    if (!q) box.insertAdjacentHTML("beforeend", '<div class="tw-drop-end" aria-hidden="true"></div>');   // seret ke sini = pindah ke akhir naskah
+  } else {
+    box.innerHTML = q ? `<p class="tw-list-empty">Tidak ada scene yang cocok dengan “${escapeHtml(twSearchQ.trim())}”.</p>`
+      : `<div class="tw-list-empty"><span class="tw-list-empty-ic">${tiPx(tiIcon("file-text"), 20)}</span><p>Belum ada scene</p><span>Buat scene atau bab lewat tombol di atas.</span></div>`;
+  }
+  // tab roving: hanya baris aktif (atau baris pertama) yang masuk urutan Tab; panah atas/bawah berpindah baris
+  const act = box.querySelector(".tw-row.active") || box.querySelector(".tw-row");
+  if (act) act.tabIndex = 0;
+  renderTwSideInfo(p);
+  if (window.NovelHome) window.NovelHome.refresh();   // Beranda tampil: node scene ikut diperbarui
+}
+// ringkasan di kepala & kaki daftar: jumlah scene/bab/kata + progres status
+function renderTwSideInfo(p) {
+  const sc = flattenScenes(p.data.scenes);
+  const words = sc.reduce((a, s) => a + twWords(s), 0);
+  el("twSideMeta").textContent = `${sc.length} scene · ${twCountFolders(p.data.scenes)} bab · ${twFmt(words)} kata`;
+  const c = { done: 0, draft: 0, todo: 0 };
+  sc.forEach((s) => { c[twStatusOf(s)]++; });
+  const keys = ["done", "draft", "todo"];
+  el("twSideFoot").innerHTML = !sc.length ? "" :
+    `<div class="tw-prog" role="img" aria-label="${c.done} Done, ${c.draft} Draft, ${c.todo} Todo">${keys.map((k) => c[k] ? `<span class="is-${k}" style="flex:${c[k]}"></span>` : "").join("")}</div>` +
+    `<div class="tw-prog-legend">${keys.map((k) => `<span><i class="tw-dot ${k}"></i>${c[k]} ${STATUS_LABELS[k]}</span>`).join("")}</div>`;
 }
 
-function buildTreeNode(node) {
-  const wrap = document.createElement("div");
-  wrap.className = "tree-node";
-
+function buildTreeNode(node, q = "", depth = 0) {
   const isFolder = node.type === "folder";
-  const isOpen = isFolder && expandedFolders.has(node.id);
-  const childCount = isFolder ? (node.children || []).length : 0;
-  const metaText = isFolder ? (childCount ? `${childCount}` : "") : (countWordsFromHtml(node.content) + "w");
-
+  let kids = [];
+  if (isFolder) {
+    kids = (node.children || []).map((c) => buildTreeNode(c, q, depth + 1)).filter(Boolean);
+    if (q && !kids.length && !twMatch(node, q)) return null;
+  } else if (!twMatch(node, q)) return null;
+  const isOpen = isFolder && (q ? true : expandedFolders.has(node.id));
+  const wrap = document.createElement("div");
+  wrap.className = "tree-node tw-node";
   const row = document.createElement("div");
-  row.className = "tree-row" + (node.id === currentSceneId ? " active" : "");
-  row.draggable = true;
-  row.innerHTML = `
-    <span class="tree-drag-handle" title="Seret untuk pindahkan">${TREE_ICONS.grip}</span>
-    <span class="tree-caret ${isFolder ? (isOpen ? "open" : "") : "leaf"}">${isFolder ? TREE_ICONS.caret : ""}</span>
-    <span class="tree-icon">${isFolder ? (isOpen ? TREE_ICONS.folderOpen : TREE_ICONS.folder) : TREE_ICONS.file}</span>
-    ${!isFolder ? `<span class="tree-status-dot ${node.status}"></span>` : ""}
-    <span class="tree-label">${escapeHtml(node.title || "(tanpa judul)")}</span>
-    <span class="tree-meta">${metaText}</span>
-    <div class="tree-actions">
-      ${isFolder
-        ? `<button class="tree-action-btn" data-action="addChild" title="Tambah scene di dalam folder ini">${TREE_ICONS.plus}</button>
-           <button class="tree-action-btn tree-action-danger" data-action="delete" title="Hapus folder & seluruh isinya">${TREE_ICONS.trash}</button>`
-        : `<button class="tree-action-btn" data-action="focus" title="Mode fokus (tanpa gangguan)">${TREE_ICONS.focus}</button>
-           <button class="tree-action-btn" data-action="duplicate" title="Duplikat scene">${TREE_ICONS.copy}</button>
-           <button class="tree-action-btn tree-action-danger" data-action="delete" title="Hapus scene">${TREE_ICONS.trash}</button>`}
-    </div>`;
-
-  row.addEventListener("click", (e) => {
-    const action = e.target.closest(".tree-action-btn")?.dataset.action;
-    if (action === "addChild") { openAddSceneModal(node.id); return; }
-    if (action === "focus") { openFocusMode(node.id); return; }
-    if (action === "duplicate") { duplicateScene(node.id); return; }
-    if (action === "delete") { deleteSceneNode(node.id); return; }
-    if (isFolder) toggleFolder(node.id); else selectScene(node.id);
-  });
-
-  const labelEl = row.querySelector(".tree-label");
-  labelEl.addEventListener("dblclick", (e) => { e.stopPropagation(); e.preventDefault(); startRenameNode(node, labelEl); });
-  labelEl.title = "Klik dua kali untuk ganti nama";
-
-  row.addEventListener("dragstart", (e) => { draggedNodeId = node.id; row.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.stopPropagation(); });
-  row.addEventListener("dragend", () => row.classList.remove("dragging"));
-  row.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); row.classList.add("drag-over"); });
-  row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
-  row.addEventListener("drop", (e) => {
-    e.preventDefault(); e.stopPropagation();
-    row.classList.remove("drag-over");
-    if (!draggedNodeId || draggedNodeId === node.id) return;
-    dropNodeOnto(draggedNodeId, node);
-  });
-
+  const active = node.id === currentSceneId;
+  row.className = "tw-row " + (isFolder ? "is-folder" : "is-scene") + (active ? " active" : "");
+  row.dataset.id = node.id;
+  row.tabIndex = -1;
+  row.draggable = !q;   // saat mencari: urutan tidak bisa diubah
+  row.setAttribute("role", "treeitem");
+  row.setAttribute("aria-level", String(depth + 1));
+  if (active) row.setAttribute("aria-current", "true");
+  const btn = (act, icon, label, danger) => `<button type="button" class="tw-act${danger ? " is-danger" : ""}" data-action="${act}" title="${label}" aria-label="${label}" tabindex="-1">${icon}</button>`;
+  if (isFolder) {
+    const sc = flattenScenes(node.children);
+    const words = sc.reduce((a, s) => a + twWords(s), 0);
+    row.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    row.innerHTML = `<span class="tw-caret${isOpen ? " open" : ""}">${TREE_ICONS.caret}</span>` +
+      `<span class="tw-folder-ic">${isOpen ? TREE_ICONS.folderOpen : TREE_ICONS.folder}</span>` +
+      `<span class="tw-row-title" title="Klik dua kali untuk ganti nama">${twMark(node.title || "Bab tanpa judul", q)}</span>` +
+      `<span class="tw-count" title="${sc.length} scene · ${twFmt(words)} kata">${sc.length}</span>` +
+      `<span class="tw-row-actions">${btn("addChild", TREE_ICONS.plus, "Tambah scene di bab ini")}${btn("rename", tiPx(tiIcon("pencil"), 13), "Ganti nama (F2)")}` +
+      `${btn("duplicate", TREE_ICONS.copy, "Duplikat bab")}${btn("delete", TREE_ICONS.trash, "Hapus bab & isinya", true)}</span>`;
+  } else {
+    const st = twStatusOf(node), w = twWords(node);
+    row.innerHTML = `<span class="tw-dot ${st}" title="${STATUS_LABELS[st]}"></span>` +
+      `<span class="tw-row-title" title="Klik dua kali untuk ganti nama">${twMark(node.title || "(tanpa judul)", q)}</span>` +
+      `<span class="tw-wc" title="${twFmt(w)} kata">${twShort(w)}</span>` +
+      `<span class="tw-row-actions">${btn("focus", TREE_ICONS.focus, "Mode fokus")}${btn("duplicate", TREE_ICONS.copy, "Duplikat scene (Ctrl+D)")}${btn("delete", TREE_ICONS.trash, "Hapus scene (Delete)", true)}</span>`;
+  }
   wrap.appendChild(row);
-
   if (isFolder) {
     const group = document.createElement("div");
     group.className = "tree-group" + (isOpen ? " open" : "");
+    group.setAttribute("role", "group");
     const inner = document.createElement("div");
     inner.className = "tree-group-inner";
-    (node.children || []).forEach((child) => inner.appendChild(buildTreeNode(child)));
+    kids.forEach((k) => inner.appendChild(k));
+    if (!kids.length && !q) inner.innerHTML = `<button type="button" class="tw-folder-empty" data-action="addChild" data-id="${twAttr(node.id)}" tabindex="-1">${TREE_ICONS.plus}<span>Bab kosong — tambah scene</span></button>`;
     group.appendChild(inner);
     wrap.appendChild(group);
   }
-
   return wrap;
+}
+// tandai baris scene yang terbuka (tanpa membangun ulang daftar)
+function twMarkActive() {
+  const box = el("sceneList");
+  if (!box) return;
+  let act = null;
+  box.querySelectorAll(".tw-row").forEach((r) => {
+    const on = r.dataset.id === currentSceneId;
+    r.classList.toggle("active", on);
+    if (on) { r.setAttribute("aria-current", "true"); act = r; } else r.removeAttribute("aria-current");
+  });
+  if (act && !box.contains(document.activeElement)) { box.querySelectorAll('.tw-row[tabindex="0"]').forEach((r) => { r.tabIndex = -1; }); act.tabIndex = 0; }
+}
+function twVisibleRows() { return [...el("sceneList").querySelectorAll(".tw-row")].filter((r) => !r.closest(".tree-group:not(.open)")); }
+function twRowEl(id) { return el("sceneList").querySelector(`.tw-row[data-id="${CSS.escape(id)}"]`); }
+// gulir daftar seperlunya supaya baris terlihat (tanpa scrollIntoView: tidak ikut menggeser panel lain)
+function twRevealRow(row) {
+  const box = el("sceneList");
+  if (!row || !box) return;
+  const r = row.getBoundingClientRect(), b = box.getBoundingClientRect();
+  if (r.top < b.top + 4) box.scrollTop -= b.top + 4 - r.top;
+  else if (r.bottom > b.bottom - 4) box.scrollTop += r.bottom - b.bottom + 4;
+}
+function twFocusRow(id) {
+  const row = twRowEl(id);
+  if (!row) return;
+  el("sceneList").querySelectorAll('.tw-row[tabindex="0"]').forEach((r) => { r.tabIndex = -1; });
+  row.tabIndex = 0;
+  row.focus({ preventScroll: true });
+  twRevealRow(row);
+}
+// ganti nama di daftar (dibuka dulu bila barisnya tersembunyi)
+function twRename(id) {
+  const p = getProject(currentProjectId), path = p && twPath(id, p.data.scenes);
+  if (!path) return;
+  let row = twRowEl(id);
+  if (!row || row.closest(".tree-group:not(.open)")) {
+    twClearSearch();
+    path.slice(0, -1).forEach((f) => expandedFolders.add(f.id));
+    renderSceneList();
+    row = twRowEl(id);
+  }
+  if (!twSideVisible()) toggleTwSide(true);
+  if (row) { twRevealRow(row); startRenameNode(path[path.length - 1], row.querySelector(".tw-row-title")); }
 }
 
 function startRenameNode(node, labelEl) {
-  if (labelEl.querySelector(".tree-rename-input")) return; // sudah dalam mode edit
-  const rowEl = labelEl.closest(".tree-row");
-  if (rowEl) rowEl.draggable = false; // supaya drag-select teks di input tidak bentrok dengan drag-drop tree
+  if (!labelEl || labelEl.querySelector(".tree-rename-input")) return; // sudah dalam mode edit
+  const rowEl = labelEl.closest(".tw-row");
+  if (rowEl) { rowEl.draggable = false; rowEl.classList.add("is-renaming"); } // drag-select teks di input tidak bentrok dengan seret baris
   const originalTitle = node.title || "";
   const input = document.createElement("input");
   input.type = "text";
   input.className = "tree-rename-input";
   input.value = originalTitle;
+  input.setAttribute("aria-label", node.type === "folder" ? "Nama bab" : "Judul scene");
   labelEl.textContent = "";
   labelEl.appendChild(input);
   input.focus();
   input.select();
 
-  let done = false;
+  let done = false, viaKey = false;
   const commit = () => {
     if (done) return;
     done = true;
-    const newTitle = input.value.trim() || originalTitle || "Tanpa Judul";
-    node.title = newTitle;
-    if (node.id === currentSceneId) {
-      const bp = document.querySelector(".breadcrumb-title");
-      if (bp) bp.textContent = newTitle;
-      const tf = el("sceneTitleField");
-      if (tf) tf.value = newTitle;
-    }
+    node.title = input.value.trim() || originalTitle || (node.type === "folder" ? "Bab tanpa judul" : "Tanpa Judul");
     renderSceneList();
+    const s = currentSceneId && findScene(currentSceneId);
+    if (node.id === currentSceneId) twTitleChanged(s, "list");   // judul halaman, Scene Settings & jalur ikut
+    else twRefreshCrumbs();                                        // bab di jalur scene aktif mungkin berganti nama
+    if (viaKey) twFocusRow(node.id);
     markDirtyAndSchedule();
   };
   const cancel = () => {
     if (done) return;
     done = true;
     renderSceneList();
+    twFocusRow(node.id);
   };
 
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+    e.stopPropagation();   // panah/Delete/F2 di input tidak ikut menggerakkan daftar
+    if (e.key === "Enter") { e.preventDefault(); viaKey = true; input.blur(); }
     else if (e.key === "Escape") { e.preventDefault(); cancel(); }
   });
   input.addEventListener("blur", commit);
@@ -975,28 +1932,209 @@ function startRenameNode(node, labelEl) {
   input.addEventListener("dblclick", (e) => e.stopPropagation());
 }
 
-function dropNodeOnto(draggedId, targetNode) {
+// pindahkan node: pos = "before" | "after" (di samping target), "inside" (masuk ke bab target), "end" (akhir naskah)
+function moveSceneNode(dragId, targetId, pos) {
   const p = getProject(currentProjectId);
-  const draggedInfo = findSceneNode(draggedId, p.data.scenes);
-  if (!draggedInfo) return;
-  if (draggedInfo.node.type === "folder" && isDescendantOf(draggedInfo.node, targetNode.id)) return; // cegah folder dipindah ke dalam anaknya sendiri
-  draggedInfo.array.splice(draggedInfo.index, 1);
-  if (targetNode.type === "folder") {
-    targetNode.children = targetNode.children || [];
-    targetNode.children.push(draggedInfo.node);
-    expandedFolders.add(targetNode.id);
-  } else {
-    const targetInfo = findSceneNode(targetNode.id, p.data.scenes);
-    if (targetInfo) targetInfo.array.splice(targetInfo.index, 0, draggedInfo.node);
-    else p.data.scenes.push(draggedInfo.node); // fallback aman
-  }
+  const d = findSceneNode(dragId, p.data.scenes);
+  if (!d) return;
+  if (targetId && (targetId === dragId || (d.node.type === "folder" && isDescendantOf(d.node, targetId)))) return; // bab tidak boleh masuk ke dirinya sendiri
+  d.array.splice(d.index, 1);
+  const t = targetId && pos !== "end" ? findSceneNode(targetId, p.data.scenes) : null;
+  if (!t) p.data.scenes.push(d.node);
+  else if (pos === "inside" && t.node.type === "folder") { (t.node.children = t.node.children || []).push(d.node); expandedFolders.add(t.node.id); }
+  else t.array.splice(t.index + (pos === "after" ? 1 : 0), 0, d.node);
   renderSceneList();
+  twRefreshCrumbs();
+  const sel = el("twMoveFolder");
+  if (sel && currentSceneId) { const path = twPath(currentSceneId, p.data.scenes); sel.value = path && path.length > 1 ? path[path.length - 2].id : ""; }
   markDirtyAndSchedule();
+}
+function dropNodeOnto(draggedId, targetNode) { moveSceneNode(draggedId, targetNode.id, targetNode.type === "folder" ? "inside" : "before"); }
+// Alt+↑/↓ di daftar: geser satu posisi di dalam bab yang sama
+function twMoveBy(id, delta) {
+  const info = findSceneNode(id);
+  if (!info) return;
+  const j = info.index + delta;
+  if (j < 0 || j >= info.array.length) return;
+  info.array.splice(info.index, 1);
+  info.array.splice(j, 0, info.node);
+  renderSceneList();
+  twFocusRow(id);
+  twRefreshCrumbs();
+  markDirtyAndSchedule();
+}
+// target lepas saat menyeret di daftar
+function twDropTarget(e) {
+  const box = el("sceneList");
+  const empty = e.target.closest(".tw-folder-empty");
+  if (empty) return twValidDrop({ id: empty.dataset.id, pos: "inside", el: empty.closest(".tree-group").previousElementSibling });
+  const row = e.target.closest(".tw-row");
+  if (!row) return twValidDrop({ id: null, pos: "end", el: box.querySelector(".tw-drop-end") });
+  const r = row.getBoundingClientRect(), y = (e.clientY - r.top) / Math.max(1, r.height);
+  let pos;
+  if (row.classList.contains("is-folder")) pos = y < 0.28 ? "before" : (y > 0.72 && !expandedFolders.has(row.dataset.id) ? "after" : "inside");
+  else pos = y < 0.5 ? "before" : "after";
+  return twValidDrop({ id: row.dataset.id, pos, el: row });
+}
+function twValidDrop(t) {
+  const d = twDrag && findSceneNode(twDrag.id);
+  t.valid = !!d && t.id !== twDrag.id && !(d.node.type === "folder" && t.id && isDescendantOf(d.node, t.id));
+  return t;
+}
+function twClearDrop() { el("sceneList").querySelectorAll(".drop-before, .drop-after, .drop-inside, .is-on").forEach((n) => n.classList.remove("drop-before", "drop-after", "drop-inside", "is-on")); }
+function twShowDrop(t) {
+  twClearDrop();
+  if (!t || !t.valid || !t.el) return;
+  t.el.classList.add(t.pos === "end" ? "is-on" : "drop-" + t.pos);
+}
+
+// ---- kartu pratinjau (hover baris): status, kata, sinopsis / awal cerita ----
+function twShowPeek(row) {
+  const peek = el("twPeek"), info = row && row.isConnected && findSceneNode(row.dataset.id);
+  if (!info || twDrag || !twFineMq.matches || twNarrowMq.matches) return;
+  const n = info.node;
+  let html;
+  if (n.type === "folder") {
+    const sc = flattenScenes(n.children), words = sc.reduce((a, s) => a + twWords(s), 0), done = sc.filter((s) => twStatusOf(s) === "done").length;
+    html = `<div class="tw-peek-kicker">${tiPx(tiIcon("folder"), 13)}Bab</div><div class="tw-peek-title">${escapeHtml(n.title || "Bab tanpa judul")}</div>` +
+      `<div class="tw-peek-meta">${sc.length} scene · ${twFmt(words)} kata · ${done} selesai</div>`;
+  } else {
+    const st = twStatusOf(n);
+    let body = n.synopsis ? `<p class="tw-peek-syn">${escapeHtml(n.synopsis)}</p>` : "";
+    if (!body) {
+      const txt = (new DOMParser().parseFromString(n.content || "", "text/html").body.textContent || "").replace(/\s+/g, " ").trim();
+      body = txt ? `<p class="tw-peek-syn is-excerpt">${escapeHtml(txt.slice(0, 160))}${txt.length > 160 ? "…" : ""}</p>` : '<p class="tw-peek-syn is-empty">Belum ada sinopsis atau isi.</p>';
+    }
+    html = `<div class="tw-peek-kicker"><span class="tw-dot ${st}"></span>${STATUS_LABELS[st]} · ${twFmt(twWords(n))} kata</div>` +
+      `<div class="tw-peek-title">${escapeHtml(n.title || "(tanpa judul)")}</div>${body}`;
+  }
+  peek.innerHTML = html;
+  const side = el("twSide").getBoundingClientRect(), r = row.getBoundingClientRect();
+  peek.classList.add("is-on");
+  const h = peek.offsetHeight;
+  peek.style.transform = `translate(${Math.round(side.right + 10)}px, ${Math.round(Math.max(8, Math.min(innerHeight - h - 8, r.top - 6)))}px)`;
+}
+function twHidePeek() {
+  clearTimeout(twPeekTimer);
+  twPeekRow = null;
+  const peek = el("twPeek");
+  if (peek) peek.classList.remove("is-on");
+}
+
+// ---- event daftar (didelegasikan, dipasang sekali) ----
+function initTwList() {
+  const box = el("sceneList");
+  box.addEventListener("click", (e) => {
+    if (e.target.closest(".tree-rename-input")) return;
+    const btn = e.target.closest("[data-action]"), row = e.target.closest(".tw-row");
+    const id = (btn && btn.dataset.id) || (row && row.dataset.id);
+    const info = id && findSceneNode(id);
+    if (!info) return;
+    const node = info.node, act = btn && btn.dataset.action;
+    twHidePeek();
+    if (act === "addChild") { twAddScene(node.id); return; }
+    if (act === "rename") { twRename(node.id); return; }
+    if (act === "focus") { openFocusMode(node.id); return; }
+    if (act === "duplicate") { duplicateScene(node.id); return; }
+    if (act === "delete") { deleteSceneNode(node.id); return; }
+    if (node.type === "folder") { toggleFolder(node.id, row); return; }
+    const kb = e.detail === 0;   // Enter/Spasi dari keyboard: fokus tetap di daftar
+    if (node.id !== currentSceneId) selectScene(node.id);
+    if (kb) twFocusRow(node.id);
+    else if (twNarrowMq.matches) toggleTwSide(false);
+  });
+  box.addEventListener("dblclick", (e) => {
+    const t = e.target.closest(".tw-row-title"), row = e.target.closest(".tw-row");
+    if (!t || !row || e.target.closest(".tree-rename-input")) return;
+    e.preventDefault();
+    twRename(row.dataset.id);
+  });
+  box.addEventListener("keydown", (e) => {
+    const row = e.target.closest && e.target.closest(".tw-row");
+    if (!row || e.target.closest("input")) return;
+    const id = row.dataset.id, info = findSceneNode(id);
+    if (!info) return;
+    const isFolder = info.node.type === "folder", rows = twVisibleRows(), i = rows.indexOf(row);
+    const go = (r) => { if (r) twFocusRow(r.dataset.id); };
+    twHidePeek();
+    if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); if (!twSearchQ.trim()) twMoveBy(id, e.key === "ArrowUp" ? -1 : 1); return; }
+    if ((e.ctrlKey || e.metaKey) && (e.key === "d" || e.key === "D")) { e.preventDefault(); duplicateScene(id); return; }
+    switch (e.key) {
+      case "ArrowDown": e.preventDefault(); go(rows[i + 1]); break;
+      case "ArrowUp": e.preventDefault(); go(rows[i - 1]); break;
+      case "Home": e.preventDefault(); go(rows[0]); break;
+      case "End": e.preventDefault(); go(rows[rows.length - 1]); break;
+      case "ArrowRight":
+        if (!isFolder) break;
+        e.preventDefault();
+        if (!expandedFolders.has(id) && !twSearchQ.trim()) toggleFolder(id, row); else go(rows[i + 1]);
+        break;
+      case "ArrowLeft":
+        e.preventDefault();
+        if (isFolder && expandedFolders.has(id) && !twSearchQ.trim()) toggleFolder(id, row);
+        else if (info.parent) go(twRowEl(info.parent.id));
+        break;
+      case "Enter": case " ": e.preventDefault(); row.click(); break;
+      case "F2": e.preventDefault(); twRename(id); break;
+      case "Delete": e.preventDefault(); deleteSceneNode(id); break;
+    }
+  });
+  // seret untuk mengurutkan: garis = sebelum/sesudah, kotak = masuk ke bab, area kosong bawah = akhir naskah
+  box.addEventListener("dragstart", (e) => {
+    const row = e.target.closest && e.target.closest(".tw-row");
+    if (!row || !row.draggable) { e.preventDefault(); return; }
+    twDrag = { id: row.dataset.id };
+    row.classList.add("dragging");
+    box.classList.add("is-dragging");
+    twHidePeek();
+    e.dataTransfer.effectAllowed = "move";
+    try { e.dataTransfer.setData("text/plain", row.querySelector(".tw-row-title").textContent); } catch (err) { /* abaikan */ }
+  });
+  box.addEventListener("dragover", (e) => {
+    if (!twDrag) return;
+    e.preventDefault();
+    const t = twDropTarget(e);
+    e.dataTransfer.dropEffect = t.valid ? "move" : "none";
+    twShowDrop(t);
+  });
+  box.addEventListener("dragleave", (e) => { if (twDrag && !box.contains(e.relatedTarget)) twClearDrop(); });
+  box.addEventListener("drop", (e) => {
+    if (!twDrag) return;
+    e.preventDefault();
+    const t = twDropTarget(e), id = twDrag.id;
+    twClearDrop();
+    twDrag = null;
+    if (t.valid) moveSceneNode(id, t.id, t.pos);
+  });
+  box.addEventListener("dragend", () => {
+    twDrag = null;
+    box.classList.remove("is-dragging");
+    box.querySelectorAll(".dragging").forEach((r) => r.classList.remove("dragging"));
+    twClearDrop();
+  });
+  // pratinjau saat kursor diam sebentar di atas baris
+  box.addEventListener("pointerover", (e) => {
+    if (e.pointerType !== "mouse") return;
+    const row = e.target.closest(".tw-row");
+    if (row === twPeekRow) return;
+    twHidePeek();
+    if (!row || row.classList.contains("is-renaming")) return;
+    twPeekRow = row;
+    twPeekTimer = setTimeout(() => twShowPeek(row), 550);
+  });
+  box.addEventListener("pointerleave", twHidePeek);
+  box.addEventListener("pointerdown", twHidePeek);
+  box.addEventListener("scroll", twHidePeek, { passive: true });
 }
 
 function selectScene(id, addToHistory = true) {
+  const col = el("sceneDetailCol");
+  if (currentSceneId && col && el("sceneEditor")) twScrollMem.set(currentSceneId, col.scrollTop);
   syncSceneFromDetail();
   currentSceneId = id;
+  const p = getProject(currentProjectId), path = p && twPath(id, p.data.scenes);
+  if (path) path.slice(0, -1).forEach((f) => expandedFolders.add(f.id));   // bab yang berisi scene ini ikut dibuka
+  if (path && twSearchQ.trim() && !twMatch(path[path.length - 1], twSearchQ.trim().toLowerCase())) twClearSearch();   // scene dari luar hasil cari
   if (addToHistory) {
     sceneHistory = sceneHistory.slice(0, sceneHistoryIndex + 1);
     sceneHistory.push(id);
@@ -1004,149 +2142,718 @@ function selectScene(id, addToHistory = true) {
   }
   renderSceneList();
   renderSceneDetail();
+  twRevealRow(el("sceneList").querySelector(".tw-row.active"));
+  const sc = findScene(id);
+  if (sc && sc.type !== "folder") noteTabDoc("write", { doc: id, kind: "scene", title: sc.title });   // TAB PROJECT: riwayat
 }
 function goSceneBack() { if (sceneHistoryIndex > 0) { sceneHistoryIndex--; selectScene(sceneHistory[sceneHistoryIndex], false); } }
 function goSceneForward() { if (sceneHistoryIndex < sceneHistory.length - 1) { sceneHistoryIndex++; selectScene(sceneHistory[sceneHistoryIndex], false); } }
 
 function syncSceneFromDetail() {
   if (!currentProjectId || !currentSceneId) return;
-  const s = findScene(currentSceneId);
-  if (!s || !el("sceneTitleField")) return;
-  s.title = el("sceneTitleField").value;
-  s.synopsis = el("sceneSynopsis").value;
-  s.content = el("sceneEditor").innerHTML;
+  const s = findScene(currentSceneId), ed = el("sceneEditor");
+  if (!s || !ed || ed.dataset.sceneId !== s.id) return;
+  if (focusSceneId === s.id && !el("focusOverlay").classList.contains("hidden")) return;   // mode fokus yang memegang isi scene ini
+  s.content = ed.innerHTML;   // judul & sinopsis langsung ditulis saat diketik
 }
 
+// ---- halaman editor: judul besar, meta (status, kata, waktu baca), sinopsis, toolbar, isi ----
 function renderSceneDetail() {
-  const col = el("sceneDetailCol");
-  const s = currentSceneId ? findScene(currentSceneId) : null;
-  if (!s) {
-    col.innerHTML = '<div class="scene-empty-hint">Pilih atau buat scene untuk mulai menulis.</div>';
+  const col = el("sceneDetailCol"), main = el("twMain");
+  const p = getProject(currentProjectId);
+  const s = p && currentSceneId ? findScene(currentSceneId) : null;
+  twHideBubble();
+  twCloseStats();
+  twMarkActive();   // openProject membangun daftar sebelum scene pertama dipilih
+  if (p) twEnsureBaselines(p);
+  if (!s || s.type === "folder") {
+    main.classList.add("is-empty");
+    col.innerHTML = twEmptyHtml(p);
+    twRenderCrumbs(null);
     updateSceneDrawerVisibility();
     return;
   }
+  main.classList.remove("is-empty");
   col.innerHTML = `
-    <div class="obsidian-pane">
-      <div class="breadcrumb-bar">
-        <span class="breadcrumb-path">${tiPx(tiIcon("file-text"), 15)}<span class="breadcrumb-title">${escapeHtml(s.title || "(tanpa judul)")}</span></span>
-      </div>
-      <div id="sceneEditor" class="obsidian-editor" contenteditable="true" spellcheck="false" style="font-size:calc(${16 * currentZoom / 100}px * var(--fs-scale, 1))">${s.content || ""}</div>
-    </div>
+    <article class="tw-page" id="twPage">
+      <header class="tw-head">
+        <div class="tw-kicker" id="twKicker"></div>
+        <textarea id="twTitle" class="tw-title" rows="1" placeholder="Judul scene" aria-label="Judul scene" spellcheck="false"></textarea>
+        ${TW_FLOURISH}
+        <div class="tw-meta">
+          <button type="button" id="twStatus" class="tw-status"></button>
+          <span class="tw-meta-item" id="twMetaWords"></span>
+          <span class="tw-meta-item" id="twMetaRead"></span>
+        </div>
+        <textarea id="twSynopsis" class="tw-syn" rows="1" placeholder="Tambah sinopsis singkat…" aria-label="Sinopsis scene"></textarea>
+      </header>
+      ${twToolbarHtml()}
+      <div id="sceneEditor" class="tw-editor" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="Isi scene" data-placeholder="Mulai menulis di sini…"></div>
+    </article>`;
+  const ed = el("sceneEditor"), title = el("twTitle"), syn = el("twSynopsis");
+  ed.innerHTML = s.content || "";
+  ed.dataset.sceneId = s.id;
+  title.value = s.title || "";
+  syn.value = s.synopsis || "";
+  twApplyPrefs();
+  twPaintStatus(s);
+  twRenderCrumbs();
+  twUpdateEmpty();
+  twUpdateStats();
+  twRefit();
 
-    <div class="obsidian-statusbar">
-      <span id="sceneWordCount" class="stats-pill">0 kata</span>
-      <div class="zoom-control">
-        <span class="zoom-ic" title="Perbesar / perkecil tulisan">${tiPx(tiIcon("zoom-in"), 15)}</span>
-        <input type="range" id="zoomSlider" min="70" max="160" value="${currentZoom}" />
-        <span id="zoomLabel">${currentZoom}%</span>
-      </div>
-    </div>`;
-
-  const updateSceneWordCount = () => {
-    const stats = computeTextStats(el("sceneEditor").innerText);
-    el("sceneWordCount").textContent = statsLabel(stats);
-  };
-  updateSceneWordCount();
-
-  el("sceneEditor").addEventListener("input", () => { s.content = el("sceneEditor").innerHTML; updateSceneWordCount(); markDirtyAndSchedule(); });
-
-  el("zoomSlider").oninput = () => {
-    currentZoom = parseInt(el("zoomSlider").value, 10);
-    el("zoomLabel").textContent = currentZoom + "%";
-    el("sceneEditor").style.fontSize = `calc(${16 * currentZoom / 100}px * var(--fs-scale, 1))`;   // ikut Aksesibilitas → Ukuran teks
-  };
+  title.addEventListener("input", () => { s.title = title.value; twAutoGrow(title); twTitleChanged(s, "page"); });
+  title.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); twCaretToStart(ed); } });
+  syn.addEventListener("input", () => {
+    s.synopsis = syn.value;
+    twAutoGrow(syn);
+    if (el("sceneSynopsis")) el("sceneSynopsis").value = s.synopsis;
+    markDirtyAndSchedule();
+  });
+  syn.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); twCaretToStart(ed); } });
+  syn.addEventListener("focus", () => syn.classList.add("is-open"));
+  syn.addEventListener("blur", () => { syn.classList.remove("is-open"); twAutoGrow(syn); });
+  el("twStatus").onclick = () => twSetStatus(s, TW_STATUS_NEXT[twStatusOf(s)]);
+  ed.addEventListener("input", twOnEditorInput);
+  ed.addEventListener("paste", twOnPaste);
+  ed.addEventListener("keydown", twEditorKeys);
+  ed.addEventListener("pointerdown", () => { twPointerSel = true; twHideBubble(); });
+  ed.addEventListener("blur", () => setTimeout(() => { if (!el("twBubble").contains(document.activeElement) && document.activeElement !== el("sceneEditor")) twHideBubble(); }, 0));
+  const tb = col.querySelector(".tw-toolbar");
+  tb.addEventListener("mousedown", (e) => { if (e.target.closest("button")) e.preventDefault(); });   // seleksi editor tidak hilang
+  tb.addEventListener("click", (e) => { const b = e.target.closest("[data-cmd]"); if (b) twCmd(b.dataset.cmd); });
+  tb.querySelector('[data-ctl="block"]').addEventListener("change", (e) => twCmd("block:" + e.target.value));
+  col.scrollTop = twScrollMem.get(s.id) || 0;
+  main.classList.toggle("is-scrolled", col.scrollTop > 4);
 
   renderSceneDrawerBody(s);
   updateSceneDrawerVisibility();
 }
+function twEmptyHtml(p) {
+  const any = !!(p && flattenScenes(p.data.scenes).length);
+  return `<div class="tw-empty">
+    <div class="tw-empty-ic">${tiPx(tiIcon(any ? "file-text" : "feather"), 26)}</div>
+    <h2 class="tw-empty-title">${any ? "Pilih scene untuk mulai menulis" : "Halaman ini masih kosong"}</h2>
+    <p class="tw-empty-text">${any ? "Buka scene dari daftar di kiri, atau buat scene baru." : "Mulai ceritamu dengan scene pertama. Kelompokkan scene ke dalam bab supaya naskah tetap rapi."}</p>
+    <div class="tw-empty-actions">
+      ${any ? `<button type="button" class="tw-btn is-primary" data-act="first">${tiPx(tiIcon("file-text"), 16)}<span>Buka scene pertama</span></button>`
+        : `<button type="button" class="tw-btn is-primary" data-act="add-scene">${tiPx(tiIcon("file-plus"), 16)}<span>Scene pertama</span></button>`}
+      <button type="button" class="tw-btn" data-act="add-folder">${tiPx(tiIcon("folder-plus"), 16)}<span>Bab baru</span></button>
+    </div>
+  </div>`;
+}
+function twToolbarHtml() {
+  const b = (cmd, icon, label) => `<button type="button" class="tw-tb" data-cmd="${cmd}" title="${label}" aria-label="${label}" aria-pressed="false">${tiPx(icon, 17)}</button>`;
+  const sep = '<span class="tw-tb-sep" aria-hidden="true"></span>';
+  return `<div class="tw-toolbar" role="toolbar" aria-label="Format teks">
+    <span class="tw-tb-selwrap"><select class="tw-tb-sel" data-ctl="block" title="Gaya paragraf" aria-label="Gaya paragraf">
+      <option value="p">Paragraf</option><option value="h1">Judul 1</option><option value="h2">Judul 2</option><option value="h3">Judul 3</option><option value="blockquote">Kutipan</option>
+    </select>${tiPx(tiIcon("chevron-down"), 13)}</span>${sep}
+    ${b("bold", tiIcon("bold"), "Tebal (Ctrl+B)")}${b("italic", tiIcon("italic"), "Miring (Ctrl+I)")}${b("underline", tiIcon("underline"), "Garis bawah (Ctrl+U)")}${b("strikeThrough", tiIcon("strikethrough"), "Coret")}${sep}
+    ${b("insertUnorderedList", tiIcon("list"), "Daftar berpoin")}${b("insertOrderedList", tiIcon("list-numbers"), "Daftar bernomor")}${b("quote", tiIcon("blockquote"), "Kutipan")}${sep}
+    ${b("justifyLeft", tiIcon("align-left"), "Rata kiri")}${b("justifyCenter", tiIcon("align-center"), "Rata tengah")}${b("justifyRight", tiIcon("align-right"), "Rata kanan")}${b("justifyFull", tiIcon("align-justified"), "Rata kiri-kanan")}${sep}
+    ${b("divider", tiIcon("separator-horizontal"), "Pemisah adegan ✦ ✦ ✦")}${b("removeFormat", tiIcon("clear-formatting"), "Hapus format")}${sep}
+    ${b("undo", tiIcon("arrow-back-up"), "Urungkan (Ctrl+Z)")}${b("redo", tiIcon("arrow-forward-up"), "Ulangi (Ctrl+Y)")}
+  </div>`;
+}
+// kicker di atas judul + jalur di bar atas: "Bab 1 · Scene 2 dari 4"
+function twRenderCrumbs(path) {
+  const nav = el("twCrumb"), p = getProject(currentProjectId);
+  if (!nav) return;
+  if (path === undefined) path = p && currentSceneId ? twPath(currentSceneId, p.data.scenes) : null;
+  const crumbs = path && path.length ? path : null;
+  nav.innerHTML = !crumbs ? `<span class="tw-crumb-cur">${tiPx(tiIcon("book-2"), 14)}<span>${escapeHtml(el("projectTitle").value || (p && p.title) || "")}</span></span>`
+    : crumbs.map((n, i) => i < crumbs.length - 1
+      ? `<span class="tw-crumb-folder">${tiPx(tiIcon("folder"), 14)}<span>${escapeHtml(n.title || "Bab tanpa judul")}</span></span><span class="tw-crumb-sep" aria-hidden="true">${tiPx(tiIcon("chevron-right"), 12)}</span>`
+      : `<span class="tw-crumb-cur">${tiPx(tiIcon("file-text"), 14)}<span>${escapeHtml(n.title || "(tanpa judul)")}</span></span>`).join("");
+  const kick = el("twKicker");
+  if (kick && crumbs) {
+    // di dalam bab: "Bab · Scene i dari n" (urutan di bab itu); di luar bab: urutan di seluruh naskah
+    const s = crumbs[crumbs.length - 1], parent = crumbs.length > 1 ? crumbs[crumbs.length - 2] : null;
+    const sib = parent ? (parent.children || []).filter((x) => x.type !== "folder") : twSceneOrder();
+    kick.innerHTML = (parent ? `<span class="tw-kicker-bab">${escapeHtml(parent.title || "Bab tanpa judul")}</span><span class="tw-kicker-sep" aria-hidden="true">·</span>` : "") +
+      `<span>Scene ${sib.indexOf(s) + 1} dari ${sib.length}</span>`;
+  }
+  const order = twSceneOrder(), i = order.findIndex((x) => x.id === currentSceneId);
+  el("twPrev").disabled = i <= 0;
+  el("twNext").disabled = i < 0 || i >= order.length - 1;
+}
+function twRefreshCrumbs() { twRenderCrumbs(); }
+function twGo(delta) { const order = twSceneOrder(), i = order.findIndex((x) => x.id === currentSceneId), t = order[i + delta]; if (i >= 0 && t) selectScene(t.id); }
+// judul berubah dari salah satu tempat (halaman / Scene Settings / daftar / mode fokus) -> tempat lain ikut
+function twTitleChanged(s, from) {
+  if (!s) return;
+  const onPage = !!el("sceneEditor") && el("sceneEditor").dataset.sceneId === s.id;   // halaman & Scene Settings sedang menampilkan scene ini
+  if (onPage && from !== "drawer" && el("sceneTitleField")) el("sceneTitleField").value = s.title || "";
+  if (onPage && from !== "page" && el("twTitle")) { el("twTitle").value = s.title || ""; twAutoGrow(el("twTitle")); }
+  const t = twRowEl(s.id), label = t && t.querySelector(".tw-row-title");
+  if (label && !label.querySelector("input")) label.innerHTML = twMark(s.title || "(tanpa judul)", twSearchQ.trim().toLowerCase());
+  twRenderCrumbs();
+  if (from !== "list") { if (window.NovelHome) window.NovelHome.refresh(); markDirtyAndSchedule(); }
+}
+function twPaintStatus(s) {
+  const b = el("twStatus");
+  if (!b) return;
+  const st = twStatusOf(s);
+  b.className = "tw-status is-" + st;
+  b.innerHTML = `<span class="tw-dot ${st}"></span><span>${STATUS_LABELS[st]}</span>${tiPx(tiIcon("refresh"), 12)}`;
+  b.title = "Status scene — klik untuk ganti (Todo → Draft → Done)";
+  b.setAttribute("aria-label", `Status: ${STATUS_LABELS[st]}. Klik untuk ganti`);
+}
+function twSetStatus(s, st) {
+  if (!s || !STATUS_LABELS[st]) return;
+  s.status = st;
+  twPaintStatus(s);
+  const dot = twRowEl(s.id);
+  if (dot && dot.querySelector(".tw-dot")) { dot.querySelector(".tw-dot").className = "tw-dot " + st; dot.querySelector(".tw-dot").title = STATUS_LABELS[st]; }
+  el("sceneDrawerBody").querySelectorAll(".status-chip").forEach((b) => { const on = b.dataset.status === st; b.classList.toggle("selected", on); b.setAttribute("aria-checked", on ? "true" : "false"); });
+  renderTwSideInfo(getProject(currentProjectId));
+  if (window.NovelHome) window.NovelHome.refresh();
+  markDirtyAndSchedule();
+}
+function twAutoGrow(t) {
+  if (!t || !t.isConnected || !t.offsetParent) return;   // tab tersembunyi: diukur lagi saat tampil (twRefit)
+  t.style.height = "auto";
+  t.style.height = t.scrollHeight + "px";
+  if (t.id === "twSynopsis") t.classList.toggle("is-long", t.scrollHeight > t.clientHeight + 2 || t.scrollHeight > 70);
+}
+function twRefit() { twAutoGrow(el("twTitle")); twAutoGrow(el("twSynopsis")); }
+function twCaretToStart(ed) {
+  ed.focus({ preventScroll: true });
+  const r = document.createRange();
+  r.selectNodeContents(ed);
+  r.collapse(true);
+  const sel = document.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
+function twUpdateEmpty() {
+  const ed = el("sceneEditor");
+  if (ed) ed.classList.toggle("is-empty", !ed.textContent.trim() && !ed.querySelector("hr, img, li"));
+}
+// tampilan per perangkat -> atribut data-tw-* (dibaca CSS) di tab Tulis & layar mode fokus
+function twApplyPrefs() {
+  [el("tabWrite"), el("focusOverlay")].forEach((host) => {
+    if (!host) return;
+    host.dataset.twFont = twPrefs.font;
+    host.dataset.twWidth = twPrefs.width;
+    host.dataset.twLh = twPrefs.lh;
+    host.dataset.twPara = twPrefs.para;
+    host.style.setProperty("--tw-zoom", String(twPrefs.zoom / 100));
+  });
+}
+function twRangeFill(r) { if (r) r.style.setProperty("--fill", ((r.value - r.min) / (r.max - r.min)) * 100 + "%"); }
+function twSetZoom(z) {
+  z = Math.min(160, Math.max(70, Math.round(Number(z) / 5) * 5 || 100));
+  currentZoom = twPrefs.zoom = z;
+  saveTwPrefs();
+  ["zoomSlider", "twZoom2", "twZoomPop"].forEach((id) => { const r = el(id); if (r) { r.value = z; twRangeFill(r); } });
+  ["zoomLabel", "twZoom2Val", "twZoomPopVal"].forEach((id) => { if (el(id)) el(id).textContent = z + "%"; });
+  el("twZoomOut").disabled = z <= 70;
+  el("twZoomIn").disabled = z >= 160;
+  twApplyPrefs();
+  twRefit();
+  twPlaceBubble();
+}
+
+// ---- isi editor: input, statistik, tempel, pintasan ----
+function twOnEditorInput() {
+  const ed = el("sceneEditor"), s = ed && findScene(ed.dataset.sceneId);
+  if (!s) return;
+  s.content = ed.innerHTML;
+  twUpdateEmpty();
+  clearTimeout(twStatsTimer);
+  twStatsTimer = setTimeout(twUpdateStats, 300);
+  twQueueSel();
+  markDirtyAndSchedule();
+}
+// teks polos editor dengan baris baru antar-blok — tidak bergantung pada tata letak (innerText salah saat tab tersembunyi)
+function twTextOf(root) {
+  let out = "";
+  const BLOCK = /^(P|DIV|H[1-6]|LI|BLOCKQUOTE|UL|OL|HR|TR|SECTION|ARTICLE|FIGURE)$/;
+  (function walk(n) {
+    for (let c = n.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType === 3) out += c.nodeValue;
+      else if (c.nodeType === 1) {
+        if (c.tagName === "BR") { out += "\n"; continue; }
+        const b = BLOCK.test(c.tagName);
+        if (b) out += "\n";
+        walk(c);
+        if (b) out += "\n";
+      }
+    }
+  })(root);
+  return out.replace(/ /g, " ");
+}
+function twUpdateStats() {
+  const ed = el("sceneEditor"), p = getProject(currentProjectId), s = ed && findScene(ed.dataset.sceneId);
+  if (!s || !p) return;
+  const st = computeTextStats(twTextOf(ed));
+  el("sceneWordCount").textContent = twFmt(st.words) + " kata";
+  el("twStatsMore").textContent = ` · ${twFmt(st.chars)} karakter · ${twFmt(st.sentences)} kalimat · ${twFmt(st.paragraphs)} paragraf`;
+  el("twStatsBtn").title = statsLabel(st) + " — klik untuk statistik & target";
+  el("twMetaWords").textContent = twFmt(st.words) + " kata";
+  el("twMetaRead").textContent = st.words ? "± " + Math.max(1, Math.round(st.words / 200)) + " menit baca" : "";
+  const wc = twRowEl(s.id), n = twWords(s);
+  if (wc && wc.querySelector(".tw-wc")) { wc.querySelector(".tw-wc").textContent = twShort(n); wc.querySelector(".tw-wc").title = twFmt(n) + " kata"; }
+  renderTwSideInfo(p);
+  twUpdateGoal(p);
+  if (!el("twStatsPop").classList.contains("hidden") && !el("twStatsPop").contains(document.activeElement)) twRenderStatsPop();
+}
+function twUpdateGoal(p) {
+  const total = twEnsureBaselines(p), day = tabStoreGet("novelist_tw_day_" + p.id);
+  const today = Math.max(0, total - (day && day.d === twToday() ? day.base : total)), sess = total - twSession.base, goal = twGoal(p);
+  twLast = { total, today, sess, goal };
+  const pct = goal ? Math.min(1, today / goal) : 0;
+  el("twRingFg").style.strokeDasharray = TW_RING.toFixed(2);
+  el("twRingFg").style.strokeDashoffset = (TW_RING * (1 - pct)).toFixed(2);
+  const btn = el("twGoalBtn");
+  btn.classList.toggle("has-goal", !!goal);
+  btn.classList.toggle("is-done", !!goal && today >= goal);
+  el("twGoalText").textContent = goal ? `${twFmt(today)} / ${twFmt(goal)}` : `${sess < 0 ? "−" : "+"}${twFmt(Math.abs(sess))} sesi`;
+  btn.title = goal ? `Target harian: ${twFmt(today)} dari ${twFmt(goal)} kata hari ini (sesi ini ${sess < 0 ? "−" : "+"}${twFmt(Math.abs(sess))})`
+    : `Kata yang kamu tulis sejak membuka project ini — klik untuk memasang target harian`;
+}
+function twSetGoal(v) {
+  const p = getProject(currentProjectId);
+  if (!p) return;
+  const g = Math.min(100000, Math.max(0, Math.round(Number(v) || 0)));
+  if (g) p.data.dailyGoal = g; else delete p.data.dailyGoal;
+  twUpdateGoal(p);
+  twPaintPopGoal();
+  markDirtyAndSchedule();
+}
+// popover statistik (klik angka kata di bar bawah)
+function twRenderStatsPop() {
+  const pop = el("twStatsPop"), ed = el("sceneEditor");
+  if (!ed) return;
+  const st = computeTextStats(twTextOf(ed)), L = twLast;
+  const stat = (n, l) => `<div class="tw-pop-stat"><b>${twFmt(n)}</b><span>${l}</span></div>`;
+  const row = (l, v) => `<div class="tw-pop-row"><span>${l}</span><b>${v}</b></div>`;
+  pop.innerHTML = `<div class="tw-pop-head"><span>Statistik scene</span><button type="button" class="tw-icon-btn tw-pop-x" data-act="close" aria-label="Tutup">${tiPx(tiIcon("x"), 15)}</button></div>
+    <div class="tw-pop-grid">${stat(st.words, "kata")}${stat(st.chars, "karakter")}${stat(st.sentences, "kalimat")}${stat(st.paragraphs, "paragraf")}</div>
+    <div class="tw-pop-rows">${row("Waktu baca", "± " + Math.max(st.words ? 1 : 0, Math.round(st.words / 200)) + " menit")}${row("Total naskah", twFmt(L.total) + " kata")}${row("Sesi ini", (L.sess < 0 ? "−" : "+") + twFmt(Math.abs(L.sess)) + " kata")}${row("Hari ini", "+" + twFmt(L.today) + " kata")}</div>
+    <div class="tw-pop-goal">
+      <label class="tw-pop-label" for="twGoalInput">${tiPx(tiIcon("target-arrow"), 14)}Target harian</label>
+      <div class="tw-pop-goal-in"><input id="twGoalInput" type="number" min="0" max="100000" step="50" inputmode="numeric" placeholder="mis. 500" /><span>kata / hari</span></div>
+      <div class="tw-goal-bar"><span id="twGoalFill"></span></div>
+      <p class="tw-pop-note" id="twGoalNote"></p>
+    </div>
+    <div class="tw-pop-zoom"><span class="tw-pop-label">${tiPx(tiIcon("text-size"), 14)}Ukuran tulisan</span><input type="range" id="twZoomPop" class="tw-range" min="70" max="160" step="5" aria-label="Ukuran tulisan" /><b id="twZoomPopVal"></b></div>`;
+  el("twGoalInput").value = L.goal || "";
+  el("twZoomPop").value = twPrefs.zoom;
+  el("twZoomPopVal").textContent = twPrefs.zoom + "%";
+  twRangeFill(el("twZoomPop"));
+  twPaintPopGoal();
+}
+function twPaintPopGoal() {
+  const fill = el("twGoalFill"), note = el("twGoalNote"), L = twLast;
+  if (!fill || !note) return;
+  fill.style.width = (L.goal ? Math.min(100, (L.today / L.goal) * 100) : 0) + "%";
+  note.textContent = !L.goal ? "Kosongkan untuk tanpa target. Target disimpan di project."
+    : L.today >= L.goal ? "Target hari ini tercapai — mantap!" : `${twFmt(L.goal - L.today)} kata lagi untuk hari ini.`;
+}
+function twToggleStats(force) {
+  const pop = el("twStatsPop");
+  const open = typeof force === "boolean" ? force : pop.classList.contains("hidden");
+  if (!open) { twCloseStats(); return; }
+  if (!el("sceneEditor")) return;
+  twUpdateGoal(getProject(currentProjectId));
+  twRenderStatsPop();
+  pop.classList.remove("hidden");
+  el("twStatsBtn").setAttribute("aria-expanded", "true");
+  document.addEventListener("pointerdown", twPopOutside, true);
+  document.addEventListener("keydown", twPopKeys, true);
+}
+function twCloseStats() {
+  const pop = el("twStatsPop");
+  if (!pop || pop.classList.contains("hidden")) return;
+  pop.classList.add("hidden");
+  el("twStatsBtn").setAttribute("aria-expanded", "false");
+  document.removeEventListener("pointerdown", twPopOutside, true);
+  document.removeEventListener("keydown", twPopKeys, true);
+}
+function twPopOutside(e) { if (!el("twStatsPop").contains(e.target) && !e.target.closest("#twStatsBtn, #twGoalBtn")) twCloseStats(); }
+function twPopKeys(e) { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); twCloseStats(); el("twStatsBtn").focus(); } }
+
+// perintah format (toolbar halaman, toolbar mengambang, Scene Settings) pada seleksi terakhir di editor
+function twRestoreSel(ed) {
+  const sel = document.getSelection();
+  if (document.activeElement === ed && sel.rangeCount && ed.contains(sel.getRangeAt(0).commonAncestorContainer)) return;
+  ed.focus({ preventScroll: true });
+  if (twRange && ed.contains(twRange.commonAncestorContainer)) { sel.removeAllRanges(); sel.addRange(twRange); }
+  else if (!sel.rangeCount || !ed.contains(sel.anchorNode)) { const r = document.createRange(); r.selectNodeContents(ed); r.collapse(false); sel.removeAllRanges(); sel.addRange(r); }
+}
+function twExec(cmd, val) {
+  const ed = el("sceneEditor");
+  if (!ed) return;
+  twRestoreSel(ed);
+  document.execCommand(cmd, false, val == null ? null : val);
+  twOnEditorInput();
+  twUpdateToolbar();
+}
+function twBlockOfSel() {
+  const ed = el("sceneEditor"), sel = document.getSelection();
+  let n = sel && sel.rangeCount ? sel.anchorNode : null;
+  while (n && n !== ed) { if (n.nodeType === 1 && /^(P|H1|H2|H3|BLOCKQUOTE|LI|DIV)$/.test(n.tagName)) return n; n = n.parentNode; }
+  return null;
+}
+function twCmd(cmd) {
+  if (cmd.startsWith("block:")) { twExec("formatBlock", "<" + cmd.slice(6) + ">"); return; }
+  const blk = () => { twRestoreSel(el("sceneEditor")); return twBlockOfSel(); };
+  if (cmd === "quote") { const b = blk(); twExec("formatBlock", b && b.closest("blockquote") ? "<p>" : "<blockquote>"); }
+  else if (cmd === "heading") { const b = blk(); twExec("formatBlock", b && b.tagName === "H2" ? "<p>" : "<h2>"); }
+  else if (cmd === "divider") twExec("insertHTML", '<hr class="scene-break"><p><br></p>');
+  else twExec(cmd);
+}
+function twUpdateToolbar() {
+  const ed = el("sceneEditor");
+  if (!ed) return;
+  const tb = el("sceneDetailCol").querySelector(".tw-toolbar"), bub = el("twBubble");
+  ["bold", "italic", "underline", "strikeThrough", "insertUnorderedList", "insertOrderedList", "justifyLeft", "justifyCenter", "justifyRight", "justifyFull"].forEach((cmd) => {
+    let on = false;
+    try { on = document.queryCommandState(cmd); } catch (e) { on = false; }
+    [tb, bub].forEach((box) => { const b = box && box.querySelector(`[data-cmd="${cmd}"]`); if (b) { b.classList.toggle("is-on", !!on); b.setAttribute("aria-pressed", on ? "true" : "false"); } });
+  });
+  const b = twBlockOfSel();
+  let tag = b ? b.tagName.toLowerCase() : "p";
+  if (b && b.closest("blockquote")) tag = "blockquote";
+  [tb, bub].forEach((box) => {
+    const q = box && box.querySelector('[data-cmd="quote"]'); if (q) q.classList.toggle("is-on", tag === "blockquote");
+    const h = box && box.querySelector('[data-cmd="heading"]'); if (h) h.classList.toggle("is-on", tag === "h2");
+  });
+  const s = tb && tb.querySelector('[data-ctl="block"]');
+  if (s) s.value = ["p", "h1", "h2", "h3", "blockquote"].includes(tag) ? tag : "p";
+}
+function twQueueSel() { if (!twSelRaf) twSelRaf = requestAnimationFrame(() => { twSelRaf = 0; twUpdateToolbar(); twPlaceBubble(); }); }
+function twOnSelChange() {
+  const ed = el("sceneEditor"), sel = document.getSelection();
+  if (!ed || !sel || !sel.rangeCount) { twHideBubble(); return; }
+  const r = sel.getRangeAt(0);
+  if (!ed.contains(r.commonAncestorContainer)) { if (!el("twBubble").contains(document.activeElement)) twHideBubble(); return; }
+  twRange = r.cloneRange();
+  twQueueSel();
+}
+// toolbar mengambang di atas teks terpilih (hanya mouse/trackpad; di layar sentuh menu bawaan sistem dipakai)
+function twPlaceBubble() {
+  const bub = el("twBubble"), ed = el("sceneEditor"), sel = document.getSelection();
+  if (!bub) return;
+  if (!ed || twPointerSel || !twFineMq.matches || !sel || !sel.rangeCount || sel.isCollapsed || el("tabWrite").classList.contains("hidden") ||
+      !ed.contains(sel.getRangeAt(0).commonAncestorContainer)) { twHideBubble(); return; }
+  const rect = sel.getRangeAt(0).getBoundingClientRect(), col = el("sceneDetailCol").getBoundingClientRect();
+  if ((!rect.width && !rect.height) || rect.bottom < col.top + 40 || rect.top > col.bottom - 20) { twHideBubble(); return; }
+  bub.classList.add("is-on");
+  const bw = bub.offsetWidth, bh = bub.offsetHeight;
+  const x = Math.max(8, Math.min(innerWidth - bw - 8, rect.left + rect.width / 2 - bw / 2));
+  let y = rect.top - bh - 10;
+  if (y < col.top + 52) y = rect.bottom + 10;
+  bub.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+}
+function twHideBubble() { const b = el("twBubble"); if (b) b.classList.remove("is-on"); }
+function twEditorKeys(e) {
+  if (e.key === "Escape") { const sel = document.getSelection(); if (sel && !sel.isCollapsed) { sel.collapseToEnd(); twHideBubble(); } return; }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && (e.key === "F" || e.key === "f")) { e.preventDefault(); if (currentSceneId) openFocusMode(currentSceneId); }   // Ctrl+Shift+F: mode fokus
+}
+// tempel: HTML dibersihkan (warna/font/ukuran dari Word/Docs/web dibuang supaya tetap terbaca di tema gelap & terang)
+function twOnPaste(e) {
+  const cd = e.clipboardData;
+  if (!cd) return;
+  const html = cd.getData("text/html"), text = cd.getData("text/plain");
+  if (!html && !text) return;   // mis. gambar: biarkan browser
+  e.preventDefault();
+  if (html) document.execCommand("insertHTML", false, twCleanHtml(html) || escapeHtml(text));
+  else if (/\n/.test(text)) document.execCommand("insertHTML", false, text.replace(/\r\n?/g, "\n").split("\n").map((l) => (l.trim() ? `<p>${escapeHtml(l)}</p>` : "<p><br></p>")).join(""));
+  else document.execCommand("insertText", false, text);
+}
+function twCleanHtml(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const out = document.createElement("div");
+  const SKIP = /^(SCRIPT|STYLE|META|LINK|TITLE|HEAD|NOSCRIPT|TEMPLATE|IFRAME|OBJECT|EMBED|SVG|MATH|IMG|PICTURE|VIDEO|AUDIO|CANVAS|BUTTON|INPUT|SELECT|TEXTAREA|FORM)$/;
+  const MAP = { P: "p", DIV: "p", TR: "p", H1: "h1", H2: "h2", H3: "h3", H4: "h3", H5: "h3", H6: "h3", BLOCKQUOTE: "blockquote", UL: "ul", OL: "ol", LI: "li",
+    B: "b", STRONG: "b", I: "i", EM: "i", U: "u", S: "s", STRIKE: "s", DEL: "s", SUB: "sub", SUP: "sup", BR: "br", HR: "hr" };
+  const BLOCKS = "p,div,h1,h2,h3,h4,h5,h6,blockquote,ul,ol,li,table,tr";
+  const walk = (src, dst) => {
+    src.childNodes.forEach((n) => {
+      if (n.nodeType === 3) { dst.appendChild(document.createTextNode(n.nodeValue)); return; }
+      if (n.nodeType !== 1 || SKIP.test(n.tagName)) return;
+      const st = n.getAttribute("style") || "";
+      let tag = MAP[n.tagName];
+      if (tag === "br" || tag === "hr") {
+        const x = document.createElement(tag);
+        if (tag === "hr" && /\b(scene-break|qd-break)\b/.test(n.getAttribute("class") || "")) x.className = "scene-break";
+        dst.appendChild(x);
+        return;
+      }
+      if (tag === "b" && /font-weight\s*:\s*(normal|[1-4]00)\b/i.test(st)) tag = null;   // Google Docs: <b style="font-weight:normal"> membungkus semuanya
+      if (tag === "p" && n.querySelector(BLOCKS)) tag = null;                             // pembungkus blok lain: isinya saja
+      if (!tag) {   // span/font/a/td/...: tebal/miring/garis dari style jadi tag sederhana, sisanya isi saja
+        let host = dst;
+        if (/font-weight\s*:\s*(bold|[6-9]00)\b/i.test(st)) host = host.appendChild(document.createElement("b"));
+        if (/font-style\s*:\s*italic/i.test(st)) host = host.appendChild(document.createElement("i"));
+        if (/text-decoration[^;]*underline/i.test(st)) host = host.appendChild(document.createElement("u"));
+        if (/text-decoration[^;]*line-through/i.test(st)) host = host.appendChild(document.createElement("s"));
+        walk(n, host);
+        if (/^(TD|TH)$/.test(n.tagName)) dst.appendChild(document.createTextNode(" "));
+        return;
+      }
+      const x = document.createElement(tag);
+      const al = String((n.style && n.style.textAlign) || n.getAttribute("align") || "").toLowerCase();
+      if (/^(p|h1|h2|h3|blockquote)$/.test(tag) && /^(center|right|justify)$/.test(al)) x.style.textAlign = al;
+      walk(n, x);
+      dst.appendChild(x);
+    });
+  };
+  walk(doc.body, out);
+  return out.innerHTML;
+}
+
+// ---- tambah scene / bab langsung (tanpa jendela) ----
+function twNewId(kind) { let id = kind + "-" + Date.now(); while (findSceneNode(id)) id = kind + "-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6); return id; }
+function twFreeTitle(base, n, nodes) {   // "Scene 4" / "Bab 2" yang belum dipakai
+  const used = new Set(nodes.map((x) => (x.title || "").trim().toLowerCase()));
+  while (used.has((base + " " + n).toLowerCase())) n++;
+  return base + " " + n;
+}
+// scene baru: di akhir bab parentId, atau tepat setelah scene yang terbuka; judulnya langsung siap diketik
+function twAddScene(parentId) {
+  const p = getProject(currentProjectId);
+  if (!p) return;
+  syncSceneFromDetail();
+  const all = flattenScenes(p.data.scenes);
+  const node = { id: twNewId("scene"), type: "scene", title: twFreeTitle("Scene", all.length + 1, all), synopsis: "", status: "todo", content: "" };
+  let arr = p.data.scenes, at = arr.length;
+  const par = parentId ? findSceneNode(parentId, p.data.scenes) : null;
+  if (par && par.node.type === "folder") { arr = par.node.children = par.node.children || []; at = arr.length; expandedFolders.add(par.node.id); }
+  else if (!parentId && currentSceneId) { const c = findSceneNode(currentSceneId, p.data.scenes); if (c) { arr = c.array; at = c.index + 1; } }
+  arr.splice(at, 0, node);
+  twClearSearch();
+  if (twNarrowMq.matches) toggleTwSide(false);
+  selectScene(node.id);
+  markDirtyAndSchedule();
+  const t = el("twTitle");
+  if (t) { t.focus({ preventScroll: true }); t.select(); }
+}
+function twAddFolder() {
+  const p = getProject(currentProjectId);
+  if (!p) return;
+  const folders = [];
+  (function walk(list) { (list || []).forEach((n) => { if (n.type === "folder") { folders.push(n); walk(n.children); } }); })(p.data.scenes);
+  const node = { id: twNewId("folder"), type: "folder", title: twFreeTitle("Bab", folders.length + 1, folders), children: [] };
+  p.data.scenes.push(node);
+  expandedFolders.add(node.id);
+  twClearSearch();
+  if (!currentSceneId) renderSceneDetail();
+  markDirtyAndSchedule();
+  twRename(node.id);   // langsung ganti nama di daftar (daftar dibuka bila tersembunyi)
+}
+
+// ---- toolbar mengambang (muncul di atas teks terpilih) ----
+function twBubbleHtml() {
+  const b = (cmd, icon, label) => `<button type="button" class="tw-tb" data-cmd="${cmd}" title="${label}" aria-label="${label}" aria-pressed="false" tabindex="-1">${tiPx(icon, 16)}</button>`;
+  const sep = '<span class="tw-tb-sep" aria-hidden="true"></span>';
+  return b("bold", tiIcon("bold"), "Tebal") + b("italic", tiIcon("italic"), "Miring") + b("underline", tiIcon("underline"), "Garis bawah") + b("strikeThrough", tiIcon("strikethrough"), "Coret") + sep +
+    b("heading", tiIcon("heading"), "Judul bagian") + b("quote", tiIcon("blockquote"), "Kutipan") + sep + b("removeFormat", tiIcon("clear-formatting"), "Hapus format");
+}
+
+// ---- status simpan di bar bawah = salinan #saveStatus (diubah markDirty / markSaved / sinkron Drive) ----
+function twMirrorSave() {
+  const box = el("twSave"), src = el("saveStatus");
+  if (!box || !src) return;
+  const t = src.textContent.replace(/\s+/g, " ").trim();
+  const st = /menyimpan|menyinkron/i.test(t) ? "saving" : /gagal|error|offline|tidak/i.test(t) ? "error" : "saved";
+  box.dataset.state = st;
+  box.querySelector(".tw-save-text").textContent = st === "saving" ? "Menyimpan…" : (t || "Tersimpan");
+  box.title = st === "saving" ? "Menyimpan ke Google Drive…" : (t || "Tersimpan");
+}
+
+// ---- pasang event tab Tulis (sekali, saat halaman dimuat) ----
+function initTwUi() {
+  initTwList();
+  el("twBubble").innerHTML = twBubbleHtml();
+  el("btnAddScene").onclick = () => twAddScene(null);
+  el("btnAddFolder").onclick = twAddFolder;
+  el("twSideClose").onclick = () => toggleTwSide(false);
+  el("twSideOpen").onclick = () => toggleTwSide();
+  el("twScrim").onclick = () => toggleTwSide(false);
+  el("twSide").addEventListener("keydown", (e) => { if (e.key === "Escape" && twNarrowMq.matches && twSideDrawer && !e.target.closest(".tree-rename-input")) { e.preventDefault(); toggleTwSide(false); } });
+  const narrowChanged = () => { twSideDrawer = false; twHidePeek(); twHideBubble(); applyTwSide(); };
+  if (twNarrowMq.addEventListener) twNarrowMq.addEventListener("change", narrowChanged); else twNarrowMq.addListener(narrowChanged);
+  // pencarian: Enter = buka hasil pertama, ↓ = pindah ke daftar, Esc = kosongkan
+  const search = el("twSearch");
+  search.addEventListener("input", () => { twSearchQ = search.value; renderSceneList(); });
+  search.addEventListener("keydown", (e) => {
+    const first = () => el("sceneList").querySelector(".tw-row.is-scene") || el("sceneList").querySelector(".tw-row");
+    if (e.key === "Escape" && search.value) { e.preventDefault(); e.stopPropagation(); search.value = ""; twSearchQ = ""; renderSceneList(); }
+    else if (e.key === "ArrowDown") { const r = first(); if (r) { e.preventDefault(); twFocusRow(r.dataset.id); } }
+    else if (e.key === "Enter") { const r = el("sceneList").querySelector(".tw-row.is-scene"); if (r) { e.preventDefault(); selectScene(r.dataset.id); if (twNarrowMq.matches) toggleTwSide(false); } }
+  });
+  el("twPrev").onclick = () => twGo(-1);
+  el("twNext").onclick = () => twGo(1);
+  // bar bawah
+  el("zoomSlider").addEventListener("input", (e) => twSetZoom(e.target.value));
+  el("twZoomOut").onclick = () => twSetZoom(twPrefs.zoom - 10);
+  el("twZoomIn").onclick = () => twSetZoom(twPrefs.zoom + 10);
+  el("twBarFocus").onclick = () => { if (currentSceneId && findScene(currentSceneId)) openFocusMode(currentSceneId); };
+  el("twStatsBtn").onclick = () => twToggleStats();
+  el("twGoalBtn").onclick = () => {
+    const open = el("twStatsPop").classList.contains("hidden");
+    twToggleStats(open);
+    if (open && el("twGoalInput") && !twLast.goal) el("twGoalInput").focus({ preventScroll: true });
+  };
+  const pop = el("twStatsPop");
+  pop.addEventListener("click", (e) => { if (e.target.closest('[data-act="close"]')) { twCloseStats(); el("twStatsBtn").focus(); } });
+  pop.addEventListener("input", (e) => {
+    if (e.target.id === "twGoalInput") twSetGoal(e.target.value);
+    else if (e.target.id === "twZoomPop") twSetZoom(e.target.value);
+  });
+  pop.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.id === "twGoalInput") { e.preventDefault(); twCloseStats(); el("twStatsBtn").focus(); } });
+  // halaman: tombol di layar kosong, bayangan bar atas saat digulir
+  const col = el("sceneDetailCol");
+  col.addEventListener("click", (e) => {
+    const b = e.target.closest(".tw-empty [data-act]");
+    if (!b) return;
+    if (b.dataset.act === "first") { const f = twSceneOrder()[0]; if (f) selectScene(f.id); }
+    else if (b.dataset.act === "add-scene") twAddScene(null);
+    else if (b.dataset.act === "add-folder") twAddFolder();
+  });
+  col.addEventListener("scroll", () => {
+    el("twMain").classList.toggle("is-scrolled", col.scrollTop > 4);
+    if (el("twBubble").classList.contains("is-on")) twQueueSel();
+  }, { passive: true });
+  // toolbar mengambang
+  const bub = el("twBubble");
+  bub.addEventListener("mousedown", (e) => e.preventDefault());   // seleksi di editor tetap
+  bub.addEventListener("click", (e) => { const b = e.target.closest("[data-cmd]"); if (b) twCmd(b.dataset.cmd); });
+  document.addEventListener("selectionchange", () => { if (el("sceneEditor") && !el("tabWrite").classList.contains("hidden")) twOnSelChange(); });
+  document.addEventListener("pointerup", () => { if (twPointerSel) { twPointerSel = false; if (el("sceneEditor")) twQueueSel(); } }, true);
+  window.addEventListener("resize", () => { twHideBubble(); twHidePeek(); });
+  // ukuran panel berubah (tab tampil lagi, jendela diubah, daftar diciutkan): tinggi judul & sinopsis diukur ulang
+  if (window.ResizeObserver) new ResizeObserver(() => { twRefit(); if (el("twBubble").classList.contains("is-on")) twQueueSel(); }).observe(el("twMain"));
+  // pintasan global saat tab Tulis tampil: Ctrl+\ = tampil/sembunyikan daftar, Alt+PageUp/PageDown = scene sebelum/berikut
+  document.addEventListener("keydown", (e) => {
+    if (el("tabWrite").classList.contains("hidden") || el("tabWrite").classList.contains("is-quill") || !el("focusOverlay").classList.contains("hidden") || el("editorView").classList.contains("hidden")) return;
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "\\") { e.preventDefault(); toggleTwSide(); }
+    else if (e.altKey && !e.ctrlKey && (e.key === "PageUp" || e.key === "PageDown")) { e.preventDefault(); twGo(e.key === "PageUp" ? -1 : 1); }
+  });
+  // status simpan
+  if (window.MutationObserver) new MutationObserver(twMirrorSave).observe(el("saveStatus"), { childList: true, characterData: true, subtree: true });
+  twMirrorSave();
+  // mode fokus: isi & judul langsung tersimpan saat diketik
+  el("focusEditor").addEventListener("input", () => {
+    const s = findScene(focusSceneId);
+    if (s) s.content = el("focusEditor").innerHTML;
+    updateFocusStats();
+    markDirtyAndSchedule();
+  });
+  el("focusEditor").addEventListener("paste", twOnPaste);
+  el("focusTitle").addEventListener("input", () => { const s = findScene(focusSceneId); if (s) { s.title = el("focusTitle").value; twTitleChanged(s, "focus"); } });
+  el("focusTitle").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); twCaretToStart(el("focusEditor")); } });
+  el("focusOverlay").addEventListener("keydown", (e) => { if (e.key === "Escape" && !el("focusOverlay").classList.contains("hidden")) { e.preventDefault(); closeFocusMode(); } });
+  // tampilan awal
+  twApplyPrefs();
+  twSetZoom(twPrefs.zoom);
+  applyTwSide();
+}
 
 // ============ SCENE OPTIONS DRAWER (nama, synopsis, status, format tulisan) ============
+// Bagian: Info scene (judul, sinopsis, status, bab) · Tampilan editor (per perangkat) · Format teks (pada seleksi) · Aksi
 function renderSceneDrawerBody(s) {
   const body = el("sceneDrawerBody");
   if (!body) return;
-  body.innerHTML = `
-    <div class="drawer-section">
-      <div class="drawer-section-label">${tiPx(tiIcon("info-circle"), 14)}Main Information</div>
-      <label class="field-label">Title</label>
-      <input id="sceneTitleField" class="field-input" value="${escapeHtml(s.title)}" />
-      <label class="field-label">Synopsis</label>
-      <textarea id="sceneSynopsis" class="field-input textarea" placeholder="Synopsis singkat scene ini...">${escapeHtml(s.synopsis || "")}</textarea>
-      <div class="status-row">
-        <button class="status-chip chip-todo ${s.status === "todo" ? "selected" : ""}" data-status="todo">Todo</button>
-        <button class="status-chip chip-draft ${s.status === "draft" ? "selected" : ""}" data-status="draft">Draft</button>
-        <button class="status-chip chip-done ${s.status === "done" ? "selected" : ""}" data-status="done">Done</button>
+  const p = getProject(currentProjectId), path = p ? twPath(s.id, p.data.scenes) : null;
+  const parentId = path && path.length > 1 ? path[path.length - 2].id : "";
+  const folderOpts = [];
+  (function walk(list, depth) {
+    (list || []).forEach((n) => { if (n.type === "folder") { folderOpts.push(`<option value="${twAttr(n.id)}"${n.id === parentId ? " selected" : ""}>${" ".repeat(depth)}${escapeHtml(n.title || "Bab tanpa judul")}</option>`); walk(n.children, depth + 1); } });
+  })(p ? p.data.scenes : [], 0);
+  const st = twStatusOf(s);
+  const sec = (icon, title, inner, note) => `<section class="drawer-section"><div class="drawer-section-label">${tiPx(icon, 14)}<span>${title}</span>${note ? `<small>${note}</small>` : ""}</div>${inner}</section>`;
+  const seg = (key, label) => `<div class="tw-dr-field"><span class="tw-dr-label" id="twSegL-${key}">${label}</span><div class="tw-seg" role="radiogroup" aria-labelledby="twSegL-${key}" data-pref="${key}">` +
+    TW_PREF_OPTS[key].map(([v, l]) => `<button type="button" role="radio" class="tw-seg-btn${key === "font" ? " tw-ff-" + v : ""}${twPrefs[key] === v ? " is-on" : ""}" data-v="${v}" aria-checked="${twPrefs[key] === v}">${l}</button>`).join("") + `</div></div>`;
+  const fb = (cmd, icon, label) => `<button type="button" class="tw-tb" data-cmd="${cmd}" title="${label}" aria-label="${label}">${tiPx(icon, 16)}</button>`;
+  body.innerHTML =
+    sec(tiIcon("info-circle"), "Info scene", `
+      <label class="tw-dr-label" for="sceneTitleField">Judul</label>
+      <input id="sceneTitleField" class="field-input" autocomplete="off" />
+      <label class="tw-dr-label" for="sceneSynopsis">Sinopsis</label>
+      <textarea id="sceneSynopsis" class="field-input textarea" placeholder="Ringkasan singkat isi scene ini…"></textarea>
+      <span class="tw-dr-label" id="twStatusL">Status</span>
+      <div class="status-row" role="radiogroup" aria-labelledby="twStatusL">
+        ${["todo", "draft", "done"].map((k) => `<button type="button" role="radio" class="status-chip chip-${k}${st === k ? " selected" : ""}" data-status="${k}" aria-checked="${st === k}"><i class="tw-dot ${k}"></i>${STATUS_LABELS[k]}</button>`).join("")}
       </div>
-    </div>
-
-    <div class="drawer-section">
-      <div class="drawer-section-label">${tiPx(tiIcon("typography"), 14)}Formatting</div>
+      <label class="tw-dr-label" for="twMoveFolder">Bab</label>
+      <div class="tw-dr-select"><select id="twMoveFolder" class="field-input"><option value="">Tanpa bab (di luar bab)</option>${folderOpts.join("")}</select>${tiPx(tiIcon("chevron-down"), 14)}</div>`) +
+    sec(tiIcon("layout"), "Tampilan editor", `
+      ${seg("font", "Huruf")}${seg("width", "Lebar halaman")}${seg("lh", "Jarak baris")}${seg("para", "Paragraf")}
+      <div class="tw-dr-field"><label class="tw-dr-label" for="twZoom2">Ukuran tulisan</label>
+        <div class="tw-dr-range"><input type="range" id="twZoom2" class="tw-range" min="70" max="160" step="5" value="${twPrefs.zoom}" /><b id="twZoom2Val">${twPrefs.zoom}%</b></div></div>`, "perangkat ini") +
+    sec(tiIcon("typography"), "Format teks", `
       <div class="drawer-toolbar-selects">
-        <select id="fmtFont" title="Font">
-          <option value="Georgia">Georgia</option>
-          <option value="'Segoe UI',sans-serif">Segoe UI</option>
-          <option value="'Times New Roman',serif">Times New Roman</option>
-          <option value="'Courier New',monospace">Courier New</option>
-        </select>
-        <select id="fmtSize" title="Ukuran">
-          <option value="2">12</option><option value="3" selected>14</option><option value="4">16</option>
-          <option value="5">18</option><option value="6">24</option><option value="7">32</option>
-        </select>
-        <select id="fmtStyle" title="Gaya">
-          <option value="p">Paragraf</option><option value="h1">Heading 1</option>
-          <option value="h2">Heading 2</option><option value="h3">Heading 3</option>
-        </select>
+        <div class="tw-dr-select"><select id="fmtStyle" class="field-input" title="Gaya paragraf" aria-label="Gaya paragraf">
+          <option value="p">Paragraf</option><option value="h1">Judul 1</option><option value="h2">Judul 2</option><option value="h3">Judul 3</option><option value="blockquote">Kutipan</option>
+        </select>${tiPx(tiIcon("chevron-down"), 14)}</div>
+        <div class="tw-dr-pair">
+          <div class="tw-dr-select"><select id="fmtFont" class="field-input" title="Font teks terpilih" aria-label="Font teks terpilih">
+            <option value="">Font…</option><option value="Georgia">Georgia</option><option value="'Palatino Linotype',Palatino,serif">Palatino</option><option value="'Segoe UI',sans-serif">Segoe UI</option>
+            <option value="'Times New Roman',serif">Times New Roman</option><option value="'Courier New',monospace">Courier New</option>
+          </select>${tiPx(tiIcon("chevron-down"), 14)}</div>
+          <div class="tw-dr-select"><select id="fmtSize" class="field-input" title="Ukuran teks terpilih" aria-label="Ukuran teks terpilih">
+            <option value="">Ukuran…</option><option value="2">Kecil</option><option value="3">Normal</option><option value="4">Sedang</option><option value="5">Besar</option><option value="6">Lebih besar</option><option value="7">Raksasa</option>
+          </select>${tiPx(tiIcon("chevron-down"), 14)}</div>
+        </div>
       </div>
-      <div class="drawer-toolbar-row">
-        <button data-cmd="bold" title="Bold" aria-label="Bold">${tiPx(tiIcon("bold"), 16)}</button>
-        <button data-cmd="italic" title="Italic" aria-label="Italic">${tiPx(tiIcon("italic"), 16)}</button>
-        <button data-cmd="underline" title="Underline" aria-label="Underline">${tiPx(tiIcon("underline"), 16)}</button>
-        <span class="toolbar-sep"></span>
-        <button data-cmd="justifyLeft" title="Rata kiri" aria-label="Rata kiri">${tiPx(tiIcon("align-left"), 16)}</button>
-        <button data-cmd="justifyCenter" title="Rata tengah" aria-label="Rata tengah">${tiPx(tiIcon("align-center"), 16)}</button>
-        <button data-cmd="justifyRight" title="Rata kanan" aria-label="Rata kanan">${tiPx(tiIcon("align-right"), 16)}</button>
-        <span class="toolbar-sep"></span>
-        <button data-cmd="insertUnorderedList" title="Bullet list" aria-label="Bullet list">${tiPx(tiIcon("list"), 16)}</button>
-        <button data-cmd="insertOrderedList" title="Numbered list" aria-label="Numbered list">${tiPx(tiIcon("list-numbers"), 16)}</button>
-        <input type="color" id="fmtColor" title="Warna teks" value="#e7e5e0" />
-      </div>
-    </div>
-
-    <div class="drawer-section">
-      <div class="drawer-section-label">${tiPx(tiIcon("settings"), 14)}Scene Actions</div>
+      <div class="drawer-toolbar-row tw-dr-tools">
+        ${fb("bold", tiIcon("bold"), "Tebal")}${fb("italic", tiIcon("italic"), "Miring")}${fb("underline", tiIcon("underline"), "Garis bawah")}${fb("strikeThrough", tiIcon("strikethrough"), "Coret")}
+        ${fb("insertUnorderedList", tiIcon("list"), "Daftar berpoin")}${fb("insertOrderedList", tiIcon("list-numbers"), "Daftar bernomor")}${fb("divider", tiIcon("separator-horizontal"), "Pemisah adegan")}
+        ${fb("justifyLeft", tiIcon("align-left"), "Rata kiri")}${fb("justifyCenter", tiIcon("align-center"), "Rata tengah")}${fb("justifyRight", tiIcon("align-right"), "Rata kanan")}${fb("justifyFull", tiIcon("align-justified"), "Rata kiri-kanan")}
+        <label class="tw-dr-color" title="Warna teks terpilih">${tiPx(tiIcon("palette"), 16)}<input type="color" id="fmtColor" value="${document.body.classList.contains("light") ? "#24221f" : "#e7e5e0"}" aria-label="Warna teks terpilih" /></label>
+        ${fb("removeFormat", tiIcon("clear-formatting"), "Hapus format")}
+      </div>`, "teks terpilih") +
+    sec(tiIcon("bolt"), "Aksi", `
       <div class="drawer-action-row">
-        <button id="sceneDuplicateBtn" class="drawer-action-btn">${tiPx(tiIcon("copy"), 16)}Duplikat Scene</button>
-        <button id="sceneDeleteBtn" class="drawer-action-btn drawer-action-danger">${tiPx(tiIcon("trash"), 16)}Hapus Scene</button>
-      </div>
-    </div>`;
+        <button type="button" id="sceneFocusBtn" class="drawer-action-btn">${tiPx(tiIcon("arrows-maximize"), 16)}<span>Mode fokus</span><kbd>Ctrl+Shift+F</kbd></button>
+        <button type="button" id="scenePreviewBtn" class="drawer-action-btn">${tiPx(tiIcon("eye"), 16)}<span>Pratinjau naskah</span></button>
+        <button type="button" id="sceneDuplicateBtn" class="drawer-action-btn">${tiPx(tiIcon("copy"), 16)}<span>Duplikat scene</span></button>
+        <button type="button" id="sceneDeleteBtn" class="drawer-action-btn drawer-action-danger">${tiPx(tiIcon("trash"), 16)}<span>Hapus scene</span></button>
+      </div>`);
+  el("sceneTitleField").value = s.title || "";
+  el("sceneSynopsis").value = s.synopsis || "";
 
-  el("sceneTitleField").addEventListener("input", () => {
-    s.title = el("sceneTitleField").value;
-    const bp = document.querySelector(".breadcrumb-title");
-    if (bp) bp.textContent = s.title || "(tanpa judul)";
-    renderSceneList();
+  el("sceneTitleField").addEventListener("input", () => { s.title = el("sceneTitleField").value; twTitleChanged(s, "drawer"); });
+  el("sceneSynopsis").addEventListener("input", () => {
+    s.synopsis = el("sceneSynopsis").value;
+    const syn = el("twSynopsis");
+    if (syn && el("sceneEditor") && el("sceneEditor").dataset.sceneId === s.id) { syn.value = s.synopsis; twAutoGrow(syn); }
     markDirtyAndSchedule();
   });
-  el("sceneSynopsis").addEventListener("input", () => { s.synopsis = el("sceneSynopsis").value; renderSceneList(); markDirtyAndSchedule(); });
+  body.querySelectorAll(".status-chip").forEach((btn) => { btn.onclick = () => twSetStatus(s, btn.dataset.status); });
+  el("twMoveFolder").onchange = (e) => {
+    const v = e.target.value;
+    if (v) moveSceneNode(s.id, v, "inside"); else moveSceneNode(s.id, null, "end");
+  };
+  // tampilan editor (disimpan di perangkat ini)
+  body.querySelectorAll(".tw-seg").forEach((g) => g.addEventListener("click", (e) => {
+    const b = e.target.closest(".tw-seg-btn");
+    if (!b) return;
+    twPrefs[g.dataset.pref] = b.dataset.v;
+    saveTwPrefs();
+    g.querySelectorAll(".tw-seg-btn").forEach((x) => { const on = x === b; x.classList.toggle("is-on", on); x.setAttribute("aria-checked", on ? "true" : "false"); });
+    twApplyPrefs();
+    twRefit();
+  }));
+  twRangeFill(el("twZoom2"));
+  el("twZoom2").addEventListener("input", (e) => twSetZoom(e.target.value));
+  // format teks: bekerja pada seleksi terakhir di editor
+  const tools = body.querySelector(".tw-dr-tools");
+  tools.addEventListener("mousedown", (e) => { if (e.target.closest("button")) e.preventDefault(); });
+  tools.addEventListener("click", (e) => { const b = e.target.closest("[data-cmd]"); if (b) twCmd(b.dataset.cmd); });
+  el("fmtStyle").onchange = () => twCmd("block:" + el("fmtStyle").value);
+  el("fmtFont").onchange = () => { if (el("fmtFont").value) twExec("fontName", el("fmtFont").value); el("fmtFont").value = ""; };
+  el("fmtSize").onchange = () => { if (el("fmtSize").value) twExec("fontSize", el("fmtSize").value); el("fmtSize").value = ""; };
+  el("fmtColor").oninput = () => twExec("foreColor", el("fmtColor").value);
 
-  body.querySelectorAll(".status-chip").forEach((btn) => {
-    btn.onclick = () => {
-      s.status = btn.dataset.status;
-      body.querySelectorAll(".status-chip").forEach((b) => b.classList.remove("selected"));
-      btn.classList.add("selected");
-      renderSceneList();
-      markDirtyAndSchedule();
-    };
-  });
-
-  // ---- toolbar format (bekerja pada seleksi terakhir di #sceneEditor) ----
-  body.querySelectorAll(".drawer-toolbar-row button[data-cmd]").forEach((btn) => {
-    btn.onclick = () => { document.execCommand(btn.dataset.cmd, false, null); el("sceneEditor").focus(); };
-  });
-  el("fmtFont").onchange = () => { document.execCommand("fontName", false, el("fmtFont").value); el("sceneEditor").focus(); };
-  el("fmtSize").onchange = () => { document.execCommand("fontSize", false, el("fmtSize").value); el("sceneEditor").focus(); };
-  el("fmtStyle").onchange = () => { document.execCommand("formatBlock", false, el("fmtStyle").value); el("sceneEditor").focus(); };
-  el("fmtColor").oninput = () => { document.execCommand("foreColor", false, el("fmtColor").value); el("sceneEditor").focus(); };
-
+  el("sceneFocusBtn").onclick = () => { closeSceneDrawer(); openFocusMode(s.id); };
+  el("scenePreviewBtn").onclick = () => { closeSceneDrawer(); flushCurrentEdits(); el("btnPreview").click(); };
   el("sceneDuplicateBtn").onclick = () => duplicateScene(s.id);
   el("sceneDeleteBtn").onclick = () => deleteSceneNode(s.id);
 }
@@ -1160,7 +2867,11 @@ function updateSceneDrawerVisibility() {
   if (!show) closeSceneDrawer();
 }
 
+// layar lebar (>= 1100 px): laci menempel di kanan & halaman menyempit (tanpa scrim, editor tetap bisa dipakai);
+// layar lebih kecil: laci menutupi halaman dengan scrim. Diatur CSS lewat kelas #tabWrite.tw-drawer-open.
 function openSceneDrawer() {
+  twHideBubble(); twCloseStats();
+  el("tabWrite").classList.add("tw-drawer-open");
   el("sceneOptionsDrawer").classList.add("open");
   el("sceneOptionsDrawer").setAttribute("aria-hidden", "false");
   el("sceneDrawerScrim").classList.remove("hidden");
@@ -1172,6 +2883,7 @@ function openSceneDrawer() {
 function closeSceneDrawer() {
   const drawer = el("sceneOptionsDrawer");
   if (!drawer || !drawer.classList.contains("open")) return;
+  el("tabWrite").classList.remove("tw-drawer-open");
   drawer.classList.remove("open");
   drawer.setAttribute("aria-hidden", "true");
   el("sceneDrawerScrim").classList.remove("visible");
@@ -1254,21 +2966,40 @@ function saveNewScene() {
 function duplicateScene(id) {
   const info = findSceneNode(id);
   if (!info) return;
+  syncSceneFromDetail();   // salinan berisi tulisan terbaru
   const copy = deepCloneNode(info.node);
-  copy.title = info.node.title + " (copy)";
+  copy.title = (info.node.title || (info.node.type === "folder" ? "Bab" : "Scene")) + " (salinan)";
   info.array.splice(info.index + 1, 0, copy);
+  if (copy.type === "folder") expandedFolders.add(copy.id);
+  twClearSearch();
   renderSceneList();
-  toast((copy.type === "folder" ? "Chapter" : "Scene") + " diduplikat", tiIcon("copy"));
+  twRefreshCrumbs();
+  const row = twRowEl(copy.id);
+  if (row) { twRevealRow(row); row.classList.add("is-new"); }
+  toast((copy.type === "folder" ? "Bab" : "Scene") + " diduplikat", tiIcon("copy"));
   markDirtyAndSchedule();
 }
 function deleteSceneNode(id) {
   const info = findSceneNode(id);
   if (!info) return;
-  const msg = info.node.type === "folder" ? "Hapus chapter ini beserta seluruh scene di dalamnya?" : "Hapus scene ini?";
+  const isFolder = info.node.type === "folder", name = info.node.title || (isFolder ? "Bab tanpa judul" : "tanpa judul");
+  const n = isFolder ? flattenScenes(info.node.children).length : 0;
+  const msg = isFolder ? (n ? `Hapus bab “${name}” beserta ${n} scene di dalamnya?` : `Hapus bab “${name}”?`) : `Hapus scene “${name}”?`;
   if (!confirm(msg)) return;
+  syncSceneFromDetail();
+  const before = twSceneOrder(), at = before.findIndex((x) => x.id === currentSceneId);
+  const p = getProject(currentProjectId);
   info.array.splice(info.index, 1);
-  if (!findSceneNode(currentSceneId)) { const first = findFirstScene(getProject(currentProjectId).data.scenes); currentSceneId = first ? first.id : null; }
-  renderSceneList(); renderSceneDetail();
+  const curGone = !currentSceneId || !findSceneNode(currentSceneId);
+  if (curGone) {   // scene yang terbuka ikut terhapus -> buka tetangganya (sesudah, lalu sebelum)
+    const left = new Set(flattenScenes(p.data.scenes).map((x) => x.id));
+    const next = before.slice(Math.max(0, at)).find((x) => left.has(x.id)) || before.slice(0, Math.max(0, at)).reverse().find((x) => left.has(x.id)) || findFirstScene(p.data.scenes);
+    currentSceneId = next ? next.id : null;
+  }
+  expandedFolders.delete(id);
+  renderSceneList();
+  if (curGone) renderSceneDetail(); else twRefreshCrumbs();
+  toast((isFolder ? "Bab" : "Scene") + " dihapus", tiIcon("trash"));
   markDirtyAndSchedule();
 }
 // alias lama, tetap dipakai di beberapa tempat
@@ -1288,8 +3019,10 @@ function computeTextStats(text) {
 }
 function statsLabel(stats) { return `${stats.words} kata · ${stats.chars} karakter · ${stats.sentences} kalimat · ${stats.paragraphs} paragraf`; }
 function updateFocusStats() {
-  const stats = computeTextStats(el("focusEditor").innerText);
-  el("focusStats").textContent = statsLabel(stats);
+  const fe = el("focusEditor"), stats = computeTextStats(twTextOf(fe));
+  el("focusStats").textContent = `${twFmt(stats.words)} kata · ${twFmt(stats.chars)} karakter`;
+  el("focusStats").title = statsLabel(stats);
+  fe.classList.toggle("is-empty", !fe.textContent.trim() && !fe.querySelector("hr, img, li"));
 }
 function updateFocusToolbarState() {
   document.querySelectorAll(".focus-toolbar button[data-cmd]").forEach((btn) => {
@@ -1299,12 +3032,19 @@ function updateFocusToolbarState() {
 
 // ---- FOCUS MODE (full writer tanpa gangguan) ----
 let focusSceneId = null;
+// isi & judul ditulis ke scene saat diketik (initTwUi); tampilan huruf/lebar/zoom sama dengan halaman Tulis
 function openFocusMode(id) {
+  const s = findScene(id);
+  if (!s || s.type === "folder") return;
+  if (id !== currentSceneId && !el("tabWrite").classList.contains("hidden")) selectScene(id);   // keluar dari mode fokus = kembali ke scene ini
   syncSceneFromDetail();
   focusSceneId = id;
-  const s = findScene(id);
-  el("focusTitle").value = s.title;
+  twHideBubble(); twHidePeek(); twCloseStats(); closeSceneDrawer();
+  twApplyPrefs();
+  el("focusTitle").value = s.title || "";
+  el("focusTitle").placeholder = "Judul scene";
   el("focusEditor").innerHTML = s.content || "";
+  el("focusEditor").dataset.placeholder = "Mulai menulis…";
   el("focusOverlay").classList.remove("hidden");
   el("focusEditor").focus();
   updateFocusStats();
@@ -1313,8 +3053,11 @@ function closeFocusMode() {
   const s = findScene(focusSceneId);
   if (s) { s.title = el("focusTitle").value; s.content = el("focusEditor").innerHTML; }
   el("focusOverlay").classList.add("hidden");
+  focusSceneId = null;
   renderSceneList(); renderSceneDetail();
   markDirtyAndSchedule();
+  const ed = el("sceneEditor");
+  if (ed && !el("tabWrite").classList.contains("hidden")) ed.focus({ preventScroll: true });
 }
 
 // ---- ORGANIZE TAB ----
@@ -1398,6 +3141,7 @@ function renderOrganizeDetail() {
     <div id="orgEditor" class="organize-editor" contenteditable="true" spellcheck="false">${item.content || ""}</div>`;
   el("orgTitleField").addEventListener("input", () => { item.title = el("orgTitleField").value; renderOrganizeList(); markDirtyAndSchedule(); });
   el("orgEditor").addEventListener("input", () => { item.content = el("orgEditor").innerHTML; markDirtyAndSchedule(); });
+  noteTabDoc("organize", { doc: item.id, kind: currentOrgCat, title: item.title });   // TAB PROJECT: riwayat
 }
 function openAddOrganizeModal() { el("organizeFieldTitle").value = ""; el("organizeModal").classList.remove("hidden"); el("organizeFieldTitle").focus(); }
 function saveNewOrganizeItem() {
@@ -3198,7 +4942,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (action === "exportWord") { flushCurrentEdits(); exportProjectToWord(p); }
   });
 
-  document.querySelectorAll(".rail-btn").forEach((btn) => btn.onclick = () => switchTab(btn.dataset.tab));
+  initProjectTabs();   // TAB PROJECT: bar tab, jendela "Tambah tab", sidebar tab & riwayat
   // Quill: tombol "Scene | Quill" di atas tab Write (panah kiri/kanan berpindah antar-tombol)
   el("writeModeSwitch").querySelectorAll(".wms-btn").forEach((btn) => {
     btn.onclick = () => setWriteMode(btn.dataset.mode);
@@ -3206,8 +4950,8 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   el("btnProjectTheme").onclick = () => document.body.classList.toggle("light");
 
-  // Write tab
-  el("btnAddScene").onclick = () => openAddSceneModal(null);
+  // Write tab (mode Scene): daftar, halaman, bar bawah, toolbar mengambang, mode fokus — lihat initTwUi()
+  initTwUi();
   el("btnCancelScene").onclick = () => el("sceneModal").classList.add("hidden");
   el("btnSaveScene").onclick = saveNewScene;
   document.querySelectorAll(".type-toggle-btn").forEach((btn) => btn.onclick = () => {
@@ -3230,9 +4974,13 @@ window.addEventListener("DOMContentLoaded", () => {
   el("sceneDrawerScrim").onclick = closeSceneDrawer;
   setupSceneDrawerDrag();
   el("btnExitFocus").onclick = closeFocusMode;
-  el("focusEditor").addEventListener("input", updateFocusStats);
   document.querySelectorAll(".focus-toolbar button[data-cmd]").forEach((btn) => {
-    btn.onclick = () => { document.execCommand(btn.dataset.cmd, false, null); el("focusEditor").focus(); updateFocusToolbarState(); };
+    btn.onmousedown = (e) => e.preventDefault();   // seleksi di editor tetap
+    btn.onclick = () => {
+      if (btn.dataset.cmd === "divider") document.execCommand("insertHTML", false, '<hr class="scene-break"><p><br></p>');
+      else document.execCommand(btn.dataset.cmd, false, null);
+      el("focusEditor").focus(); updateFocusToolbarState();   // execCommand memicu "input" -> isi scene ikut tersimpan
+    };
   });
   el("focusColor").oninput = () => { document.execCommand("foreColor", false, el("focusColor").value); el("focusEditor").focus(); };
   document.addEventListener("selectionchange", () => { if (!el("focusOverlay").classList.contains("hidden")) updateFocusToolbarState(); });
