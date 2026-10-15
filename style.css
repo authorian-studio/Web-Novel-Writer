@@ -585,6 +585,16 @@ body.light .proj-float-btn:hover { background: rgba(0,0,0,.06); }
 .home-panel { display: block; overflow: hidden; }
 .home-canvas { position: absolute; inset: 0; z-index: 1; }
 .home-loading { position: absolute; inset: 2px 12px 12px; display: flex; align-items: center; justify-content: center; gap: 10px; border-radius: 14px; border: 1px solid var(--glass-border); color: var(--text-dim); font-size: calc(13px * var(--fs-scale, 1)); }
+/* Beranda memenuhi seluruh layar project (seperti dunia di vvd): isi tab di belakang bar atas, bar atas tembus klik di
+   area kosongnya, sidebar tab (menempel / laci) melayang di atas kanvas, tombol preview pindah ke tepi kanan kanvas */
+#editorView[data-tab="home"] #editorBody { position: absolute; inset: 0; }
+#editorView[data-tab="home"] #projectTopbar { pointer-events: none; }
+#editorView[data-tab="home"] #projectTopbar > * { pointer-events: auto; }
+#editorView[data-tab="home"] .tab-sidebar { position: absolute; top: 52px; bottom: 0; left: 0; pointer-events: none; }
+#editorView[data-tab="home"] .tsb-panel { pointer-events: auto; }
+#editorView[data-tab="home"] .proj-float-tools { display: none; }   /* preview di tepi kanan kanvas, tema di menu "…" kanvas */
+#homeCanvas > .home-loading { inset: 0; border: none; border-radius: 0; }
+@media (max-width: 700px) { #editorView[data-tab="home"] .tab-sidebar { bottom: 58px; } }
 .home-loading .ti { animation: homeSpin 1s linear infinite; }
 @keyframes homeSpin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .home-loading .ti { animation: none; } }

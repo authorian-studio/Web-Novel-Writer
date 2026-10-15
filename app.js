@@ -632,7 +632,7 @@ function flushCurrentEdits() {
 // "quill" = panel Write dalam mode Quill (tab sendiri). switchTab(x) dari mana pun (Timeline "buka scene", alat Map di
 // Quill, Home, riwayat, ...) otomatis membuka tab x kalau sedang tertutup (disisipkan setelah tab aktif).
 const TAB_DEFS = [
-  { id: "home", panel: "home", name: "Beranda", icon: tiIcon("home"), desc: "Kanvas scene & papan ide — geser, susun, hubungkan" },
+  { id: "home", panel: "home", name: "Beranda", icon: tiIcon("home"), desc: "Jejak semua dokumenmu & papan ide — zoom, susun, hubungkan" },
   { id: "write", panel: "write", name: "Tulis", icon: tiIcon("pencil"), desc: "Editor scene: bab & adegan bertingkat" },
   { id: "quill", panel: "write", name: "Quill", icon: tiIcon("feather"), desc: "Tulis cerita bergaya buku, lalu terbitkan" },
   { id: "organize", panel: "organize", name: "Organize", icon: tiIcon("folders"), desc: "Karakter, lokasi & catatan dunia cerita" },
@@ -1177,6 +1177,7 @@ function consumeTabPendingDoc(tab) {
   const api = tab === "timeline" ? window.NovelTimeline : tab === "home" ? window.NovelHome : tab === "jejaring" ? window.NovelJejaring : window.NovelMap;
   if (!api || typeof api.open !== "function" || el("tab" + capitalize(tab)).classList.contains("hidden")) return;
   tabPendingDoc = null;
+  if (d.act === "new") { if (typeof api.create === "function") api.create(); return; }   // Beranda → "Buat jejaring baru"
   api.open(d.id);
 }
 // Quill: catat cerita yang dibuka (hook "screen") + jalankan navigasi dari riwayat langkah demi langkah
@@ -1192,8 +1193,20 @@ function stepQuillNav() {
   const nav = quillNav;
   if (!nav || projTabs.active !== "quill" || !quillScreen || !quillScreen.view) return;
   const v = quillScreen.view, host = el("quillRoot");
-  // sudah di cerita itu / form cerita baru (jangan buang isiannya) / terlalu banyak langkah -> selesai
-  if ((quillScreen.storyId === nav.id && v !== "create") || v === "create" || nav.steps++ > 6) { quillNav = null; return; }
+  // form cerita baru (jangan buang isiannya) / terlalu banyak langkah -> selesai
+  if (v === "create" || nav.steps++ > 6) { quillNav = null; return; }
+  if (quillScreen.storyId === nav.id) {   // sudah di cerita itu; chapter tertentu (titik jejak / kartu di Beranda) -> buka chapternya
+    if (nav.page && v === "editor" && !nav.pageDone) {   // Beranda -> cerita: kembali ke halaman ceritanya
+      const tb = host.querySelector('[data-act="tostory"]');
+      nav.pageDone = true;
+      if (tb) { setTimeout(() => { if (quillNav === nav && tb.isConnected) tb.click(); }, 0); return; }
+    }
+    const cb = nav.ch && !nav.chDone && (v === "story" || v === "editor") ? [...host.querySelectorAll('[data-act="opench"]')].find((b) => b.dataset.id === nav.ch) : null;
+    if (!cb) { quillNav = null; return; }
+    nav.chDone = true;
+    setTimeout(() => { if (quillNav === nav && cb.isConnected) cb.click(); if (v === "editor" && quillNav === nav) quillNav = null; }, 0);
+    return;
+  }
   const btn = v === "library" ? [...host.querySelectorAll('.qd-card[data-act="open"]')].find((b) => b.dataset.id === nav.id)
     : host.querySelector('.qd-back[data-act="back"], [data-act="tostory"]');
   if (!btn) { quillNav = null; return; }
@@ -1402,6 +1415,95 @@ function openSceneInWrite(id) {
   switchTab("write");   // tab Tulis = mode Scene
   selectScene(id);
 }
+// bab (folder) dari Beranda: tab Tulis, bab terbuka di daftar + scene pertamanya dibuka
+function openFolderInWrite(id) {
+  const p = getProject(currentProjectId), path = p && twPath(id, p.data.scenes);
+  if (!path) return;
+  path.forEach((n) => { if (n.type === "folder") expandedFolders.add(n.id); });
+  twClearSearch();
+  const first = findFirstScene(path[path.length - 1].children || []);
+  switchTab("write");
+  if (first) selectScene(first.id); else renderSceneList();
+  setTimeout(() => twFocusRow(id), 0);   // baris bab disorot
+}
+// BERANDA (titik jejak & kartu dokumen): buka dokumen apa pun tepat di tempatnya — tab dibuka otomatis bila tertutup,
+// lewat jalur yang sama dengan riwayat sidebar tab (openTabHist / consumeTabPendingDoc / navigasi Quill)
+function openProjectDoc(kind, id) {
+  const p = getProject(currentProjectId);
+  if (!p || !id) return;
+  if (kind === "scene") { openSceneInWrite(id); return; }
+  if (kind === "folder") { openFolderInWrite(id); return; }
+  if (kind === "characters" || kind === "locations" || kind === "notes") { openTabHist({ k: "organize:" + id, tab: "organize", doc: id, kind }); return; }
+  if (kind === "chapter") {
+    const s = ((p.data.quill && p.data.quill.stories) || []).find((x) => x && Array.isArray(x.chapters) && x.chapters.some((c) => c && c.id === id));
+    if (!s) return;
+    quillNav = { id: s.id, ch: id, steps: 0 };
+    switchTab("quill");
+    return;
+  }
+  if (kind === "story") {   // halaman cerita (daftar chapter), juga bila editor chapter cerita itu sedang terbuka
+    if (!tabDocInfo(p, { tab: "quill", doc: id })) return;
+    quillNav = { id, steps: 0, page: true };
+    switchTab("quill");
+    return;
+  }
+  const tab = { timeline: "timeline", map: "map", jejaring: "jejaring" }[kind];
+  if (tab) openTabHist({ k: tab + ":" + id, tab, doc: id, kind });
+}
+// BERANDA (alat Dokumen → "Buat baru"): dokumen baru dibuat dengan struktur data yang sama seperti di tabnya (scene di
+// akhir naskah, item Organize, timeline, peta lewat map-core.js, cerita Quill). Mengembalikan id dokumen baru, atau null
+// bila pembuatannya diteruskan ke tabnya (Jejaring Tokoh: wizard pilih templat).
+async function createProjectDoc(kind, title) {
+  const p = getProject(currentProjectId);
+  if (!p) return null;
+  const d = p.data, t = String(title || "").trim().slice(0, 120), stamp = Date.now();
+  const rid = () => stamp.toString(36) + Math.random().toString(36).slice(2, 7);
+  let id = null;
+  if (kind === "scene") {
+    syncSceneFromDetail();
+    const all = flattenScenes(d.scenes);
+    const node = { id: twNewId("scene"), type: "scene", title: t || twFreeTitle("Scene", all.length + 1, all), synopsis: "", status: "todo", content: "" };
+    d.scenes.push(node);
+    id = node.id;
+    renderSceneList();
+  } else if (kind === "characters" || kind === "locations" || kind === "notes") {
+    syncOrganizeFromDetail();
+    const arr = d.organize[kind] || (d.organize[kind] = []);
+    let nid = kind + "-" + stamp;
+    while (arr.some((x) => x && x.id === nid)) nid = kind + "-" + stamp + "-" + Math.random().toString(36).slice(2, 6);
+    arr.push({ id: nid, title: t || { characters: "Karakter baru", locations: "Lokasi baru", notes: "Catatan baru" }[kind], content: "" });
+    id = nid;
+    if (currentOrgCat === kind) renderOrganizeList();
+  } else if (kind === "timeline") {
+    if (!Array.isArray(d.timelines)) d.timelines = [];
+    const tl = { id: "tl-" + rid(), title: t || "Timeline Baru", start: 1500, end: 1900, events: [] };
+    d.timelines.push(tl);
+    id = tl.id;
+  } else if (kind === "map") {
+    await loadScriptOnce("map-core.js");
+    if (getProject(currentProjectId) !== p) return null;   // sudah pindah project
+    if (!Array.isArray(d.maps)) d.maps = [];
+    const names = new Set(d.maps.map((m) => m && m.title));
+    let name = t;
+    if (!name) { name = "Peta Baru"; for (let i = 2; names.has(name); i++) name = "Peta Baru " + i; }   // sama dengan tab Map
+    const m = window.NovelMapCore.createMap(name);
+    d.maps.push(window.NovelMapCore.serialize(m));
+    id = m.id;
+  } else if (kind === "story") {
+    if (!d.quill || typeof d.quill !== "object" || Array.isArray(d.quill)) d.quill = { mode: "scene", stories: [] };
+    if (!Array.isArray(d.quill.stories)) d.quill.stories = [];
+    const now = new Date().toISOString();
+    const s = { id: "story-" + rid(), title: t, author: quillUserName(), createdAt: now, updatedAt: now, chapters: [], panel: {} };   // sampul bawaan diisi quill.js
+    d.quill.stories.push(s);
+    id = s.id;
+  } else if (kind === "jejaring") {
+    tabPendingDoc = { tab: "jejaring", id: null, act: "new" };
+    switchTab("jejaring");
+    return null;
+  }
+  if (id) markDirtyAndSchedule();
+  return id;
+}
 
 // React Flow (Timeline) tetap mendengar Delete/Backspace di document walau tabnya tersembunyi, jadi event timeline
 // yang masih terpilih ikut terhapus saat tombol itu dipakai di tab lain (mis. menghapus objek di Map).
@@ -1543,6 +1645,8 @@ async function renderProjectHome() {
     onChange: markDirtyAndSchedule,
     getCurrentSceneId: () => currentSceneId,
     openScene: (id) => openSceneInWrite(id),
+    openDoc: (kind, id) => openProjectDoc(kind, id),          // titik jejak / kartu dokumen -> dokumennya
+    createDoc: (kind, title) => createProjectDoc(kind, title), // alat Dokumen -> "Buat baru"
     closeTab: () => closeProjectTab("home"),
     preview: () => el("btnPreview").click(),
     toggleTheme: () => el("btnProjectTheme").click(),
@@ -3195,6 +3299,8 @@ function markDirtyAndSchedule() {
   const elapsed = Date.now() - firstDirtyAt;
   const wait = elapsed >= AUTOSAVE_MAX_WAIT_MS ? 0 : AUTOSAVE_DEBOUNCE_MS;
   saveDebounceTimer = setTimeout(doAutosaveFlush, wait);
+  // Beranda: dokumen baru / terhapus dicatat ke jejak (dicek sebentar kemudian; ikut tersimpan di simpan berikutnya)
+  if (window.NovelHome && window.NovelHome.track) window.NovelHome.track(getProject(currentProjectId));
 }
 
 // ================= GOOGLE DRIVE (REST API) =================
@@ -4887,8 +4993,7 @@ window.addEventListener("DOMContentLoaded", () => {
   initAccount();   // rail Project/Akun, menu Pengaturan Akun & Bantuan, halaman akun + modalnya
   initDashBg();    // background dashboard pilihan sendiri (Pengaturan Akun → Tampilan), dibaca dari IndexedDB sedini mungkin
 
-  // ---- Ikon aksi di rail kiri dashboard ----
-  el("btnQuickTheme").addEventListener("click", () => document.body.classList.toggle("light"));
+  // ---- Ikon aksi di rail kiri dashboard (tombol tema dihapus: sudah ada di Pengaturan Akun → Tema tampilan) ----
   el("btnQuickCloud").addEventListener("click", openCloudLibrary);
   el("btnQuickLogout").addEventListener("click", () => { if (confirm("Logout dari Google?")) driveSignOut(); });
   el("btnSupport").addEventListener("click", () => el("supportModal").classList.remove("hidden"));

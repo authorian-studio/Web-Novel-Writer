@@ -2125,6 +2125,8 @@
     },
     // dari riwayat sidebar tab: buka jejaring tertentu
     open(id) { if (ctx && dom && data() && data().docs.some((d) => d.id === id) && (!doc || doc.id !== id)) switchDoc(id); },
+    // dari Beranda (alat Dokumen → "Buat jejaring baru"): buka wizard jejaring baru
+    create() { if (ctx && dom && !wiz) openWizard("new"); },
     flush() { if (root) flushEdit(isShown()); },
   };
 })();

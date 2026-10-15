@@ -1,6 +1,26 @@
-# Novelist Web — v0.11.0
+# Novelist Web — v0.11.1
 
-## Riwayat perubahan terbaru (v0.11.0) — paling baru di atas
+## Riwayat perubahan terbaru (v0.11.1) — paling baru di atas
+
+- **Beranda memenuhi seluruh layar** (seperti halaman dunia di vvd): kanvas tidak lagi di dalam panel berbingkai.
+  Topbar, sidebar tab & tombol-tombol melayang di atasnya; judul papan, zoom % & menu "…" jadi chip kecil di atas,
+  tombol zoom/pas/minimap/pratinjau & filter di tepi kanan. Tombol "perbesar" diganti **Sembunyikan antarmuka**.
+- **Roda mouse = zoom in/out** di titik kursor (halus; instan bila "kurangi gerakan" / mode hemat performa aktif).
+  Cubit trackpad & Ctrl/⌘+roda juga zoom; seret area kosong = geser; Shift+roda = geser ke samping, Alt+roda = geser
+  atas-bawah.
+- **Benang jejak otomatis:** setiap hal yang kamu buat — scene, bab, karakter/lokasi/catatan, timeline, peta, cerita &
+  chapter Quill, jejaring, papan kanvas — muncul sebagai titik bercahaya di Beranda, tersambung benang tipis sesuai
+  urutan dibuat (plus benang samar scene→bab & chapter→cerita). Hover = jenis, judul, kapan dibuat & cuplikan; **klik =
+  langsung membuka dokumen itu** di tab-nya. Titik bisa diseret (posisi disimpan), nama ikut berubah saat diganti, dan
+  hilang saat dokumennya dihapus. Project lama otomatis disusun dari waktu pembuatan. Tombol **filter** di kanan untuk
+  memilih jenis yang tampil & menyalakan/mematikan benang; garis urutan scene lama jadi opsi di menu "…".
+- **Alat baru "Dokumen"** (ke-4 di toolbar, pintasan D): ubin bergambar Kartu, Peta, Kanvas, Jejaring, Timeline,
+  Scene, Cerita → pilih dari daftar (bisa cari) atau "Buat baru" → taruh di kanvas sebagai **kartu pratinjau**
+  (cuplikan scene, potret tokoh, peta mini, strip timeline, avatar jejaring, sampul cerita). Klik dua kali / "Buka" untuk
+  membuka dokumennya; kartu bisa diubah ukuran, dipindah, dihubungkan.
+- Tombol **ganti tema** di rail dashboard dihapus (tema diatur di Pengaturan Akun → Tema tampilan).
+
+### v0.11.0
 
 - **Fitur baru: Jejaring Tokoh** (tab baru, tambahkan lewat tombol + → "Jejaring Tokoh") — pohon/jejaring hubungan
   antar-tokoh.
