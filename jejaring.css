@@ -1,0 +1,442 @@
+/* ================= JEJARING TOKOH: pohon relasi antar tokoh (jejaring.js, dimuat lazy) =================
+   Panel kaca seperti Beranda: kanvas React Flow + dot-grid, kepala panel (jejaring + menu), tombol zoom kanan bawah,
+   lembar + bilah alat di bawah, wizard "jejaring baru" di dalam panel. Gelap = bawaan, body.light = terang. */
+.jj-panel {
+  --jj-bg: rgba(10,11,15,.34);
+  --jj-border: rgba(255,255,255,.085);
+  --jj-glass: rgba(18,19,24,.74);
+  --jj-glass-b: rgba(255,255,255,.09);
+  --jj-pop: rgba(22,23,28,.96);
+  --jj-dlg: rgba(21,20,26,.95);
+  --jj-hover: rgba(255,255,255,.08);
+  --jj-on: rgba(255,255,255,.14);
+  --jj-dot: rgba(220,224,232,.17);
+  --jj-edge: #8e8b97;
+  --jj-card: rgba(16,16,21,.88);
+  --jj-card-b: rgba(255,255,255,.3);
+  --jj-pill: rgba(30,30,37,.97);
+  --jj-pv-bg: rgba(255,255,255,.035);
+  --jj-shadow: 0 18px 44px rgba(0,0,0,.42);
+  --jj-tint: rgba(215,168,110,.08);
+  position: absolute; inset: 2px 12px 12px 12px; overflow: hidden; border-radius: 14px;
+  background: var(--jj-bg); border: 1px solid var(--jj-border);
+  box-shadow: 0 18px 50px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.035);
+  color: var(--text); isolation: isolate; -webkit-user-select: none; user-select: none;
+  transition: inset .3s cubic-bezier(.32,.72,0,1), border-radius .3s ease;
+}
+body.light .jj-panel {
+  --jj-bg: rgba(255,255,255,.42);
+  --jj-border: rgba(0,0,0,.08);
+  --jj-glass: rgba(255,255,255,.86);
+  --jj-glass-b: rgba(0,0,0,.08);
+  --jj-pop: rgba(255,255,255,.98);
+  --jj-dlg: rgba(255,255,255,.97);
+  --jj-hover: rgba(0,0,0,.05);
+  --jj-on: rgba(0,0,0,.08);
+  --jj-dot: rgba(0,0,0,.2);
+  --jj-edge: #8a8476;
+  --jj-card: rgba(255,255,255,.82);
+  --jj-card-b: rgba(0,0,0,.26);
+  --jj-pill: rgba(255,255,255,.98);
+  --jj-pv-bg: rgba(0,0,0,.025);
+  --jj-shadow: 0 16px 38px rgba(0,0,0,.12);
+  box-shadow: 0 14px 40px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.6);
+}
+#editorView.tsb-docked .jj-panel { left: 4px; }   /* sidebar tab menempel */
+.jj-panel.is-max { inset: 0; border-radius: 0; border-color: transparent; box-shadow: none; }
+.jj-panel button { font-family: inherit; }
+.jj-panel input, .jj-panel textarea { -webkit-user-select: text; user-select: text; }
+.jj-panel button:focus-visible, .jj-panel input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* tombol mengambang project (preview & tema) di tepi kanan, di bawah kepala; status simpan di pojok kanan bawah */
+#editorView[data-tab="jejaring"] .proj-float-tools { top: 104px; right: 22px; gap: 2px; padding: 4px; border-radius: 12px; }
+#editorView[data-tab="jejaring"] .proj-float-btn { width: 30px; height: 30px; border-radius: 8px; }
+#editorView[data-tab="jejaring"] .proj-float-sep { width: 16px; }
+#editorView[data-tab="jejaring"].jj-maxed .proj-float-tools { display: none; }
+@media (min-width: 701px) { #editorView[data-tab="jejaring"] .save-status { right: 28px; bottom: 22px; } }
+
+/* ---- kanvas ---- */
+.jj-flow { position: absolute; inset: 0; z-index: 1; }
+.jj-flow > .react-flow, .jj-pv > .react-flow { position: absolute; inset: 0; width: auto; height: auto; background: transparent; }
+.jj-bg circle { fill: var(--jj-dot); }
+.jj-rf .react-flow__pane { cursor: default; }
+.jj-rf .react-flow__pane.dragging { cursor: grabbing; }
+.jj-rf.is-hand .react-flow__pane, .jj-rf.is-hand .react-flow__node, .jj-rf.is-hand .jj-name, .jj-rf.is-hand .jj-photo-add { cursor: grab; }
+.jj-rf.is-hand .react-flow__pane.dragging { cursor: grabbing; }
+.jj-rf .react-flow__node { font-family: inherit; }
+.jj-rf .react-flow__attribution { background: transparent; color: var(--text-dim); opacity: .45; font-size: calc(10px * var(--fs-scale, 1)); margin: 0 0 6px 8px; }
+.jj-rf .react-flow__attribution a { color: inherit; }
+.jj-rf .react-flow__selection { background: var(--jj-tint); border: 1px dashed rgba(215,168,110,.65); border-radius: 4px; }
+.jj-rf:not(.is-select) .react-flow__nodesselection { display: none; }
+.jj-rf .react-flow__nodesselection-rect { background: rgba(215,168,110,.04); border: 1px dashed rgba(215,168,110,.45); border-radius: 4px; }
+.jj-rf .react-flow__connection-path { stroke: var(--accent); }
+.jj-pv-rf .react-flow__pane { cursor: grab; }
+.jj-pv-rf .react-flow__node { cursor: default; }
+
+/* ---- kepala panel ---- */
+.jj-head { position: absolute; z-index: 16; top: 0; left: 0; right: 0; height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 8px 0 10px; pointer-events: none; }
+.jj-doc, .jj-head-right { display: flex; align-items: center; min-width: 0; pointer-events: auto; }
+.jj-doc { gap: 8px; }
+.jj-doc-btn, .jj-doc-input {
+  height: 30px; border-radius: 9px; border: 1px solid var(--jj-glass-b); background: var(--jj-glass); color: var(--text);
+  font-size: calc(13px * var(--fs-scale, 1)); font-weight: 700; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.jj-doc-btn { display: inline-flex; align-items: center; gap: 7px; max-width: min(340px, 46vw); padding: 0 8px 0 9px; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+.jj-doc-btn > .ti:last-child { color: var(--text-dim); transition: transform .2s ease; }
+.jj-doc-btn[aria-expanded="true"] > .ti:last-child { transform: rotate(180deg); }
+.jj-doc-btn:hover, .jj-doc-btn[aria-expanded="true"] { border-color: rgba(255,255,255,.2); }
+body.light .jj-doc-btn:hover, body.light .jj-doc-btn[aria-expanded="true"] { border-color: rgba(0,0,0,.18); }
+.jj-doc-btn.is-static { cursor: default; }
+.jj-doc-btn.is-static > .ti:last-child { display: none; }
+.jj-doc-btn.is-static:hover { border-color: var(--jj-glass-b); }
+.jj-doc-ic { display: flex; color: var(--accent); }
+.jj-doc-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jj-doc-input { width: 230px; max-width: 46vw; padding: 0 10px; outline: 2px solid var(--accent); outline-offset: -1px; }
+.jj-doc-sub { pointer-events: none; font-size: calc(11.5px * var(--fs-scale, 1)); color: var(--text-dim); white-space: nowrap; text-shadow: 0 1px 6px rgba(0,0,0,.5); }
+body.light .jj-doc-sub { text-shadow: none; }
+.jj-head-right { gap: 3px; }
+.jj-ibtn { width: 30px; height: 30px; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.jj-ibtn:hover, .jj-ibtn[aria-expanded="true"] { background: var(--jj-hover); color: var(--text); }
+.jj-ibtn-sm { width: 26px; height: 26px; flex-shrink: 0; border-radius: 7px; }
+.jj-ibtn-sm[aria-pressed="true"] { color: var(--accent); }
+.jj-max-btn .ti + .ti, .jj-max-btn[aria-pressed="true"] .ti:first-child { display: none; }
+.jj-max-btn[aria-pressed="true"] .ti + .ti { display: block; }
+
+/* ---- tombol zoom (kanan bawah, seperti referensi) ---- */
+.jj-side { position: absolute; z-index: 6; right: 10px; bottom: 44px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px; border-radius: 12px; background: var(--jj-glass); border: 1px solid var(--jj-glass-b); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.jj-sbtn { width: 30px; height: 30px; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.jj-sbtn:hover { background: var(--jj-hover); color: var(--text); }
+.jj-panel.is-wiz .jj-side, .jj-panel.is-nodoc .jj-side, .jj-panel.is-wiz .jj-bottom, .jj-panel.is-nodoc .jj-bottom,
+.jj-panel.is-wiz .jj-hint, .jj-panel.is-wiz .jj-empty { display: none; }
+
+/* ---- bawah: lembar + bilah alat ---- */
+.jj-bottom { position: absolute; z-index: 6; left: 10px; right: 10px; bottom: 12px; display: flex; flex-direction: column; align-items: center; gap: 7px; pointer-events: none; }
+.jj-sheets { pointer-events: auto; display: flex; align-items: center; gap: 3px; max-width: 100%; padding: 2px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+.jj-sheets::-webkit-scrollbar { display: none; }
+.jj-sheet { flex-shrink: 0; height: 26px; max-width: 170px; padding: 0 12px; border: 1px solid transparent; border-radius: 13px; background: none; color: var(--text-dim); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.jj-sheet:hover { background: var(--jj-hover); color: var(--text); }
+.jj-sheet.is-on { background: var(--jj-glass); border-color: var(--jj-glass-b); color: var(--text); box-shadow: 0 4px 14px rgba(0,0,0,.22); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.jj-sheet.is-on[aria-expanded="true"] { border-color: var(--accent); }
+.jj-sheet-add { flex-shrink: 0; width: 26px; height: 26px; padding: 0; border: none; border-radius: 50%; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.jj-sheet-add:hover { background: var(--jj-hover); color: var(--text); }
+.jj-sheet-input { flex-shrink: 0; width: 130px; height: 26px; padding: 0 10px; border: 1px solid var(--accent); border-radius: 13px; outline: none; background: var(--jj-pop); color: var(--text); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 650; }
+.jj-tools-wrap { display: flex; justify-content: center; max-width: 100%; pointer-events: none; }
+.jj-tools {
+  pointer-events: auto; display: flex; align-items: center; gap: 2px; max-width: 100%; padding: 5px; border-radius: 16px;
+  background: var(--jj-glass); border: 1px solid var(--jj-glass-b); box-shadow: var(--jj-shadow);
+  backdrop-filter: blur(16px) saturate(1.2); -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+}
+.jj-tools::-webkit-scrollbar { display: none; }
+.jj-tool { position: relative; flex-shrink: 0; width: 40px; height: 38px; padding: 0; border: none; border-radius: 11px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.jj-tool:hover, .jj-tool[aria-expanded="true"] { background: var(--jj-hover); color: var(--text); }
+.jj-tool[aria-pressed="true"] { background: var(--jj-on); color: var(--text); box-shadow: inset 0 0 0 1px var(--jj-glass-b); }
+.jj-tool.is-on { color: var(--accent); }
+.jj-tsep { flex-shrink: 0; width: 1px; height: 22px; margin: 0 4px; background: var(--jj-glass-b); }
+
+/* ---- petunjuk alat, kosong, toast ---- */
+.jj-hint { position: absolute; z-index: 6; top: 52px; left: 50%; max-width: calc(100% - 150px); padding: 6px 12px; border-radius: 10px; background: var(--jj-glass); border: 1px solid var(--jj-glass-b); color: var(--text); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; opacity: 0; transform: translate(-50%, -4px); transition: opacity .15s ease, transform .15s ease; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.jj-hint.is-on { opacity: 1; transform: translate(-50%, 0); }
+.jj-empty { position: absolute; z-index: 5; left: 50%; top: 50%; width: min(340px, calc(100% - 40px)); transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; color: var(--text-dim); font-size: calc(12.5px * var(--fs-scale, 1)); line-height: 1.45; pointer-events: none; }
+.jj-empty p { margin: 4px 0 0; color: var(--text); font-size: calc(14px * var(--fs-scale, 1)); font-weight: 700; }
+.jj-empty .jj-btn-primary { margin-top: 8px; pointer-events: auto; }
+.jj-empty-ic { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 13px; background: var(--jj-hover); border: 1px solid var(--jj-glass-b); }
+.jj-toast { position: absolute; z-index: 30; left: 50%; bottom: 112px; max-width: calc(100% - 40px); padding: 8px 14px; border-radius: 10px; background: var(--bg-panel); border: 1px solid var(--border); color: var(--text); font-size: calc(12.5px * var(--fs-scale, 1)); box-shadow: 0 10px 26px rgba(0,0,0,.3); pointer-events: none; opacity: 0; transform: translate(-50%, 6px); transition: opacity .18s ease, transform .18s ease; }
+.jj-toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+.jj-panel.is-drop::after { content: ""; position: absolute; z-index: 8; inset: 8px; border: 2px dashed var(--accent); border-radius: 12px; background: var(--jj-tint); pointer-events: none; }
+
+/* ---- tombol ---- */
+.jj-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px; padding: 0 20px; border: none; border-radius: 11px; background: var(--accent); color: #1c140a; font-size: calc(13.5px * var(--fs-scale, 1)); font-weight: 700; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.22); transition: filter .15s ease, transform .15s ease; }
+.jj-btn-primary:hover { filter: brightness(1.08); }
+.jj-btn-primary:active { transform: translateY(1px); }
+body.light .jj-btn-primary { color: #fff; }
+.jj-btn-sm { flex-shrink: 0; height: 30px; padding: 0 12px; border: none; border-radius: 8px; background: var(--accent); color: #1c140a; font-size: calc(12.5px * var(--fs-scale, 1)); font-weight: 700; cursor: pointer; }
+body.light .jj-btn-sm { color: #fff; }
+.jj-btn-primary.jj-btn-sm { height: 32px; padding: 0 14px; border-radius: 9px; }
+.jj-link-btn { margin-left: auto; padding: 2px 6px; border: none; border-radius: 6px; background: none; color: var(--accent); font-size: calc(11.5px * var(--fs-scale, 1)); font-weight: 650; letter-spacing: 0; text-transform: none; cursor: pointer; }
+.jj-link-btn:hover { background: var(--jj-hover); }
+
+/* ---- menu / popover ---- */
+.jj-pop {
+  position: absolute; z-index: 25; min-width: 236px; max-width: min(330px, calc(100% - 16px)); padding: 6px; border-radius: 13px;
+  background: var(--jj-pop); border: 1px solid var(--jj-glass-b); box-shadow: var(--jj-shadow); color: var(--text);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); animation: jjPop .14s cubic-bezier(.2,.9,.3,1.1);
+}
+@keyframes jjPop { from { opacity: 0; transform: translateY(-3px) scale(.98); } to { opacity: 1; transform: none; } }
+.jj-pop.is-rel { width: 272px; }
+.jj-pop.is-wicon, .jj-pop.is-wcolor, .jj-pop.is-emoji { min-width: 0; padding: 10px; }
+.jj-pop.is-labels, .jj-pop.is-tagsel { width: 292px; }
+.jj-pop.is-help { width: 360px; }
+.jj-mi { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 32px; padding: 5px 9px 5px 8px; border: none; border-radius: 8px; background: none; color: var(--text); font-size: calc(13px * var(--fs-scale, 1)); text-align: left; cursor: pointer; }
+.jj-mi:hover, .jj-mi:focus-visible { background: var(--jj-hover); outline: none; }
+.jj-mi[disabled] { opacity: .4; cursor: default; background: none; }
+.jj-mi.is-danger, .jj-mi.is-danger .jj-mi-ic { color: var(--danger); }
+.jj-mi-ic { width: 18px; flex-shrink: 0; display: flex; justify-content: center; color: var(--text-dim); }
+.jj-mi-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3; }
+.jj-mi-label small { display: block; overflow: hidden; text-overflow: ellipsis; font-size: calc(11px * var(--fs-scale, 1)); color: var(--text-dim); }
+.jj-mi kbd, .jj-help kbd { flex-shrink: 0; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--jj-glass-b); background: var(--jj-hover); color: var(--text-dim); font: inherit; font-size: calc(10.5px * var(--fs-scale, 1)); white-space: nowrap; }
+.jj-mi-check { display: flex; flex-shrink: 0; color: var(--accent); }
+.jj-mi-mixed { flex-shrink: 0; width: 14px; text-align: center; color: var(--text-dim); font-weight: 700; }
+.jj-mi-sep { height: 1px; margin: 5px 6px; background: var(--jj-glass-b); }
+.jj-mi-head { padding: 6px 9px 4px; font-size: calc(10.5px * var(--fs-scale, 1)); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jj-mi-scroll { max-height: 250px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.jj-mi-empty { margin: 4px 9px 8px; font-size: calc(12.5px * var(--fs-scale, 1)); line-height: 1.45; color: var(--text-dim); }
+.jj-pick-head { margin: 0 2px 8px; font-size: calc(10.5px * var(--fs-scale, 1)); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.jj-pick-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 228px; }
+.jj-icon-grid { display: grid; grid-template-columns: repeat(6, 36px); gap: 4px; }
+.jj-pick { width: 36px; height: 36px; padding: 0; border: 1px solid transparent; border-radius: 9px; background: var(--jj-hover); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+.jj-pick:hover { background: var(--jj-on); }
+.jj-pick.is-on { border-color: var(--accent); background: rgba(215,168,110,.16); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.jj-emoji-grid { display: grid; grid-template-columns: repeat(5, 38px); gap: 4px; margin-bottom: 4px; }
+.jj-emoji { width: 38px; height: 38px; padding: 0; border: 1px solid transparent; border-radius: 9px; background: var(--jj-hover); font-size: calc(19px * var(--fs-scale, 1)); line-height: 1; cursor: pointer; transition: background .15s ease, transform .12s ease; }
+.jj-emoji:hover { background: var(--jj-on); transform: scale(1.06); }
+.jj-emoji.is-on { border-color: var(--accent); }
+.jj-sw { flex-shrink: 0; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 2px solid transparent; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); cursor: pointer; transition: transform .12s ease; }
+.jj-sw:hover { transform: scale(1.12); }
+.jj-sw.is-on, .jj-sw[aria-pressed="true"] { border-color: var(--text); }
+.jj-sw.is-note { border-radius: 6px; }
+.jj-sw.is-none { background: linear-gradient(135deg, transparent 45%, var(--text-dim) 45%, var(--text-dim) 55%, transparent 55%), var(--jj-hover); box-shadow: inset 0 0 0 1px var(--jj-glass-b); }
+.jj-dot { display: inline-block; flex-shrink: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.jj-help-head { display: flex; align-items: center; gap: 8px; padding: 4px 6px 10px; font-size: calc(13px * var(--fs-scale, 1)); }
+.jj-help dl { display: grid; grid-template-columns: auto 1fr; gap: 7px 12px; margin: 0; padding: 0 6px 6px; font-size: calc(12.5px * var(--fs-scale, 1)); align-items: center; }
+.jj-help dt { white-space: nowrap; }
+.jj-help dd { margin: 0; color: var(--text-dim); }
+
+/* popover relasi ("RELASI": kisi jenis + Buat kustom + Tautkan + Lewati) */
+.jj-pop-head { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; font-size: calc(13px * var(--fs-scale, 1)); font-weight: 700; }
+.jj-pop-head.is-cap { min-height: 0; padding: 6px 8px 6px; font-size: calc(10.5px * var(--fs-scale, 1)); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.jj-pop-back { width: 26px; height: 26px; flex-shrink: 0; padding: 0; border: none; border-radius: 7px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.jj-pop-back:hover { background: var(--jj-hover); color: var(--text); }
+.jj-pop-sub { margin: -2px 8px 8px; font-size: calc(12px * var(--fs-scale, 1)); line-height: 1.4; color: var(--text-dim); }
+.jj-pop-sub b { color: var(--text); }
+.jj-pop-note { margin: 2px 8px 4px; font-size: calc(11.5px * var(--fs-scale, 1)); line-height: 1.4; color: var(--text-dim); }
+.jj-relgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding-bottom: 4px; }
+.jj-rel { display: flex; align-items: center; gap: 8px; min-width: 0; height: 32px; padding: 0 8px; border: none; border-radius: 8px; background: none; color: var(--text); font-size: calc(13px * var(--fs-scale, 1)); text-align: left; cursor: pointer; transition: background .12s ease; }
+.jj-rel .ti { flex-shrink: 0; color: var(--c, var(--text-dim)); }
+.jj-rel span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jj-rel:hover, .jj-rel:focus-visible { background: var(--jj-hover); outline: none; }
+.jj-rel.is-on { background: rgba(215,168,110,.16); background: color-mix(in srgb, var(--accent) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.jj-relchip { display: flex; align-items: center; gap: 6px; margin: 0 6px 8px; padding: 4px 4px 4px 8px; border-radius: 8px; background: rgba(215,168,110,.14); background: color-mix(in srgb, var(--accent) 16%, transparent); font-size: calc(12.5px * var(--fs-scale, 1)); font-weight: 650; }
+.jj-relchip .ti { flex-shrink: 0; color: var(--accent); }
+.jj-relchip span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jj-relchip button { width: 22px; height: 22px; flex-shrink: 0; padding: 0; border: none; border-radius: 6px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.jj-relchip button:hover { background: var(--jj-hover); color: var(--text); }
+.jj-custom, .jj-newtag { display: flex; align-items: center; gap: 6px; padding: 2px 4px 4px; }
+.jj-custom-in, .jj-newtag input { flex: 1; min-width: 0; height: 30px; padding: 0 9px; border: 1px solid var(--jj-glass-b); border-radius: 8px; outline: none; background: var(--jj-hover); color: var(--text); font-size: calc(13px * var(--fs-scale, 1)); }
+.jj-custom-in:focus, .jj-newtag input:focus { border-color: var(--accent); }
+.jj-newtag { margin-top: 6px; padding: 8px 4px 2px 8px; border-top: 1px solid var(--jj-glass-b); }
+.jj-search { display: flex; align-items: center; gap: 7px; margin: 0 4px 6px; height: 32px; padding: 0 9px; border: 1px solid var(--jj-glass-b); border-radius: 8px; background: var(--jj-hover); color: var(--text-dim); }
+.jj-search:focus-within { border-color: var(--accent); }
+.jj-search input { flex: 1; min-width: 0; height: 100%; padding: 0; border: none; outline: none; background: none; color: var(--text); font-size: calc(13px * var(--fs-scale, 1)); }
+.jj-search input::-webkit-search-cancel-button { display: none; }
+/* label: pengelola & pilih */
+.jj-tagrow { display: flex; align-items: center; gap: 5px; padding: 2px 2px 2px 6px; }
+.jj-tagrow .jj-sw { width: 18px; height: 18px; }
+.jj-tagname { flex: 1; min-width: 0; height: 28px; padding: 0 7px; border: 1px solid transparent; border-radius: 7px; outline: none; background: none; color: var(--text); font-size: calc(13px * var(--fs-scale, 1)); }
+.jj-tagname:hover { border-color: var(--jj-glass-b); }
+.jj-tagname:focus { border-color: var(--accent); background: var(--jj-hover); }
+.jj-tagcount { min-width: 18px; text-align: center; font-size: calc(11px * var(--fs-scale, 1)); font-variant-numeric: tabular-nums; color: var(--text-dim); }
+
+/* ---- bilah aksi kartu terpilih (NodeToolbar): Buat kartu · Tautkan kartu · foto · lencana · label · hapus ---- */
+.jj-selbar { display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 12px; background: var(--jj-pop); border: 1px solid var(--jj-glass-b); box-shadow: var(--jj-shadow); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.jj-sb-btn { height: 28px; min-width: 28px; padding: 0 6px; border: none; border-radius: 7px; background: none; color: var(--text-dim); display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; font-size: calc(12px * var(--fs-scale, 1)); font-weight: 650; white-space: nowrap; transition: background .15s ease, color .15s ease; }
+.jj-sb-btn:hover, .jj-sb-btn[aria-expanded="true"] { background: var(--jj-hover); color: var(--text); }
+.jj-sb-btn[aria-pressed="true"] { background: var(--jj-on); color: var(--text); }
+.jj-sb-btn.is-wide { padding: 0 9px; color: var(--text); }
+.jj-sb-btn.is-danger { color: var(--danger); }
+.jj-sb-btn.is-danger:hover { background: rgba(225,92,92,.14); }
+.jj-sb-size { min-width: 30px; font-weight: 750; }
+.jj-sb-sep { width: 1px; height: 18px; margin: 0 3px; background: var(--jj-glass-b); }
+.jj-selbar .jj-sw { width: 18px; height: 18px; margin: 0 1px; }
+
+/* ---- kartu tokoh (foto 96x120 + pil nama menjorok ke bawah) ---- */
+.jj-card { position: relative; width: 100%; height: 100%; color: var(--text); }
+.jj-photo { position: relative; width: 96px; height: 120px; border-radius: 11px; background: var(--jj-card); border: 1.5px dashed var(--jj-card-b); box-shadow: 0 10px 26px rgba(0,0,0,.28); transition: border-color .15s ease, box-shadow .15s ease; }
+body.light .jj-photo { box-shadow: 0 8px 20px rgba(0,0,0,.1); }
+.jj-card.has-photo .jj-photo { border-style: solid; border-color: rgba(255,255,255,.16); background: #000; }
+body.light .jj-card.has-photo .jj-photo { border-color: rgba(0,0,0,.12); }
+.jj-card.is-linked.is-empty .jj-photo { border-style: solid; }
+.jj-photo img { display: block; width: 100%; height: 100%; border-radius: 10px; object-fit: cover; pointer-events: none; -webkit-user-drag: none; }
+.jj-photo-add { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0 0 8px; border: none; border-radius: 10px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: inherit; }
+.jj-card.is-sel .jj-photo-add { cursor: pointer; }
+.jj-card.is-sel .jj-photo-add:hover { color: var(--text); background: var(--jj-hover); }
+.jj-card.is-sel .jj-photo { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 12px 30px rgba(0,0,0,.32); }
+.jj-card.is-dim, .jj-rf .react-flow__node.is-dim { opacity: .28; }
+.jj-rf.is-focus .react-flow__edge { opacity: .45; }
+.jj-name { position: absolute; z-index: 2; left: 50%; top: 107px; transform: translateX(-50%); display: block; max-width: 118px; height: 22px; padding: 0 10px; border: 1px solid var(--jj-glass-b); border-radius: 11px; background: var(--jj-pill); color: var(--text); font-size: calc(11px * var(--fs-scale, 1)); font-weight: 650; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: inherit; box-shadow: 0 3px 10px rgba(0,0,0,.25); }
+body.light .jj-name { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.jj-name.is-ph { color: var(--text-dim); font-style: italic; font-weight: 500; }
+.jj-card.is-sel .jj-name { cursor: text; border-color: rgba(215,168,110,.5); }
+.jj-name-edit { position: absolute; z-index: 3; left: 50%; top: 106px; transform: translateX(-50%); width: 132px; height: 24px; padding: 0 8px; border: 1px solid var(--accent); border-radius: 12px; outline: none; background: var(--jj-pop); color: var(--text); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 650; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+.jj-tags { position: absolute; left: 5px; right: 5px; top: 5px; display: flex; flex-wrap: wrap; gap: 3px; pointer-events: none; }
+.jj-tag { max-width: 100%; padding: 1px 6px; border-radius: 6px; background: var(--c); color: #16130e; font-size: calc(9.5px * var(--fs-scale, 1)); font-weight: 750; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+.jj-tag.is-more { background: rgba(0,0,0,.55); color: #fff; }
+.jj-badge { position: absolute; right: -9px; top: -9px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--jj-pill); border: 1px solid var(--jj-glass-b); font-size: calc(14px * var(--fs-scale, 1)); line-height: 1; box-shadow: 0 3px 10px rgba(0,0,0,.3); pointer-events: none; }
+.jj-linked { position: absolute; right: 5px; bottom: 16px; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: rgba(0,0,0,.55); color: #f3d7b0; pointer-events: none; }
+.jj-card.is-empty .jj-linked { background: rgba(215,168,110,.2); color: var(--accent); }
+/* pratinjau wizard: kartu inisial berwarna */
+.jj-card.is-pv .jj-photo, .jj-pv-photo { border-style: solid; }
+.jj-pv-photo { display: flex; align-items: center; justify-content: center; padding-bottom: 10px; background: linear-gradient(160deg, var(--h1), var(--h2)) !important; border-color: rgba(255,255,255,.14) !important; color: rgba(255,255,255,.92); font-size: 28px; font-weight: 750; letter-spacing: .02em; }
+.jj-card.is-pv .jj-name { font-size: 11px; }
+
+/* pegangan: target tak terlihat menutupi kartu (aktif saat menghubungkan) + empat tombol "+" */
+.jj-rf .react-flow__handle.jj-hit { top: 0; left: 0; right: 0; bottom: 0; width: auto; height: auto; min-width: 0; min-height: 0; transform: none; border: none; border-radius: 11px; background: transparent; opacity: 0; z-index: 0; }
+.jj-rf.is-connecting .react-flow__handle.jj-hit { z-index: 5; opacity: 1; }
+.jj-rf .react-flow__handle.jj-hit.connectingto { box-shadow: 0 0 0 2px var(--accent), 0 0 18px rgba(215,168,110,.45); }
+.jj-rf .react-flow__handle.jj-plus {
+  width: 20px; height: 20px; min-width: 0; min-height: 0; padding: 0; z-index: 4; border-radius: 50%;
+  border: 1px solid var(--jj-glass-b); background: var(--jj-pop); color: var(--text-dim);
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px rgba(0,0,0,.3);
+  opacity: 0; visibility: hidden; pointer-events: none; cursor: pointer; transition: opacity .12s ease, background .12s ease, color .12s ease;
+}
+.jj-rf .react-flow__handle.jj-plus .ti { pointer-events: none; }
+.jj-rf .react-flow__handle.jj-plus.is-on { opacity: 1; visibility: visible; pointer-events: all; }
+.jj-rf .react-flow__handle.jj-plus.is-on:hover { background: var(--accent); border-color: var(--accent); color: #1c140a; }
+.jj-rf .react-flow__handle.jj-plus.is-t { top: -30px; left: 50%; transform: translateX(-50%); }
+.jj-rf .react-flow__handle.jj-plus.is-b { top: auto; bottom: -30px; left: 50%; transform: translateX(-50%); }
+.jj-rf .react-flow__handle.jj-plus.is-l { top: 60px; left: -32px; transform: translateY(-50%); }
+.jj-rf .react-flow__handle.jj-plus.is-r { top: 60px; right: -32px; left: auto; transform: translateY(-50%); }
+
+/* ---- garis relasi (siku) + label ---- */
+.jj-rf .react-flow__edge-rel .react-flow__edge-path { stroke: var(--jj-edge); stroke-width: 1.5; }
+.jj-rf .react-flow__edge-rel:hover .react-flow__edge-path { stroke-width: 2.2; }
+.jj-rf .react-flow__edge-rel.selected .react-flow__edge-path { stroke: var(--accent) !important; stroke-width: 2.2; }
+.jj-elabel { position: absolute; display: inline-flex; align-items: center; gap: 4px; height: 20px; max-width: 150px; padding: 0 7px 0 5px; border: 1px solid var(--jj-glass-b); border-radius: 6px; background: var(--jj-pill); color: var(--text); font-family: inherit; font-size: calc(10.5px * var(--fs-scale, 1)); font-weight: 650; white-space: nowrap; pointer-events: all; cursor: pointer; box-shadow: 0 3px 9px rgba(0,0,0,.22); }
+.jj-elabel span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.jj-elabel .ti { flex-shrink: 0; color: var(--c, var(--text-dim)); }
+.jj-elabel.has-c { border-color: rgba(255,255,255,.2); border-color: color-mix(in srgb, var(--c) 50%, transparent); }
+.jj-elabel:hover { border-color: var(--text-dim); }
+.jj-elabel.is-sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 3px 9px rgba(0,0,0,.22); }
+.jj-elabel.is-pv { height: 18px; padding: 0 6px 0 4px; font-size: 9.5px; pointer-events: none; cursor: default; }
+.jj-rf.is-hand .jj-elabel { cursor: grab; }
+
+/* ---- catatan tempel & teks ---- */
+.jj-note { width: 100%; height: 100%; padding: 14px; border-radius: 4px; background: var(--c); color: #2b2618; font-size: calc(14px * var(--fs-scale, 1)); line-height: 1.45; box-shadow: 0 10px 26px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.4); }
+body.light .jj-note { box-shadow: 0 8px 22px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.5); }
+.jj-note-text { height: 100%; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
+.jj-note .jj-ph { color: rgba(43,38,24,.45); }
+.jj-note-edit { display: block; width: 100%; height: 100%; padding: 0; border: none; outline: none; resize: none; background: transparent; color: inherit; font: inherit; line-height: inherit; }
+.jj-rf .react-flow__node-text { height: auto !important; }
+.jj-textn { width: 100%; min-height: 1.3em; padding: 2px 4px; border-radius: 4px; color: var(--text); font-size: calc(var(--fz, 24) * 1px * var(--fs-scale, 1)); font-weight: 650; line-height: 1.25; white-space: pre-wrap; overflow-wrap: anywhere; }
+.jj-textn.is-sel { outline: 1.5px solid var(--accent); outline-offset: 3px; }
+.jj-textn .jj-ph { color: var(--text-dim); font-weight: 500; }
+.jj-textn-edit { display: block; width: 100%; min-height: 1.25em; padding: 0; border: none; outline: none; resize: none; overflow: hidden; background: transparent; color: inherit; font: inherit; line-height: inherit; }
+.jj-rf .react-flow__resize-control.line.jj-rz-line, .jj-rf .react-flow__resize-control.line.jj-rz-w { border-color: var(--accent); }
+.jj-rf .react-flow__resize-control.handle.jj-rz-handle { width: 9px; height: 9px; border-radius: 2px; background: #fff; border: 1.5px solid var(--accent); }
+.jj-rf .react-flow__resize-control.line.jj-rz-w { width: 9px; border-left-width: 0; background: transparent; }
+.jj-rf .react-flow__resize-control.line.jj-rz-w::after { content: ""; position: absolute; top: 2px; bottom: 2px; left: 3px; width: 3px; border-radius: 2px; background: var(--accent); }
+
+/* kartu hover: ringkasan kartu Organize */
+.jj-tip { pointer-events: none !important; }
+.jj-tip-card { width: 240px; padding: 10px 12px 9px; border-radius: 12px; background: var(--jj-pop); border: 1px solid var(--jj-glass-b); box-shadow: var(--jj-shadow); color: var(--text); text-align: left; animation: jjPop .14s ease-out; }
+.jj-tip-top { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; font-size: calc(11px * var(--fs-scale, 1)); color: var(--text-dim); }
+.jj-tip-title { margin-bottom: 4px; font-size: calc(13.5px * var(--fs-scale, 1)); font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.jj-tip-snip { margin: 0; font-size: calc(12px * var(--fs-scale, 1)); line-height: 1.45; color: var(--text-dim); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.jj-tip-snip.is-empty { font-style: italic; }
+
+/* ---- peta mini ---- */
+.jj-rf .react-flow__minimap.jj-minimap { margin: 0 58px 14px 0; overflow: hidden; border-radius: 10px; border: 1px solid var(--jj-glass-b); background: var(--jj-pop) !important; box-shadow: var(--jj-shadow); }
+.jj-minimap .react-flow__minimap-mask { fill: rgba(0,0,0,.42); }
+body.light .jj-minimap .react-flow__minimap-mask { fill: rgba(0,0,0,.08); }
+
+/* ---- alat taruh ---- */
+.jj-place { position: absolute; inset: 0; z-index: 5; cursor: crosshair; touch-action: none; }
+.jj-ghost { position: absolute; border: 1.5px dashed var(--accent); border-radius: 4px; background: rgba(246,217,122,.2); pointer-events: none; }
+
+/* ================= WIZARD "Jejaring baru" (di dalam panel, di bawah kepala) ================= */
+.jj-wiz { position: absolute; z-index: 15; inset: 46px 0 0 0; display: flex; align-items: center; justify-content: center; padding: 8px 20px 24px; background: rgba(6,6,9,.28); }
+body.light .jj-wiz { background: rgba(244,241,234,.35); }
+.jj-wiz-dlg {
+  position: relative; display: grid; grid-template-columns: minmax(300px, 390px) minmax(0, 1fr); gap: 20px;
+  width: min(960px, 100%); height: min(540px, 100%); padding: 20px; border-radius: 20px;
+  background: var(--jj-dlg); border: 1px solid var(--jj-glass-b); box-shadow: 0 30px 80px rgba(0,0,0,.45);
+  backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); animation: jjWiz .22s cubic-bezier(.2,.9,.3,1);
+}
+body.light .jj-wiz-dlg { box-shadow: 0 26px 70px rgba(0,0,0,.14); }
+@keyframes jjWiz { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
+.jj-wiz-left { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.jj-wiz-head { display: flex; align-items: flex-start; gap: 12px; padding: 4px 2px 16px; }
+.jj-wiz-ic { width: 36px; height: 36px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--text); }
+.jj-wiz-back { width: 36px; height: 36px; flex-shrink: 0; padding: 0; border: none; border-radius: 10px; background: none; color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.jj-wiz-back:hover { background: var(--jj-hover); }
+.jj-wiz-titles { flex: 1; min-width: 0; }
+.jj-wiz-titles h2 { margin: 0; font-size: calc(18px * var(--fs-scale, 1)); font-weight: 700; line-height: 1.3; }
+.jj-wiz-titles p { margin: 2px 0 0; font-size: calc(13.5px * var(--fs-scale, 1)); color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; }
+.jj-wiz-x { width: 30px; height: 30px; flex-shrink: 0; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.jj-wiz-x:hover { background: var(--jj-hover); color: var(--text); }
+.jj-wiz-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0 -6px; padding: 2px 6px; scrollbar-width: thin; }
+.jj-wiz-foot { display: flex; justify-content: flex-end; padding-top: 14px; }
+/* langkah 1: templat */
+.jj-tpls { display: flex; flex-direction: column; gap: 4px; }
+.jj-tpl { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 10px; border: 1px solid transparent; border-radius: 12px; background: none; color: var(--text); text-align: left; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+.jj-tpl:hover { background: var(--jj-hover); }
+.jj-tpl[aria-checked="true"] { background: var(--jj-on); border-color: var(--jj-glass-b); }
+.jj-tpl-ic { width: 38px; height: 38px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 10px; color: var(--c, var(--text)); background: var(--jj-hover); border: 1px solid var(--jj-glass-b); }
+.jj-tpl-ic[style] { background: color-mix(in srgb, var(--c) 18%, transparent); border-color: color-mix(in srgb, var(--c) 38%, transparent); }
+.jj-tpl-text { flex: 1; min-width: 0; }
+.jj-tpl-text b { display: block; font-size: calc(14px * var(--fs-scale, 1)); font-weight: 700; line-height: 1.3; }
+.jj-tpl-text small { display: block; margin-top: 1px; font-size: calc(12px * var(--fs-scale, 1)); color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* langkah 2: jenis relasi */
+.jj-types { display: flex; flex-direction: column; gap: 7px; }
+.jj-types-empty { margin: 4px 2px 8px; font-size: calc(13px * var(--fs-scale, 1)); line-height: 1.5; color: var(--text-dim); }
+.jj-trow { display: flex; align-items: center; gap: 4px; }
+.jj-trow-ic { width: 38px; height: 38px; flex-shrink: 0; margin-right: 2px; padding: 0; border: 1px solid var(--jj-glass-b); border-radius: 10px; background: var(--jj-hover); color: var(--c, var(--text)); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease; }
+.jj-trow-ic:hover, .jj-trow-ic[aria-expanded="true"] { background: var(--jj-on); }
+.jj-trow-name { flex: 1; min-width: 0; height: 38px; padding: 0 12px; border: 1px solid var(--jj-glass-b); border-radius: 10px; outline: none; background: var(--jj-hover); color: var(--text); font-size: calc(14px * var(--fs-scale, 1)); font-weight: 550; }
+.jj-trow-name:focus { border-color: var(--accent); }
+.jj-trow-btn { width: 30px; height: 30px; flex-shrink: 0; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.jj-trow-btn:hover, .jj-trow-btn[aria-expanded="true"] { background: var(--jj-hover); color: var(--text); }
+.jj-trow-btn[data-w="dash"] { color: var(--text); }
+.jj-dash-svg line { stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.jj-trow-col i { display: block; width: 14px; height: 14px; border-radius: 50%; border: 1.5px dashed var(--text-dim); }
+.jj-trow-col.has-c i { border: none; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.2); }
+.jj-trow-x:hover { color: var(--danger); background: rgba(225,92,92,.12); }
+.jj-wiz-add { display: inline-flex; align-items: center; gap: 8px; height: 34px; margin-top: 6px; padding: 0 10px 0 8px; border: none; border-radius: 9px; background: none; color: var(--text); font-size: calc(13.5px * var(--fs-scale, 1)); font-weight: 650; cursor: pointer; }
+.jj-wiz-add:hover { background: var(--jj-hover); }
+/* pratinjau */
+.jj-wiz-right { position: relative; min-height: 0; min-width: 0; overflow: hidden; border-radius: 14px; background: var(--jj-pv-bg); border: 1px solid var(--jj-glass-b); }
+.jj-pv { position: absolute; inset: 0; }
+.jj-pv-zoom { position: absolute; z-index: 5; right: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 2px; padding: 4px; border-radius: 12px; background: var(--jj-glass); border: 1px solid var(--jj-glass-b); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+
+/* ---- HP (<= 700 px): panel menyisakan bar tab bawah, wizard bertumpuk, bilah alat menggulir ---- */
+@media (max-width: 700px) {
+  .jj-panel { inset: 2px 8px 66px 8px; border-radius: 12px; }
+  .jj-panel.is-max { inset: 0 0 58px 0; }
+  .jj-doc-sub { display: none; }
+  .jj-doc-btn { max-width: 52vw; }
+  .jj-side { top: 50px; bottom: auto; right: 8px; }
+  .jj-bottom { left: 6px; right: 6px; bottom: 8px; gap: 5px; }
+  .jj-tool { width: 38px; height: 36px; }
+  .jj-sb-btn.is-wide { padding: 0 7px; }
+  .jj-sb-btn.is-wide span { display: none; }   /* bilah kartu ringkas: ikon saja (label ada di aria-label) */
+  .jj-tsep { margin: 0 2px; }
+  .jj-hint { top: 50px; max-width: calc(100% - 64px); white-space: normal; text-align: center; }
+  .jj-toast { bottom: 100px; }
+  .jj-rf .react-flow__attribution { display: none; }
+  .jj-rf .react-flow__minimap.jj-minimap { margin: 0 8px 100px 0; transform: scale(.7); transform-origin: bottom right; }
+  #editorView[data-tab="jejaring"] .proj-float-tools { display: none; }   /* tema ada di menu "…" */
+  .jj-wiz { padding: 6px 6px 8px; align-items: stretch; }
+  .jj-wiz-dlg { display: flex; flex-direction: column; gap: 12px; height: auto; max-height: 100%; padding: 14px; border-radius: 16px; overflow-y: auto; overscroll-behavior: contain; }
+  .jj-wiz-left { display: contents; }
+  .jj-wiz-head { order: 0; padding-bottom: 2px; }
+  .jj-wiz-right { order: 1; flex: 0 0 210px; }
+  .jj-wiz-body { order: 2; flex: none; overflow: visible; margin: 0; padding: 0; }
+  .jj-wiz-foot { order: 3; position: sticky; bottom: -14px; margin: 0 -14px -14px; padding: 10px 14px 14px; background: var(--jj-dlg); }
+  .jj-tpl { padding: 8px; }
+  .jj-pop.is-help { width: calc(100% - 16px); }
+}
+@media (hover: none) {
+  .jj-sbtn[data-act="zoomin"], .jj-sbtn[data-act="zoomout"] { display: none; }   /* layar sentuh: cubit untuk zoom */
+  .jj-rf .react-flow__handle.jj-plus { width: 26px; height: 26px; }
+}
+
+/* ---- hemat performa: tanpa blur, permukaan solid ---- */
+body.perf-boost .jj-tools, body.perf-boost .jj-side, body.perf-boost .jj-pop, body.perf-boost .jj-selbar, body.perf-boost .jj-tip-card,
+body.perf-boost .jj-doc-btn, body.perf-boost .jj-hint, body.perf-boost .jj-sheet.is-on, body.perf-boost .jj-wiz-dlg, body.perf-boost .jj-pv-zoom { background: var(--bg-panel); backdrop-filter: none; -webkit-backdrop-filter: none; }
+body.perf-boost .jj-panel { transition: none; }
+body.perf-boost .jj-pop, body.perf-boost .jj-wiz-dlg, body.perf-boost .jj-tip-card { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .jj-panel, .jj-tool, .jj-hint, .jj-toast, .jj-doc-btn > .ti, .jj-sw, .jj-emoji, .jj-photo, .jj-btn-primary,
+  .jj-rf .react-flow__handle.jj-plus { transition: none !important; }
+  .jj-pop, .jj-tip-card, .jj-wiz-dlg { animation: none; }
+}

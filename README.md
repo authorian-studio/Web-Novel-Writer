@@ -1,6 +1,34 @@
-# Novelist Web — v0.10.1
+# Novelist Web — v0.11.0
 
-## Riwayat perubahan terbaru (v0.10.1) — paling baru di atas
+## Riwayat perubahan terbaru (v0.11.0) — paling baru di atas
+
+- **Fitur baru: Jejaring Tokoh** (tab baru, tambahkan lewat tombol + → "Jejaring Tokoh") — pohon/jejaring hubungan
+  antar-tokoh.
+  - **Wizard 2 langkah:** pilih jenis — **Keluarga**, **Perusahaan**, **Militer**, **Istana Kerajaan** atau
+    **Mulai kosong** — dengan pratinjau langsung; lalu atur jenis hubungan (ikon, nama, garis lurus/putus-putus,
+    warna, arah, tambah/hapus) → "Buat jejaring".
+  - **Kanvas kartu tokoh:** kartu potret (foto + nama) dengan tombol **+** di keempat sisi → menu hubungan (atas =
+    orang tua, bawah = anak, samping = pasangan/saudara), "Buat kustom", "Tautkan tokoh yang ada…" (dari Organize),
+    "Lewati dulu". Garis penghubung berlabel ikon + nama; klik garis untuk ganti jenis, balik arah, atau hapus.
+  - **Toolbar kartu:** Buat kartu (jadikan tokoh di Organize), Tautkan kartu, Foto, Emoji, Label, Hapus.
+    **Toolbar bawah:** Pilih, Geser, Tambah tokoh, Catatan, Teks, Label. **Lembar** ("Utama" + tambah lembar),
+    **Rapikan** (tata otomatis per generasi), undo/redo, duplikat, zoom & geser seperti Beranda.
+  - Beberapa jejaring per project (dropdown judul), tersimpan di project (`data.jejaring`) & tampil di riwayat sidebar
+    tab. File: `jejaring.js`, `jejaring.css`.
+- **Tab Tulis dirombak jadi lebih nyaman:**
+  - **Halaman tulis di tengah** (lebar bisa diatur): label "Bab · Scene i dari n", judul besar dengan ornamen,
+    chip status (klik untuk ganti Todo/Draft/Done), jumlah kata & waktu baca, sinopsis yang bisa diedit, toolbar
+    format yang menempel di atas (paragraf/judul, tebal/miring/garis bawah/coret, daftar, rata, pemisah adegan ✦ ✦ ✦,
+    undo/redo) + gelembung format saat memilih teks; tempel dari Word/Docs dibersihkan.
+  - **Daftar scene "Naskah":** titik status, jumlah kata, cari (dengan sorotan), bab yang bisa dilipat, tombol
+    "+ Scene" & "+ Bab", seret untuk mengurutkan (juga Alt+↑/↓), pratinjau saat hover, bar progres status; bisa
+    disembunyikan (Ctrl+\) dan jadi laci di HP.
+  - **Bar bawah:** statistik, kata per sesi / **target harian** (disimpan di project), zoom, mode fokus, status simpan.
+  - **Pengaturan scene** dirapikan (info scene + pindah bab, tampilan editor: Serif/Sans/Mono, lebar halaman, jarak
+    baris, ukuran) dan menempel di samping halaman di layar lebar.
+  - Perbaikan: jumlah kata saat pertama dibuka kini benar; scene aktif langsung tersorot saat project dibuka.
+
+### v0.10.1
 
 - **Beranda jadi kanvas yang bisa digeser & di-zoom** (React Flow, seperti kanvas di vvd): tampil di panel kaca
   berbingkai dengan dot-grid.
@@ -627,6 +655,7 @@ nama-repo/
 ├── logo-anim-poster.webp
 ├── login-logo.webm, login-logo.mp4, login-logo-poster.webp
 ├── timeline.js
+├── jejaring.js, jejaring.css   (Jejaring Tokoh: wizard + kanvas pohon hubungan)
 ├── home-canvas.js, home-canvas.css   (kanvas Beranda: papan React Flow + toolbar)
 ├── smooth-scroll.js, smooth-scroll.css   (scrollbar custom + Lenis smooth scroll)
 ├── quill.js, quill.css, quill-tiles.js   (fitur Quill di tab Write: cerita, buku 3D, editor chapter, panel alat)

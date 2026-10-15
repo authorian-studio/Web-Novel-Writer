@@ -545,32 +545,90 @@
             </button>
           </div>
           <div id="quillRoot" class="quill-root hidden" aria-label="Quill"></div>
-          <div class="scenes-col">
-            <div class="scenes-header">
-              <span>SCENES</span>
-              <div class="scenes-header-actions">
-                <button id="btnAddScene" class="mini-icon-btn" title="Tambah scene" aria-label="Tambah scene"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-plus"></use></svg></button>
+          <!-- TULIS (mode Scene): daftar scene kiri (bisa diciutkan; laci di HP) + halaman editor (judul, meta, toolbar, isi)
+               + bar bawah (statistik, kata sesi/target harian, zoom, mode fokus, status simpan) + laci Scene Settings.
+               Isi daftar & halaman dibangun app.js (bagian WRITE TAB). Tampilan (huruf, lebar, zoom, daftar) disimpan per perangkat. -->
+          <div id="twScrim" class="tw-scrim" aria-hidden="true"></div>
+          <aside class="scenes-col tw-side" id="twSide" aria-label="Daftar scene">
+            <div class="tw-side-head">
+              <div class="tw-side-titles">
+                <div class="tw-side-title">Naskah</div>
+                <div class="tw-side-meta" id="twSideMeta"></div>
               </div>
+              <button type="button" id="twSideClose" class="tw-icon-btn" title="Sembunyikan daftar scene" aria-label="Sembunyikan daftar scene">
+                <svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-layout-sidebar-left-collapse"></use></svg>
+              </button>
             </div>
-            <div id="sceneList" class="scenes-list"></div>
-          </div>
+            <label class="tw-search">
+              <svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-search"></use></svg>
+              <input id="twSearch" type="search" placeholder="Cari scene…" aria-label="Cari scene atau bab" autocomplete="off" spellcheck="false" />
+            </label>
+            <div class="tw-side-actions">
+              <button type="button" id="btnAddScene" class="tw-add-btn is-primary" title="Tambah scene setelah scene yang terbuka" aria-label="Tambah scene">
+                <svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-file-plus"></use></svg><span>Scene</span>
+              </button>
+              <button type="button" id="btnAddFolder" class="tw-add-btn" title="Tambah bab (folder) untuk mengelompokkan scene" aria-label="Tambah bab">
+                <svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-folder-plus"></use></svg><span>Bab</span>
+              </button>
+            </div>
+            <div id="sceneList" class="scenes-list tw-list" role="tree" aria-label="Scene &amp; bab"></div>
+            <div id="twSideFoot" class="tw-side-foot"></div>
+          </aside>
 
-          <div class="scene-detail-col" id="sceneDetailCol">
-            <div class="scene-empty-hint">Pilih atau buat scene untuk mulai menulis.</div>
-          </div>
+          <section class="tw-main is-empty" id="twMain" aria-label="Editor scene">
+            <div class="tw-topbar">
+              <button type="button" id="twSideOpen" class="tw-icon-btn tw-side-open" title="Tampilkan daftar scene" aria-label="Tampilkan daftar scene" aria-controls="twSide" aria-expanded="true">
+                <svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-layout-sidebar-left-expand"></use></svg>
+              </button>
+              <nav id="twCrumb" class="tw-crumb" aria-label="Lokasi scene"></nav>
+              <span class="tw-flex"></span>
+              <button type="button" id="twPrev" class="tw-icon-btn tw-nav-btn" title="Scene sebelumnya" aria-label="Scene sebelumnya">
+                <svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-chevron-up"></use></svg>
+              </button>
+              <button type="button" id="twNext" class="tw-icon-btn tw-nav-btn" title="Scene berikutnya" aria-label="Scene berikutnya">
+                <svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-chevron-down"></use></svg>
+              </button>
+              <button type="button" id="sceneDrawerToggle" class="tw-icon-btn tw-drawer-btn hidden" title="Scene Settings: info, format & tampilan" aria-label="Buka Scene Settings" aria-expanded="false" aria-controls="sceneOptionsDrawer">
+                <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-adjustments-horizontal"></use></svg><span>Pengaturan</span>
+              </button>
+            </div>
+            <div class="scene-detail-col" id="sceneDetailCol">
+              <div class="scene-empty-hint">Pilih atau buat scene untuk mulai menulis.</div>
+            </div>
+            <div id="twBar" class="tw-bar" role="group" aria-label="Statistik &amp; tampilan">
+              <button type="button" id="twStatsBtn" class="tw-bar-btn tw-stats" title="Statistik & target menulis" aria-haspopup="dialog" aria-expanded="false" aria-controls="twStatsPop">
+                <svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-chart-bar"></use></svg><span id="sceneWordCount" class="tw-wc-main">0 kata</span><span id="twStatsMore" class="tw-stats-more"></span>
+              </button>
+              <span class="tw-bar-sep" aria-hidden="true"></span>
+              <button type="button" id="twGoalBtn" class="tw-bar-btn tw-goal" title="Kata sesi ini & target harian" aria-haspopup="dialog" aria-controls="twStatsPop">
+                <svg class="tw-ring" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle class="tw-ring-bg" cx="10" cy="10" r="8"></circle><circle id="twRingFg" class="tw-ring-fg" cx="10" cy="10" r="8"></circle></svg>
+                <span id="twGoalText">+0 sesi</span>
+              </button>
+              <span class="tw-bar-sep tw-zoom-sep" aria-hidden="true"></span>
+              <div class="tw-zoom">
+                <button type="button" id="twZoomOut" class="tw-bar-icon" title="Perkecil tulisan" aria-label="Perkecil tulisan"><svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-minus"></use></svg></button>
+                <input type="range" id="zoomSlider" class="tw-range" min="70" max="160" step="5" value="100" aria-label="Ukuran tulisan" />
+                <button type="button" id="twZoomIn" class="tw-bar-icon" title="Perbesar tulisan" aria-label="Perbesar tulisan"><svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-plus"></use></svg></button>
+                <span id="zoomLabel" class="tw-zoom-val">100%</span>
+              </div>
+              <span class="tw-bar-sep" aria-hidden="true"></span>
+              <button type="button" id="twBarFocus" class="tw-bar-icon" title="Mode fokus (layar penuh tanpa gangguan)" aria-label="Mode fokus"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-arrows-maximize"></use></svg></button>
+              <span id="twSave" class="tw-save" data-state="saved" title="Tersimpan"><span class="tw-save-dot" aria-hidden="true"></span><span class="tw-save-text">Tersimpan</span></span>
+            </div>
+            <div id="twStatsPop" class="tw-pop hidden" role="dialog" aria-label="Statistik &amp; target menulis"></div>
+          </section>
 
-          <!-- ============ SCENE OPTIONS DRAWER TOGGLE ============ -->
-          <button id="sceneDrawerToggle" class="scene-drawer-toggle hidden" title="Edit info scene" aria-label="Buka panel edit scene" aria-expanded="false">
-            <svg class="ti drawer-toggle-icon" width="14" height="14" aria-hidden="true"><use href="#ti-chevron-right"></use></svg>
-          </button>
+          <!-- kartu pratinjau saat kursor di atas baris daftar, toolbar mengambang saat ada teks terpilih -->
+          <div id="twPeek" class="tw-peek" aria-hidden="true"></div>
+          <div id="twBubble" class="tw-bubble" role="toolbar" aria-label="Format cepat"></div>
 
           <div id="sceneDrawerScrim" class="scene-drawer-scrim hidden"></div>
 
-          <aside id="sceneOptionsDrawer" class="scene-options-drawer" aria-hidden="true">
+          <aside id="sceneOptionsDrawer" class="scene-options-drawer" aria-hidden="true" aria-label="Scene Settings">
             <header class="drawer-header" id="sceneDrawerGrip">
               <div class="drawer-header-text">
                 <h2 class="drawer-title">Scene Settings</h2>
-                <p class="drawer-desc">Info &amp; format tulisan scene ini</p>
+                <p class="drawer-desc">Info, format teks &amp; tampilan editor</p>
               </div>
               <button id="sceneDrawerClose" class="drawer-close-btn" aria-label="Tutup panel" title="Tutup">
                 <svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-x"></use></svg>
@@ -599,6 +657,12 @@
           <div class="scene-detail-col" id="organizeDetailCol">
             <div class="scene-empty-hint">Pilih atau buat item untuk mulai isi.</div>
           </div>
+        </div>
+
+        <!-- ============ JEJARING TOKOH: pohon relasi tokoh (keluarga, kantor, militer, istana) di kanvas React Flow.
+             Isinya dibangun jejaring.js (+ jejaring.css), dimuat saat tab ini pertama kali dibuka ============ -->
+        <div id="tabJejaring" class="tab-panel home-panel hidden">
+          <div class="home-canvas" id="jejaringCanvas" role="region" aria-label="Jejaring Tokoh"></div>
         </div>
 
         <!-- ============ TIMELINE TAB (React Flow: satu garis waktu horizontal, event menempel di garis) ============ -->
@@ -887,24 +951,27 @@
 </div>
 
 <!-- ============ FOCUS / FULL WRITER OVERLAY ============ -->
-<div id="focusOverlay" class="focus-overlay hidden">
+<!-- mode fokus: tampilan huruf/lebar/zoom mengikuti halaman Tulis (atribut data-tw-* dari app.js); isi tersimpan saat diketik, Esc = keluar -->
+<div id="focusOverlay" class="focus-overlay hidden" role="dialog" aria-label="Mode fokus">
   <div class="focus-topbar">
-    <input id="focusTitle" class="focus-title" />
-    <div class="focus-toolbar">
-      <button data-cmd="bold" title="Bold" aria-label="Bold"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-bold"></use></svg></button>
-      <button data-cmd="italic" title="Italic" aria-label="Italic"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-italic"></use></svg></button>
-      <button data-cmd="underline" title="Underline" aria-label="Underline"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-underline"></use></svg></button>
+    <input id="focusTitle" class="focus-title" aria-label="Judul scene" autocomplete="off" spellcheck="false" />
+    <div class="focus-toolbar" role="toolbar" aria-label="Format teks">
+      <button data-cmd="bold" title="Tebal (Ctrl+B)" aria-label="Tebal"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-bold"></use></svg></button>
+      <button data-cmd="italic" title="Miring (Ctrl+I)" aria-label="Miring"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-italic"></use></svg></button>
+      <button data-cmd="underline" title="Garis bawah (Ctrl+U)" aria-label="Garis bawah"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-underline"></use></svg></button>
+      <button data-cmd="strikeThrough" title="Coret" aria-label="Coret"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-strikethrough"></use></svg></button>
       <span class="toolbar-sep"></span>
       <button data-cmd="justifyLeft" title="Rata kiri" aria-label="Rata kiri"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-align-left"></use></svg></button>
       <button data-cmd="justifyCenter" title="Rata tengah" aria-label="Rata tengah"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-align-center"></use></svg></button>
       <button data-cmd="justifyRight" title="Rata kanan" aria-label="Rata kanan"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-align-right"></use></svg></button>
       <span class="toolbar-sep"></span>
-      <input type="color" id="focusColor" title="Warna teks" value="#e7e5e0" />
+      <button data-cmd="divider" title="Pemisah adegan ✦ ✦ ✦" aria-label="Pemisah adegan"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-separator-horizontal"></use></svg></button>
+      <label class="focus-color" title="Warna teks"><input type="color" id="focusColor" value="#e7e5e0" aria-label="Warna teks" /></label>
     </div>
     <div id="focusStats" class="focus-stats">0 kata · 0 karakter · 0 kalimat · 0 paragraf</div>
-    <button id="btnExitFocus" class="icon-btn" title="Keluar dari mode fokus" aria-label="Keluar dari mode fokus"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-x"></use></svg></button>
+    <button id="btnExitFocus" class="icon-btn focus-exit" title="Keluar dari mode fokus (Esc)" aria-label="Keluar dari mode fokus"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-arrows-minimize"></use></svg></button>
   </div>
-  <div id="focusEditor" class="focus-editor" contenteditable="true" spellcheck="false"></div>
+  <div id="focusEditor" class="focus-editor" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="Isi scene"></div>
 </div>
 
 <!-- ============ DROPDOWNS ============ -->
