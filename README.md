@@ -19,6 +19,21 @@
   (cuplikan scene, potret tokoh, peta mini, strip timeline, avatar jejaring, sampul cerita). Klik dua kali / "Buka" untuk
   membuka dokumennya; kartu bisa diubah ukuran, dipindah, dihubungkan.
 - Tombol **ganti tema** di rail dashboard dihapus (tema diatur di Pengaturan Akun → Tema tampilan).
+- **Simpan di perangkat dulu + sinkron dengan deteksi konflik** (`novelist-sync.js`, dimuat setelah `app.js`; file yang
+  sama dipakai aplikasi Android, repo Web-Novel-Writer-Android). Tidak ada kode `app.js` yang diubah — fungsi simpan/muat
+  Drive dibungkus dari file itu.
+  - Setiap simpan langsung ditulis ke IndexedDB `novelist-sync` (per akun Google), baru dikirim ke Drive. Koneksi putus /
+    sesi Google habis: tulisan tetap aman di browser dan dikirim otomatis saat online / setelah login lagi (indikator
+    sinkron di dashboard — atau status simpan di editor — bisa diklik untuk sinkron sekarang atau login ulang).
+  - Sebelum mengunggah, `modifiedTime` file di Drive dicek. Diubah dari perangkat lain (mis. HP) sementara di sini tidak
+    ada suntingan → versi Drive langsung dimuat (tab yang aktif tetap). Dua-duanya disunting → dialog **Versi project
+    berbeda**: *Simpan keduanya* / *Pakai versi web* / *Pakai versi Drive*; versi yang tidak dipakai disimpan dulu ke
+    folder backup Drive. Tab yang dibiarkan terbuka tidak lagi menimpa tulisan dari perangkat lain.
+  - "Disunting" = ada perubahan lewat `markDirtyAndSchedule` (mengetik, Organize, Quill, Map, Timeline, Beranda, Jejaring,
+    …). Sekadar membuka tab Beranda/Jejaring/Timeline/Map (yang menambahkan struktur bawaannya ke project) tidak dihitung.
+  - Project yang terbuka dicek ke Drive saat tab kembali aktif dan tiap 2 menit; dashboard ikut menampilkan project baru
+    / menghapus project yang dipindah ke Trash dari perangkat lain. Hapus project saat offline diproses begitu online.
+  - Hapus akun ikut menghapus IndexedDB `novelist-sync`.
 
 ### v0.11.0
 
