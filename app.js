@@ -174,12 +174,13 @@ function onTokenResponse(resp) {
     tokenExpiresAt = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
     tokenSilentFailAt = 0;
     scheduleTokenRefresh();
+    saveRememberedToken();
   }
   settleTokenWaiters(resp && resp.access_token ? resp : { error: (resp && resp.error) || "no_token" });
 }
 function onTokenError(err) { settleTokenWaiters({ error: (err && (err.type || err.message)) || "popup_error" }); }
 // prompt: "consent" (login pertama) | "" (tanpa layar izin bila sudah pernah setuju). timeoutMs 0 = tunggu terus.
-function requestGoogleToken(prompt, timeoutMs) {
+function requestGoogleToken(prompt, timeoutMs, hint) {
   return new Promise((resolve, reject) => {
     if (GOOGLE_CLIENT_ID.startsWith("ISI_CLIENT_ID")) { reject({ error: "Client ID Google belum diisi di config.js" }); return; }
     if (!window.google || !google.accounts || !google.accounts.oauth2) { reject({ error: "Layanan login Google belum dimuat" }); return; }
@@ -190,7 +191,7 @@ function requestGoogleToken(prompt, timeoutMs) {
     client.callback = onTokenResponse;
     client.error_callback = onTokenError;
     const opts = { prompt };
-    const email = typeof accountInfo !== "undefined" && accountInfo && accountInfo.user && accountInfo.user.emailAddress;
+    const email = hint || (typeof accountInfo !== "undefined" && accountInfo && accountInfo.user && accountInfo.user.emailAddress);
     if (prompt === "" && email) opts.login_hint = email;   // akun yang sama, tanpa memilih akun lagi
     try { client.requestAccessToken(opts); } catch (e) { settleTokenWaiters({ error: (e && e.message) || "request_failed" }); }
   });
@@ -221,6 +222,7 @@ function scheduleTokenRefresh() {
 }
 const tokenExpiringSoon = () => !!tokenExpiresAt && Date.now() > tokenExpiresAt - 60000;
 function driveSignOut() {
+  forgetRememberedToken(true);   // pilihan "Ingat saya" & email tetap, token dibuang, tidak masuk otomatis lagi
   if (accessToken && window.google && google.accounts?.oauth2?.revoke) google.accounts.oauth2.revoke(accessToken, () => {});
   accessToken = null;
   tokenExpiresAt = 0;
@@ -264,6 +266,7 @@ const LOGIN_I18N = {
     heading: "Sign In atau Mulai Menulis", tagline: "Tulis novelmu, tersimpan otomatis ke Google Drive-mu sendiri.",
     google: "Lanjutkan dengan Google", discord: "Lanjutkan dengan Discord", apple: "Lanjutkan dengan Apple", email: "Lanjutkan dengan Email",
     soon: "Segera", lastUsed: "Terakhir kamu login pakai Google", waiting: "Menunggu login...", loginFailed: "Login gagal: ",
+    remember: "Ingat saya", restoring: "Memulihkan sesi...", continueAs: (e) => `Lanjutkan sebagai ${e}`,
     note: "Login diperlukan supaya project kamu aman tersimpan & ter-backup otomatis di Google Drive-mu. Tidak ada data yang disimpan di server kami.",
     soonNotice: (n) => `Login dengan ${n} belum tersedia. Untuk saat ini pakai Google dulu ya — project kamu disimpan di Google Drive-mu.`,
     help: "Bantuan", terms: "Ketentuan", privacy: "Privasi",
@@ -289,7 +292,7 @@ const LOGIN_I18N = {
     privacyBody: [
       ["Data yang kami simpan", "Tidak ada. Novelist berjalan di browser-mu dan tidak punya server penyimpanan sendiri."],
       ["Google Drive", "Project disimpan sebagai file di Google Drive-mu sendiri. Akses Drive hanya dipakai untuk membaca & menyimpan file project Novelist."],
-      ["Penyimpanan lokal", "Browser menyimpan beberapa preferensi kecil (misalnya tema, bahasa, login terakhir, dan gambar halaman login pilihanmu) di perangkatmu."],
+      ["Penyimpanan lokal", "Browser menyimpan beberapa preferensi kecil (misalnya tema, bahasa, login terakhir, dan gambar halaman login pilihanmu) di perangkatmu. Bila \"Ingat saya\" dicentang, sesi login Google (token akses sementara ±1 jam & email akun) juga disimpan di perangkat ini supaya tidak perlu login lagi saat halaman dimuat ulang; logout menghapusnya."],
       ["Mencabut akses", "Kamu bisa mencabut akses Novelist kapan saja lewat pengaturan keamanan akun Google-mu."],
     ],
   },
@@ -297,6 +300,7 @@ const LOGIN_I18N = {
     heading: "Sign In or Start Writing", tagline: "Write your novel, saved automatically to your own Google Drive.",
     google: "Continue with Google", discord: "Continue with Discord", apple: "Continue with Apple", email: "Continue with Email",
     soon: "Soon", lastUsed: "You last signed in with Google", waiting: "Waiting for sign-in...", loginFailed: "Sign-in failed: ",
+    remember: "Remember me", restoring: "Restoring session...", continueAs: (e) => `Continue as ${e}`,
     note: "Sign-in is required so your projects are safely saved & backed up automatically to your Google Drive. No data is stored on our servers.",
     soonNotice: (n) => `Signing in with ${n} isn't available yet. Please use Google for now — your projects are stored in your Google Drive.`,
     help: "Help", terms: "Terms", privacy: "Privacy",
@@ -321,7 +325,7 @@ const LOGIN_I18N = {
     privacyBody: [
       ["Data we store", "None. Novelist runs in your browser and has no storage server of its own."],
       ["Google Drive", "Projects are saved as files in your own Google Drive. Drive access is only used to read & save Novelist project files."],
-      ["Local storage", "Your browser keeps a few small preferences (such as theme, language, last sign-in, and your chosen login-page image) on your device."],
+      ["Local storage", "Your browser keeps a few small preferences (such as theme, language, last sign-in, and your chosen login-page image) on your device. With \"Remember me\" checked, your Google sign-in session (a temporary ~1-hour access token and your account email) is also kept on this device so reloading the page doesn't ask you to sign in again; signing out removes it."],
       ["Revoking access", "You can revoke Novelist's access at any time from your Google account's security settings."],
     ],
   },
@@ -371,20 +375,108 @@ async function handleLogin() {
   btn.disabled = true;
   label.textContent = lt("waiting");
   try {
-    await driveSignIn(true);
-    loadAccountInfo(true);   // nama & foto akun untuk rail (tidak ditunggu; gagal = placeholder)
-    try { localStorage.setItem(LAST_LOGIN_KEY, "google"); } catch (e) { /* abaikan */ }
-    el("loginView").classList.add("hidden");
-    el("dashboardView").classList.remove("hidden");
-    await loadProjectsFromDrive(true);
-    startBackupInterval();
+    // sesi tersimpan tapi token habis: akun yang sama tanpa layar izin lagi (prompt "" + login_hint)
+    const r = readRemember();
+    if (r && r.on && r.email && el("loginRemember").checked) await requestGoogleToken("", 0, r.email);
+    else await driveSignIn(true);
+    writeRemember(el("loginRemember").checked ? { on: true, email: (r && r.email) || null } : { on: false });
+    saveRememberedToken();
+    await enterApp();
   } catch (e) {
     el("loginError").textContent = lt("loginFailed") + (e.error || e.message || e);
     el("loginError").classList.remove("hidden");
   }
   btn.disabled = false;
-  label.textContent = lt("google");
+  updateLoginButtonLabel();
   showLastLoginHint();
+}
+// token sudah ada -> dashboard
+async function enterApp() {
+  loadAccountInfo(true);   // nama & foto akun untuk rail (tidak ditunggu; gagal = placeholder)
+  try { localStorage.setItem(LAST_LOGIN_KEY, "google"); } catch (e) { /* abaikan */ }
+  el("loginView").classList.add("hidden");
+  el("dashboardView").classList.remove("hidden");
+  await loadProjectsFromDrive(true);
+  startBackupInterval();
+}
+
+// ================= INGAT SAYA =================
+// Dicentang saat login -> access token Google (GIS, berlaku ±1 jam) + email akun disimpan di localStorage perangkat ini
+// (REMEMBER_KEY) dan diperbarui setiap token diperpanjang. Saat halaman dimuat ulang:
+//   token masih berlaku  -> langsung masuk ke dashboard (diuji dulu ke Drive; ditolak = tetap di halaman login)
+//   token sudah habis    -> minta token baru diam-diam untuk akun yang sama (berhasil bila browser mengizinkan popup
+//                           otomatis); kalau tidak bisa, tombol login berubah jadi "Lanjutkan sebagai <email>" = 1 klik,
+//                           tanpa memilih akun / layar izin lagi.
+// Logout membuang token & menandai `out` (pilihan centang & email tetap; tidak masuk otomatis sampai login lagi).
+// Tidak dicentang -> tidak ada yang disimpan.
+// Android memakai sesi Google Play services sendiri (NovelistSync.hooks), jadi bagian ini hanya untuk web.
+const REMEMBER_KEY = "novelist_remember";   // { on, email, token, exp }
+function readRemember() {
+  try { const v = JSON.parse(localStorage.getItem(REMEMBER_KEY) || "null"); return v && typeof v === "object" ? v : null; } catch (e) { return null; }
+}
+function writeRemember(v) { try { localStorage.setItem(REMEMBER_KEY, JSON.stringify(v)); } catch (e) { /* storage diblokir: hanya sesi ini */ } }
+function saveRememberedToken() {
+  const r = readRemember();
+  if (!r || !r.on || !accessToken) return;
+  const email = typeof accountInfo !== "undefined" && accountInfo && accountInfo.user && accountInfo.user.emailAddress;
+  writeRemember({ on: true, email: email || r.email || null, token: accessToken, exp: tokenExpiresAt });
+}
+// signedOut = logout sengaja -> setelah muat ulang tidak masuk otomatis (hanya tombol "Lanjutkan sebagai …")
+function forgetRememberedToken(signedOut) {
+  const r = readRemember();
+  if (r && (r.token || signedOut)) writeRemember({ on: r.on, email: r.email || null, out: !!signedOut || !!r.out });
+}
+function updateLoginButtonLabel() {
+  const r = readRemember(), label = el("btnLoginGoogle").querySelector(".btn-label");
+  const asUser = r && r.on && r.email && el("loginRemember").checked;
+  label.textContent = asUser ? lt("continueAs")(r.email) : lt("google");
+  label.removeAttribute("data-i18n");
+  if (!asUser) label.dataset.i18n = "google";
+}
+const isAndroidShell = () => !!(window.NovelistSync && window.NovelistSync.hooks && window.NovelistSync.hooks.refreshToken);
+function waitForGis(ms) {
+  return new Promise((resolve) => {
+    const t0 = Date.now();
+    (function poll() {
+      if (window.google && google.accounts && google.accounts.oauth2) resolve(true);
+      else if (Date.now() - t0 > ms) resolve(false);
+      else setTimeout(poll, 100);
+    })();
+  });
+}
+async function tryRememberedLogin() {
+  const r = readRemember(), cb = el("loginRemember");
+  cb.checked = !r || r.on !== false;
+  cb.onchange = () => {
+    const cur = readRemember() || {};
+    if (!cb.checked) writeRemember({ on: false });   // tidak dicentang: token & email dilupakan
+    else writeRemember({ on: true, email: cur.email || null });
+    updateLoginButtonLabel();
+  };
+  updateLoginButtonLabel();
+  if (!r || !r.on || r.out || isAndroidShell() || accessToken) return;
+  const btn = el("btnLoginGoogle"), label = btn.querySelector(".btn-label");
+  btn.disabled = true;
+  label.textContent = lt("restoring");
+  let ok = false;
+  try {
+    if (r.token && r.exp > Date.now() + 60000) {
+      accessToken = r.token; tokenExpiresAt = r.exp;
+      await driveFetch(`${DRIVE_API}/about?fields=user(emailAddress)`);   // token dicabut / akun berubah -> 401
+      scheduleTokenRefresh();
+      ok = true;
+    } else if (r.email && (await waitForGis(5000))) {
+      await requestGoogleToken("", 8000, r.email);   // popup otomatis bisa diblokir browser -> gagal cepat
+      ok = !!accessToken;
+    }
+  } catch (e) {
+    accessToken = null; tokenExpiresAt = 0; clearTimeout(tokenRefreshTimer);
+    forgetRememberedToken();
+  }
+  btn.disabled = false;
+  updateLoginButtonLabel();
+  if (!ok || accessToken === null) return;
+  if (!el("loginView").classList.contains("hidden")) await enterApp();
 }
 
 // ================= DASHBOARD RENDER =================
@@ -3904,6 +3996,7 @@ function loadAccountInfo(force = false) {
       if (!memberSince) memberSince = await fetchMemberSince().catch(() => null);
       if (gen !== accountGen) return null;
       accountInfo = { user, quota: about.storageQuota || null, memberSince, fetchedAt: Date.now() };
+      saveRememberedToken();   // email akun untuk "Lanjutkan sebagai …"
       accountStatus = "ok";
       rememberFirstSeen();
     } catch (e) {
@@ -5390,6 +5483,7 @@ window.addEventListener("DOMContentLoaded", () => {
   initRailSidebar();   // rail kiri dashboard: buka/tutup lewat logo & tepi kiri layar
   pickDashTitle();
   el("btnLoginGoogle").onclick = handleLogin;
+  tryRememberedLogin();   // "Ingat saya": masuk otomatis bila sesi Google tersimpan masih berlaku
   document.querySelectorAll("#loginView .btn-oauth.is-soon").forEach((b) => b.onclick = () => handleSoonProvider(b.dataset.provider));
   showLastLoginHint();
 

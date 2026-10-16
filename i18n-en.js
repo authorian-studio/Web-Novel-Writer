@@ -1,6 +1,8 @@
 /* i18n-en.js — kamus Bahasa Indonesia -> English untuk i18n.js (DIHASILKAN dari teks antarmuka di kode; boleh diedit
    manual). exact = teks utuh, patterns = teks dengan nilai dinamis ({} di sumber, {1} {2} … di terjemahan). */
-window.NOVELIST_EN = {"exact":{"Kirim, ambil, dan pulihkan project di Google Drive kamu":"Send, fetch and restore projects in your Google Drive",
+window.NOVELIST_EN = {"exact":{"Ingat saya":"Remember me",
+"Memulihkan sesi...":"Restoring session...",
+"Kirim, ambil, dan pulihkan project di Google Drive kamu":"Send, fetch and restore projects in your Google Drive",
 "Kembali ke project":"Back to projects",
 "Kirim semua":"Send all",
 "Simpan salinan project di perangkat ini ke Google Drive sekarang juga.":"Save a copy of the projects on this device to Google Drive right now.",
@@ -1655,7 +1657,8 @@ window.NOVELIST_EN = {"exact":{"Kirim, ambil, dan pulihkan project di Google Dri
 "Entri Peristiwa baru":"New Event entry",
 "Entri Catatan baru":"New Note entry",
 "Cari tab & riwayat":"Search tabs & history",
-"kata":"words"},"patterns":[["{} menit lalu", "{1} minutes ago"],
+"kata":"words"},"patterns":[["Lanjutkan sebagai {}","Continue as {1}"],
+["{} menit lalu", "{1} minutes ago"],
 ["{} jam lalu", "{1} hours ago"],
 ["{} hari lalu", "{1} days ago"],
 ["{} project gagal dikirim", "{1} projects failed to send"],

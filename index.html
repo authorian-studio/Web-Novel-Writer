@@ -96,6 +96,12 @@
             <span class="btn-label" data-i18n="google">Lanjutkan dengan Google</span>
           </button>
           <p id="lastLoginHint" class="login-last-used hidden" data-i18n="lastUsed">Terakhir kamu login pakai Google</p>
+          <!-- Ingat saya: login Google disimpan di perangkat ini -> muat ulang halaman tidak perlu login lagi (bagian INGAT SAYA di app.js) -->
+          <label class="login-remember" for="loginRemember">
+            <input type="checkbox" id="loginRemember" checked />
+            <span class="login-remember-box" aria-hidden="true"><svg class="ti" width="12" height="12"><use href="#ti-check"></use></svg></span>
+            <span data-i18n="remember">Ingat saya</span>
+          </label>
         </div>
 
         <button class="btn-oauth is-soon" data-provider="discord" aria-disabled="true">
