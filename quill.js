@@ -2043,9 +2043,11 @@
 
   /* ============================ F. TERBITKAN ============================ */
   function manuscriptHtml(s) {
+    const b = s.book, blurb = (b.blurb || "").trim();
+    const back = hasBack(s) ? `<section class="qd-ms-back"><div class="qd-ms-num">Sampul belakang</div>${b.backJacket ? `<img class="qd-ms-header" src="${esc(b.backJacket)}" alt="">` : ""}${blurb ? `<p class="qd-ms-blurb">${esc(blurb)}</p>` : ""}</section>` : "";
     return `<div class="qd-ms-title">${esc(storyTitle(s))}</div>${s.author ? `<div class="qd-ms-author">oleh ${esc(s.author)}</div>` : ""}${FLOURISH}` +
       s.chapters.map((c, i) => `<section class="qd-ms-ch">${chMark(s, i) ? `<div class="qd-ms-num">${chMark(s, i)}</div>` : ""}<h2 class="qd-ms-ch-title">${esc(chapterLabel(c, i, s))}</h2>
-        ${c.header ? `<img class="qd-ms-header" src="${esc(c.header)}" alt="">` : ""}<div class="qd-ms-body">${sanitizeHtml(c.html) || '<p class="qd-muted">(kosong)</p>'}</div></section>`).join("");
+        ${c.header ? `<img class="qd-ms-header" src="${esc(c.header)}" alt="">` : ""}<div class="qd-ms-body">${sanitizeHtml(c.html) || '<p class="qd-muted">(kosong)</p>'}</div></section>`).join("") + back;
   }
   function renderPublish() {
     const s = findStory(route.storyId), n = s.chapters.length, words = storyWords(s);
@@ -2143,6 +2145,62 @@
       g.font = `500 ${Math.round(W * 0.045)}px ${font}`;
       g.textBaseline = "bottom";
       g.fillText(s.author.trim(), W / 2, H * 0.9);
+    }
+    return cv.toDataURL(type || "image/jpeg", 0.9);
+  }
+  // sampul belakang ada isinya? (gambar sendiri atau teks blurb)
+  const hasBack = (s) => !!(s.book && (s.book.backJacket || (s.book.blurb || "").trim()));
+  // sampul belakang (warna sampul + gambar belakang + teks blurb) digambar ke canvas — dipakai EPUB, HTML & Word
+  async function renderBackCover(s, W, H, type) {
+    W = W || 1000; H = H || 1500;
+    const b = s.book, cv = document.createElement("canvas");
+    cv.width = W; cv.height = H;
+    const g = cv.getContext("2d");
+    const cols = coverColors(b);
+    if (cols.length === 1) g.fillStyle = cols[0];
+    else {
+      const gr = g.createLinearGradient(W, 0, 0, H);   // arah gradasi dicerminkan (sisi belakang buku)
+      cols.forEach((c, i) => gr.addColorStop(i / (cols.length - 1), c));
+      g.fillStyle = gr;
+    }
+    g.fillRect(0, 0, W, H);
+    let art = false;
+    if (b.backJacket) {
+      try {
+        const im = await loadImg(b.backJacket);
+        const sc = (b.backFit === "contain" ? Math.min : Math.max)(W / im.naturalWidth, H / im.naturalHeight);
+        const w = im.naturalWidth * sc, h = im.naturalHeight * sc;
+        g.drawImage(im, (W - w) / 2, (H - h) / 2, w, h);
+        art = true;
+      } catch (e) { /* gambar rusak: tetap warna polos */ }
+    }
+    if (!art) { g.fillStyle = "rgba(0,0,0,.28)"; g.fillRect(0, 0, W, H); }   // sama seperti buku 3D: sisi belakang sedikit lebih gelap
+    const blurb = (b.blurb || "").trim();
+    if (blurb) {
+      const font = fontCss(b.titleFont), maxW = W * 0.7;
+      let size = Math.round(W * 0.042), lines = [];
+      const wrapAll = () => {
+        const out = [];
+        blurb.split(/\n/).forEach((para) => {
+          if (!para.trim()) { out.push(""); return; }
+          let line = "";
+          para.trim().split(/\s+/).forEach((w) => { const t = line ? line + " " + w : w; if (g.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t; });
+          if (line) out.push(line);
+        });
+        return out;
+      };
+      for (;;) { g.font = `400 ${size}px ${font}`; lines = wrapAll(); if (lines.length * size * 1.5 <= H * 0.7 || size < W * 0.024) break; size = Math.round(size * 0.92); }
+      const lh = size * 1.5, blockH = lines.length * lh, top = (H - blockH) / 2;
+      if (art) {   // panel gelap supaya teks terbaca di atas gambar
+        const pad = W * 0.06;
+        g.fillStyle = "rgba(0,0,0,.45)";
+        g.fillRect((W - maxW) / 2 - pad, top - pad, maxW + pad * 2, blockH + pad * 2);
+      }
+      g.fillStyle = b.titleColor;
+      g.textAlign = "center";
+      g.textBaseline = "top";
+      if (art) { g.shadowColor = "rgba(0,0,0,.5)"; g.shadowBlur = W * 0.01; }
+      lines.forEach((ln, i) => g.fillText(ln, W / 2, top + i * lh));
     }
     return cv.toDataURL(type || "image/jpeg", 0.9);
   }
@@ -2260,6 +2318,18 @@ nav ol{list-style:none;padding:0;} nav li{margin:.4em 0;}`;
       manifest.push(`<item id="ch${i + 1}" href="${href}" media-type="application/xhtml+xml"/>`);
       chapters.push({ href, label, id: "ch" + (i + 1) });
     }
+    // sampul belakang: halaman terakhir buku
+    let back = false;
+    if (hasBack(s)) {
+      try {
+        files.push({ name: "OEBPS/images/back-cover.jpg", data: dataUrlBytes(await renderBackCover(s, 1000, 1500, "image/jpeg")) });
+        manifest.push(`<item id="back-cover-image" href="images/back-cover.jpg" media-type="image/jpeg"/>`);
+        const blurb = (s.book.blurb || "").trim();
+        files.push({ name: "OEBPS/back-cover.xhtml", data: page("Sampul belakang", `<section epub:type="backmatter" class="cover"><img src="images/back-cover.jpg" alt="${xmlEsc(blurb ? "Sampul belakang: " + blurb : "Sampul belakang")}"/></section>`, "cover") });
+        manifest.push(`<item id="back-cover" href="back-cover.xhtml" media-type="application/xhtml+xml"/>`);
+        back = true;
+      } catch (e) { back = false; }
+    }
     images.forEach((im) => { files.push({ name: "OEBPS/" + im.href, data: im.bytes }); manifest.push(`<item id="${im.id}" href="${im.href}" media-type="${im.type}"/>`); });
     files.push({ name: "OEBPS/style.css", data: EPUB_CSS });
     files.push({ name: "OEBPS/nav.xhtml", data: page("Daftar Isi", `<nav epub:type="toc" id="toc"><h1>Daftar Isi</h1><ol>${chapters.map((c) => `<li><a href="${c.href}">${xmlEsc(c.label)}</a></li>`).join("")}</ol></nav><nav epub:type="landmarks" id="landmarks" hidden="hidden"><ol><li><a epub:type="cover" href="cover.xhtml">Sampul</a></li><li><a epub:type="bodymatter" href="${chapters[0].href}">Mulai membaca</a></li></ol></nav>`) });
@@ -2285,6 +2355,7 @@ nav ol{list-style:none;padding:0;} nav li{margin:.4em 0;}`;
     <itemref idref="cover" linear="yes"/>
     <itemref idref="titlepage"/>
     ${chapters.map((c) => `<itemref idref="${c.id}"/>`).join("\n    ")}
+    ${back ? `<itemref idref="back-cover"/>` : ""}
     <itemref idref="nav" linear="no"/>
   </spine>
 </package>
@@ -2296,7 +2367,7 @@ nav ol{list-style:none;padding:0;} nav li{margin:.4em 0;}`;
     return zipStore(files, "application/epub+zip");
   }
   async function exportEpub(s) { download(await buildEpub(s), safeName(storyTitle(s)) + ".epub"); }
-  function exportDoc(s) {
+  async function exportDoc(s) {
     const title = storyTitle(s);
     const body = (html) => sanitizeHtml(html).replace(/<hr class="qd-break">/g, '<p style="text-align:center;color:#888;">&#10022; &#10022; &#10022;</p>');
     let html = `<div style="text-align:center;margin-top:160pt;"><h1 style="font-family:Georgia,serif;font-size:30pt;font-weight:normal;">${esc(title)}</h1>${s.author ? `<p style="font-family:Georgia,serif;font-size:14pt;color:#555;">oleh ${esc(s.author)}</p>` : ""}</div>`;
@@ -2306,6 +2377,13 @@ nav ol{list-style:none;padding:0;} nav li{margin:.4em 0;}`;
       if (c.header) html += `<p style="text-align:center;"><img src="${esc(c.header)}" style="max-width:100%;" width="560" alt=""></p>`;
       html += `<div style="font-family:Georgia,serif;font-size:12pt;line-height:1.6;">${body(c.html)}</div>`;
     });
+    if (hasBack(s)) {   // sampul belakang di halaman terakhir
+      let backImg = "";
+      try { backImg = await renderBackCover(s, 800, 1200, "image/jpeg"); } catch (e) { backImg = ""; }
+      html += `<br clear="all" style="page-break-before:always" />`;
+      if (backImg) html += `<p style="text-align:center;"><img src="${backImg}" width="400" alt="Sampul belakang"></p>`;
+      else html += `<p style="text-align:center;font-family:Georgia,serif;font-style:italic;white-space:pre-line;">${esc(s.book.blurb.trim())}</p>`;
+    }
     const pre = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>" + esc(title) + "</title><style>blockquote{margin:12pt 24pt;font-style:italic;} img{max-width:100%;}</style></head><body>";
     download(new Blob(["﻿", pre + html + "</body></html>"], { type: "application/msword" }), safeName(title) + ".doc");
   }
@@ -2313,6 +2391,9 @@ nav ol{list-style:none;padding:0;} nav li{margin:.4em 0;}`;
     const title = storyTitle(s);
     let cover = "";
     try { cover = await renderCover(s, 800, 1200, "image/jpeg"); } catch (e) { cover = ""; }
+    let back = "";
+    if (hasBack(s)) { try { back = await renderBackCover(s, 800, 1200, "image/jpeg"); } catch (e) { back = ""; } }
+    const blurb = (s.book.blurb || "").trim();
     const toc = s.chapters.map((c, i) => `<li><a href="#ch${i + 1}"><span>${chMark(s, i)}</span>${esc(chapterLabel(c, i, s))}</a></li>`).join("");
     const chs = s.chapters.map((c, i) => `<section class="ch" id="ch${i + 1}">${chMark(s, i) ? `<p class="num">${chMark(s, i)}</p>` : ""}<h2>${esc(chapterLabel(c, i, s))}</h2>
       ${c.header ? `<img class="hdr" src="${esc(c.header)}" alt="">` : ""}${sanitizeHtml(c.html)}</section>`).join("\n");
@@ -2333,13 +2414,14 @@ h2{text-align:center;font-weight:normal;font-size:1.8em;margin:.2em 0 1.2em;}
 .hdr{display:block;width:100%;max-height:420px;object-fit:cover;border-radius:6px;margin:0 0 1.6em;}
 p{margin:0 0 .9em;}blockquote{margin:1.2em 1.6em;font-style:italic;color:var(--dim);}img{max-width:100%;}
 hr.qd-break{border:0;text-align:center;height:1.4em;margin:1.6em 0;}hr.qd-break:after{content:"\\2726 \\2726 \\2726";color:var(--dim);}
-footer{text-align:center;color:var(--dim);font-size:.8em;margin-top:5em;}
+footer{text-align:center;color:var(--dim);font-size:.8em;margin-top:5em;}.back{margin-top:5em;padding-top:3em;border-top:1px solid var(--line);}
 </style></head>
 <body><main>
 ${cover ? `<img class="cover" src="${cover}" alt="Sampul ${esc(title)}">` : ""}
 <h1>${esc(title)}</h1>${s.author ? `<p class="by">oleh ${esc(s.author)}</p>` : ""}
 <nav aria-label="Daftar isi"><ol>${toc}</ol></nav>
 ${chs}
+${back ? `<section class="back"><img class="cover" src="${back}" alt="${esc(blurb ? "Sampul belakang: " + blurb : "Sampul belakang")}"></section>` : ""}
 <footer>Ditulis dengan Novelist</footer>
 </main></body></html>`;
     download(new Blob([doc], { type: "text/html;charset=utf-8" }), safeName(title) + ".html");

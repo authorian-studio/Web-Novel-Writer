@@ -1,6 +1,7 @@
 /* i18n-en.js — kamus Bahasa Indonesia -> English untuk i18n.js (DIHASILKAN dari teks antarmuka di kode; boleh diedit
    manual). exact = teks utuh, patterns = teks dengan nilai dinamis ({} di sumber, {1} {2} … di terjemahan). */
-window.NOVELIST_EN = {"exact":{"Kerangka":"Outline",
+window.NOVELIST_EN = {"exact":{"Sampul belakang":"Back cover",
+"Kerangka":"Outline",
 "Kerangka cerita":"Story outline",
 "Halaman":"Page",
 "Tampilan kerangka":"Outline view",

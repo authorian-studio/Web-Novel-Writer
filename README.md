@@ -1,6 +1,14 @@
-# Novelist Web — v0.15.0
+# Novelist Web — v0.15.1
 
-## Riwayat perubahan terbaru (v0.15.0) — paling baru di atas
+## Riwayat perubahan terbaru (v0.15.1) — paling baru di atas
+
+**Quill: sampul belakang ikut diekspor.** Bila cerita punya gambar sampul belakang atau teks sampul belakang, sampul
+belakang digambar lengkap (warna sampul, gambar, dan teks blurb) lalu dipasang di akhir buku:
+- **EPUB**: halaman terakhir setelah chapter terakhir (teks blurb juga ada di teks alternatif gambarnya).
+- **HTML**: di bawah chapter terakhir.
+- **Word (.doc)**: halaman terakhir.
+- Pratinjau naskah di layar Terbitkan juga menampilkannya di bagian paling bawah.
+
 
 **Mode Scene kini menjadi Kerangka.** Di tab Write, pilihan "Scene | Quill" sekarang menjadi **Kerangka | Quill**. Tab
 "Tulis" pun bernama Kerangka. Kerangka adalah tempat *merencanakan* cerita, sedangkan menulis versi bukunya di Quill.

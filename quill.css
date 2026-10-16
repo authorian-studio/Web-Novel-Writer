@@ -1286,3 +1286,8 @@ body.light.perf-boost .qdt-scrim { background: rgba(40,32,20,.4); }
   .qdt-loading .ti { animation: none; }
   .qdt-mood-img img { transition: none; }
 }
+
+/* pratinjau Terbitkan: sampul belakang di akhir naskah */
+.qd-ms-back { margin-top: 3em; padding-top: 2em; border-top: 1px solid rgba(0,0,0,.12); text-align: center; }
+.qd-ms-back .qd-ms-header { max-width: 260px; margin: 1em auto; }
+.qd-ms-blurb { margin: 1em auto 0; max-width: 440px; font-style: italic; white-space: pre-line; line-height: 1.6; }
