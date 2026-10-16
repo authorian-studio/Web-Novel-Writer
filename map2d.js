@@ -7,9 +7,10 @@
 //   1. medan  -> kanvas offscreen 8 px/sel (1024x1024) diisi per piksel lewat ImageData: palet & pola bioma sama dengan
 //                tekstur permukaan 3D; tinggi/kemiringan/jarak pantai dari grid vertex 2/sel (rumus sama dengan 3D);
 //                cahaya matahari dari barat daya + langit seperti 3D (bayangan pohon & puncak ikut dilukis ke tanah).
-//                Laut meniru shader air 3D: garis tinta pantai, buih putih, cincin air dangkal biru muda, bercak terang.
+//                Laut meniru shader air 3D: biru muda terang, buih putih, cincin pasir krem; garis tinta biru tua tegas di
+//                pantai digambar sebagai vektor (drawCoast) supaya tetap tajam di semua zoom.
 //                Hanya area yang berubah yang dihitung ulang (diff medan lama vs baru)
-//   2. dekor  -> pohon toon & puncak batu: model 3D yang sama dirender sekali per ukuran ke sprite (rasterizer kecil:
+//   2. dekor  -> pohon toon (gunung = bukit batu dari medan itu sendiri, tanpa sprite puncak): model 3D yang sama dirender sekali per ukuran ke sprite (rasterizer kecil:
 //                shading toon + garis tepi tinta, dilihat dari selatan agak dari atas); posisi sama dengan 3D. Digambar urut
 //                belakang->depan ke ubin cache per potongan 16x16 sel (zoom jauh) atau langsung (zoom dekat)
 //   3. vektor -> wilayah, sungai (berhenti di pantai), jalan, lalu teks: pin & nama tempat, nama wilayah, label
@@ -23,13 +24,12 @@
   const CHUNK = 16;                // ukuran potongan cache dekor (sel)
   const FRAME = 6;                 // tebal bingkai krem (px layar)
   const MAX_PX = 48;               // zoom maksimum (px layar per sel)
-  const MT_GRID = 2.3;             // grid puncak gunung (sel) — sama dengan 3D
-  const MT_SNOW_H = 0.74;          // terrain.h: puncak bertudung salju (sama dengan 3D)
   const WARP = 0.62 / 127.5;       // amplitudo distorsi tepi pantai/bioma (sel)
   const LAND_T = 0.45;             // kontur pantai pada topeng darat halus
   // grid tinggi seperti map3d.js: tinggi dunia = terrain.h x VSCALE, 2 vertex/sel, kemiringan pantai, jarak pantai maks
-  const VSCALE = 10, SEA_DEEP = 3.6, SUB = 2, BANK = 1.3, DCAP = 20, SNOW_MIN = 9;
+  const VSCALE = 10, SEA_DEEP = 3.6, SUB = 2, BANK = 1.3, DCAP = 20, SNOW_MIN = 14;   // salju hanya di puncak yang sangat tinggi (alat Ketinggian)
   const VIEW_EL = (55 * Math.PI) / 180, VS = Math.sin(VIEW_EL), VC = Math.cos(VIEW_EL);   // sudut pandang sprite dekor
+  const MT_SHADE = 1.9;            // penguat bayang-terang bukit batu (gunung) di 2D
   const TILE_MAX = 46;             // px perangkat per sel: di atas ini dekor digambar langsung (bukan ubin)
   const TILE_BUDGET = 24e6;        // total piksel ubin dekor yang disimpan
   const CREAM = "#f1e9cf", INK = "#2b2118", ACCENT = "#d7a86e";
@@ -51,9 +51,9 @@
 
   // warna tekstur permukaan — sama dengan map3d.js (T_*, FIELD_TONES)
   const T_SAND = rgb("#e9dcae"), T_FLOOR = rgb("#d9c99a"), T_DEEP = rgb("#557580"), T_HIGH = rgb("#a39a7e"),
-    T_SNOW = rgb("#f3f5f6"), T_POOL = rgb("#6a8a82"), T_HEDGE = rgb("#7e7c45"), T_CRACK = rgb("#83502c"), T_ROCK = rgb("#877a6c");
+    T_SNOW = rgb("#f3f5f6"), T_POOL = rgb("#6a8a82"), T_HEDGE = rgb("#5f7236"), T_CRACK = rgb("#83502c"), T_ROCK = rgb("#877a6c");
   const FIELD_TONES = ["#e0cb70", "#b7c865", "#9fbc5a", "#d7b061", "#cbda84", "#cc9d5c", "#dfcb78"].map(rgb);
-  const T_GRASS_D = rgb("#a0b35d"), T_POOL_RIM = rgb("#b2b985"), T_MT_GRASS = rgb("#a9b864");
+  const T_GRASS_D = rgb("#a0b35d"), T_POOL_RIM = rgb("#b2b985");
 
   // ---------- cahaya seperti 3D: matahari (-70,125,80) 2.35 + langit/tanah 1.35 (linear, sudah /π) ----------
   const s2l = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
@@ -69,7 +69,7 @@
   const enc = (v) => ENC[v <= 0 ? 0 : v >= 1 ? 4096 : (v * 4096 + 0.5) | 0];
   const fl = (v) => FLUT[v <= 0 ? 0 : v >= 2 ? 2048 : (v * 1024 + 0.5) | 0];
   // air (shader air 3D): dangkal, dalam, buih, garis tinta pantai (linear)
-  const W_SH = linHex("#8fc9df"), W_DP = linHex("#3f75a3"), W_FOAM = linHex("#f2f8f7"), W_INK = linHex("#33424a");
+  const W_SH = linHex("#b3dfea"), W_DP = linHex("#7db7cf"), W_FOAM = linHex("#e9f6f6"), W_INK = linHex("#263a4c");   // air terang ala ilustrasi
   const FLAT = [0, 1, 2].map((c) => fl(SUN_C[c] * SUN[1] + SKY_C[c]));   // pengali sRGB permukaan datar
 
   // ---------- tekstur noise per seed (belang daratan, distorsi tepi, gelombang/punggung vertex) — sama dengan map3d.js ----------
@@ -118,7 +118,7 @@
     };
     const vt = (scale, sd) => ({ scale, ...lat(scale, sd, 0) });
     const wt = (scale, sd) => { const p = lat(scale, sd, 0); return { scale, G: p.G, fx: p.a, fy: lat(scale, sd, 1).a, fc: lat(scale, sd, 7).a }; };
-    f.nGrass = vt(0.42, seed + 201); f.nWoods = vt(1.9, seed + 61); f.nTundra = vt(0.55, seed + 211); f.nFoot = vt(1.4, seed + 223);
+    f.nGrass = vt(0.42, seed + 201); f.nWoods = vt(1.9, seed + 61); f.nTundra = vt(0.55, seed + 211);
     f.wBig = wt(0.44, seed + 87); f.wFine = wt(0.9, seed + 83);
     return f;
   }
@@ -650,7 +650,7 @@
         ?? (b.tree && b.treeDensity > 0.3 ? PAT.woods : PAT.plain);
     }
     // pohon per bioma (sama dengan treeCfg 3D): hutan lebat = grid rapat, bioma jarang = peluang treeDensity
-    const TREE_GAP = { pine: 0.86, broad: 0.98, palm: 1.04 };
+    const TREE_GAP = { pine: 1.1, broad: 1.5, palm: 1.4 };   // hutan lebat: tajuk besar saling menutup (ala ilustrasi)
     const TREE_SIZE = [[1.06, 0.4], [0.95, 0.32], [1, 0.32], [1.02, 0.34], [0.95, 0.3], [1.04, 0.32], [0.95, 0.55]];   // per jenis: [dasar, variasi]
     const treeCfg = [];
     BIOMES.forEach((b, i) => {
@@ -659,7 +659,7 @@
       const pale = (c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11) / 255 > 0.62;
       const kind = b.tree === "pine" ? (pale ? "snowPine" : "pine") : b.tree === "broad" ? (pale ? "broadLight" : "broad") : b.tree;
       treeCfg[i] = { s: dense ? TREE_GAP[kind] || 0.8 : 1, p: dense ? 0.55 + dens * 0.5 : Math.min(0.6, dens * (b.tree === "reed" ? 2 : 1.25)),
-        kind: KIND[kind] ?? KIND.broad, mix: b.tree === "broad" && pale };
+        kind: KIND[kind] ?? KIND.broad, mix: b.tree === "broad" && pale, z: dense ? (b.tree === "broad" ? 1.6 : 1.3) : b.tree === "reed" ? 1 : 1.55 };   // z = pengali ukuran pohon (jarang = pohon besar)
     });
     const SPACINGS = [...new Set(treeCfg.filter(Boolean).map((c) => c.s))];
 
@@ -833,7 +833,7 @@
           const SH = shore[a0] * w0 + shore[a1] * w1 + shore[a2] * w2 + shore[a3] * w3;
           const MT = mtLUT[bio[a0]] * w0 + mtLUT[bio[a1]] * w1 + mtLUT[bio[a2]] * w2 + mtLUT[bio[a3]] * w3;
           let v = HL + sstep(0.3, 1, SH) * wave[k] * 0.09;
-          if (MT > 0) v += MT * ridge[k] * 0.2;
+          if (MT > 0) v += MT * ridge[k] * 0.05;   // tekstur batu tipis saja (gunung membulat, tidak bergerigi)
           v *= VSCALE;
           const bank = BANK * d;
           H = Math.max(Math.min(v, bank), Math.min(bank, 0.08));
@@ -910,19 +910,18 @@
         case PAT.grass:            // bercak hijau lebih tua + bintik rumput halus
           f = vnoise(fields.nGrass, wu, wv);
           if (f > 0.55) { f = Math.min(1, (f - 0.55) * 3) * 0.45; r += (T_GRASS_D[0] - r) * f; g += (T_GRASS_D[1] - g) * f; b += (T_GRASS_D[2] - b) * f; }
-          if (gr > 0.9) { r *= 0.88; g *= 0.93; b *= 0.84; }
           break;
         case PAT.fields: {         // ladang petak-petak + pematang tegas + alur bajak
-          const fu = (wu * fieldAng.c - wv * fieldAng.s) / 1.7, fv = (wu * fieldAng.s + wv * fieldAng.c) / 1.15;
+          const fu = (wu * fieldAng.c - wv * fieldAng.s) / 3.4, fv = (wu * fieldAng.s + wv * fieldAng.c) / 2.4;   // petak ladang besar
           const row = Math.floor(fv), fu2 = fu + C.hash2(row, 7, seed) * 3.7, col = Math.floor(fu2);
           const fid = C.hash2(col, row, seed + 5), ex = fu2 - col, ey = fv - row;
           const tone = FIELD_TONES[(fid * FIELD_TONES.length) | 0];
           k = 0.97 + (m - 0.5) * 0.12;
           r = tone[0] * k; g = tone[1] * k; b = tone[2] * k;
-          k = 1 + Math.sin((fid > 0.5 ? ex * 1.7 : ey * 1.15) * TAU * 3.2) * 0.045;
+          k = 1 + Math.sin((fid > 0.5 ? ex * 3.4 : ey * 2.4) * TAU * 1.6) * 0.04;
           r *= k; g *= k; b *= k;
-          const e = Math.min(Math.min(ex, 1 - ex) * 1.7, Math.min(ey, 1 - ey) * 1.15);
-          f = (1 - sstep(0.03, 0.085, e)) * 0.8;
+          const e = Math.min(Math.min(ex, 1 - ex) * 3.4, Math.min(ey, 1 - ey) * 2.4);
+          f = (1 - sstep(0.06, 0.13, e)) * 0.85;
           if (f > 0) { r += (T_HEDGE[0] - r) * f; g += (T_HEDGE[1] - g) * f; b += (T_HEDGE[2] - b) * f; }
           break;
         }
@@ -961,26 +960,27 @@
           if (f > 0) { r += (T_CRACK[0] - r) * f; g += (T_CRACK[1] - g) * f; b += (T_CRACK[2] - b) * f; }
           break;
         }
-        case PAT.mountain: {       // batu hangat: makin tinggi makin terang, kaki gunung berumput
+        case PAT.mountain: {       // bukit batu abu-abu: makin tinggi makin terang
           k = clamp01((hT - 0.2) / 0.75) * 0.75 + t * 0.25;
-          r = (cR[bi] + (aR[bi] - cR[bi]) * k) * 1.03; g = (cG[bi] + (aG[bi] - cG[bi]) * k) * 0.98; b = (cB[bi] + (aB[bi] - cB[bi]) * k) * 0.92;
-          const foot = 1.4 + (vnoise(fields.nFoot, wu, wv) - 0.5) * 2.4 + (m - 0.5) * 1.4;
-          f = (1 - sstep(foot - 0.25, foot + 0.25, hw)) * 0.92;
-          if (f > 0) { r += (T_MT_GRASS[0] - r) * f; g += (T_MT_GRASS[1] - g) * f; b += (T_MT_GRASS[2] - b) * f; }
-          if (gr > 0.95) { r *= 0.93; g *= 0.93; b *= 0.93; }
+          r = cR[bi] + (aR[bi] - cR[bi]) * k; g = cG[bi] + (aG[bi] - cG[bi]) * k; b = cB[bi] + (aB[bi] - cB[bi]) * k;   // batu abu-abu netral
+          // bukit batu ala ilustrasi: tepi tegas (tanpa kaki berumput) + guratan bongkah batu samar
+          const e = worleyT(fields.wBig, wu * 0.8, wv * 0.8);
+          k = 0.96 + wCellOut * 0.09 - (1 - sstep(0.02, 0.09, e)) * 0.08;
+          r *= k; g *= k; b *= k;
+          if (gr > 0.95) { r *= 0.95; g *= 0.95; b *= 0.95; }
           break;
         }
       }
       if (p !== PAT.mountain && hT > 0.45) { f = clamp01((hT - 0.45) / 0.45) * 0.38; r += (T_HIGH[0] - r) * f; g += (T_HIGH[1] - g) * f; b += (T_HIGH[2] - b) * f; }
       // tebing curam jadi batu (bukan tepi pantai)
-      f = sl > 0.6 ? sstep(0.6, 1.4, sl) * (p === PAT.mountain ? 0.45 : 0.8) * sstep(0.8, 1.6, sd) : 0;
+      f = sl > 0.6 && p !== PAT.mountain ? sstep(0.6, 1.4, sl) * 0.8 * sstep(0.8, 1.6, sd) : 0;
       if (f > 0) { r += (T_ROCK[0] - r) * f; g += (T_ROCK[1] - g) * f; b += (T_ROCK[2] - b) * f; }
       // salju hanya di bagian puncak (relatif ke puncak tertinggi), tepinya berpetak
       f = hw < snowLine - 1.9 ? 0 : sstep(snowLine - 0.35, snowLine + 0.5, hw + (m - 0.5) * 2.4 + (fields.warpX[i] - 127.5) * 0.006) * (1 - sstep(2.6, 4, sl) * 0.5);
       if (f > 0) { r += (T_SNOW[0] - r) * f; g += (T_SNOW[1] - g) * f; b += (T_SNOW[2] - b) * f; }
       // tebing batu berlapis (shader medan 3D): pita & garis mendatar menurut tinggi dunia di lereng curam
-      if (sl > 0.65) {
-        let rk = sstep(0.18, 0.45, 1 - 1 / Math.sqrt(1 + sl * sl)) * (p === PAT.mountain ? 1 : Math.min(1, sstep(0.7, 1.4, sl) * 0.77));
+      if (sl > 0.65 && p !== PAT.mountain) {   // gunung: batu mulus tanpa pita lapisan
+        let rk = sstep(0.18, 0.45, 1 - 1 / Math.sqrt(1 + sl * sl)) * Math.min(1, sstep(0.7, 1.4, sl) * 0.77);
         rk *= 1 - Math.max(snowW, sstep(snowLine - 1, snowLine, hw));
         if (rk > 0) {
           const sv = hw * 0.95 + (m - 0.5) * 0.3, fr = sv - Math.floor(sv), ln = 1 - sstep(0.03, 0.1, Math.min(fr, 1 - fr));
@@ -989,8 +989,8 @@
         }
       }
       // pantai: pasir tipis + garis gelap halus tepat di tepi
-      if (edge < 0.3 && p !== PAT.tundra && p !== PAT.mountain) {
-        f = (1 - edge / 0.3) * 0.5; r += (T_SAND[0] - r) * f; g += (T_SAND[1] - g) * f; b += (T_SAND[2] - b) * f;
+      if (edge < 0.6 && p !== PAT.tundra && p !== PAT.mountain) {   // cincin pasir krem di sisi darat garis pantai
+        f = (1 - sstep(0.25, 0.6, edge)) * 0.75; r += (T_SAND[0] - r) * f; g += (T_SAND[1] - g) * f; b += (T_SAND[2] - b) * f;
       }
       if (edge < 0.06) { k = 0.86 + edge * 2.3; r *= k; g *= k; b *= k; }
       k = 0.965 + gr * 0.07;
@@ -1102,6 +1102,9 @@
               kg = fl((SUN_C[1] * ld + GND_C[1] + (SKY_C[1] - GND_C[1]) * lh) * ao);
               kb = fl((SUN_C[2] * ld + GND_C[2] + (SKY_C[2] - GND_C[2]) * lh) * ao);
             }
+            if (pat[bi] === PAT.mountain) {   // bukit batu: bayang-terang dipertegas supaya bentuknya terbaca dari atas
+              kr = FLAT[0] + (kr - FLAT[0]) * MT_SHADE; kg = FLAT[1] + (kg - FLAT[1]) * MT_SHADE; kb = FLAT[2] + (kb - FLAT[2]) * MT_SHADE;
+            }
             if (s00 === 1 && s10 === 1 && s01 === 1 && s11 === 1) {
               landColor(bi, i, wu, wv, gr, m, 1, hT, hw, sl, sd); r = LR; g = LG; b = LB;
               if (!uni && pb2 >= 0 && pbd < 0.14) {   // anti-alias batas antar bioma
@@ -1173,17 +1176,6 @@
       });
       return m;
     }
-    function addPeak(list, x, y, wd, ht, snow, hv) {
-      const r = wd * 0.46;
-      let base = sampleH(x, y);   // alas = titik terendah di bawah kerucut (sama dengan 3D)
-      for (let a = 0; a < 5; a++) base = Math.min(base, sampleH(x + Math.cos(a * 1.257) * r * 0.8, y + Math.sin(a * 1.257) * r * 0.8));
-      if (base < 0.3) return;
-      const H = ht * 1.05 + 0.25, as = H / r;
-      let t = 0;
-      for (let i = 1; i < PEAK_AS.length; i++) if (Math.abs(PEAK_AS[i] - as) < Math.abs(PEAK_AS[t] - as)) t = i;
-      // di 3D alas puncak terbenam di lereng (hanya bagian atasnya terlihat) -> di 2D digambar sedikit lebih kecil
-      list.push(decorInst({ x, y, k: snow ? KIND.peakSnow : KIND.peak, v: Math.min(PEAK_HV - 1, (hv * PEAK_HV) | 0), t, s: r * 0.82, sy: 1, h: H * 0.82 }));
-    }
     function buildChunk(cx, cy) {
       const list = [], seed = map.seed, bio = map.biome, river = terrain.river;
       const x0 = cx * CHUNK, y0 = cy * CHUNK, x1 = Math.min(n, x0 + CHUNK), y1 = Math.min(n, y0 + CHUNK);
@@ -1203,26 +1195,10 @@
             const sl = Math.abs(sampleH(x + 0.5, y) - sampleH(x - 0.5, y)) + Math.abs(sampleH(x, y + 0.5) - sampleH(x, y - 0.5));
             if (sl > 1.7) continue;
             const r1 = C.hash2(gx, gy, sd + 3), r2 = C.hash2(gx, gy, sd + 4), r3 = C.hash2(gx, gy, sd + 5);
-            const k = cfg.mix ? (r3 < 0.72 ? KIND.pineLight : KIND.broadLight) : cfg.kind, sz = TREE_SIZE[k];
+            const k = cfg.mix ? (r3 < 0.35 ? KIND.pineLight : KIND.broadLight) : cfg.kind, sz = TREE_SIZE[k];
             list.push(decorInst({ x, y, k, v: (((r2 * 3.1) % 1) * TREE_ROT) | 0, t: Math.min(2, (r2 * 3) | 0) * 2 + (r3 < 0.5 ? 0 : 1),
-              s: sz[0] + sz[1] * r1, sy: 0.9 + r3 * 0.24 }));
+              s: (sz[0] + sz[1] * r1) * cfg.z, sy: 0.9 + r3 * 0.24 }));
           }
-      }
-      // puncak gunung pada grid bergeser; milik potongan tempat titik grid berada
-      const g0x = Math.floor(x0 / MT_GRID) - 1, g1x = Math.ceil(x1 / MT_GRID) + 1, g0y = Math.floor(y0 / MT_GRID) - 1, g1y = Math.ceil(y1 / MT_GRID) + 1;
-      for (let gy = g0y; gy <= g1y; gy++) for (let gx = g0x; gx <= g1x; gx++) {
-        const mx = (gx + 0.5 + (C.hash2(gx, gy, seed + 131) - 0.5) * 0.7) * MT_GRID;
-        const my = (gy + 0.5 + (C.hash2(gx, gy, seed + 137) - 0.5) * 0.7) * MT_GRID;
-        if (mx < x0 || mx >= x1 || my < y0 || my >= y1 || mx < 0 || my < 0 || mx >= n || my >= n) continue;
-        const ci = (my | 0) * n + (mx | 0);
-        if (!mtLUT[bio[ci]] || river[ci] || landAtWarped(mx, my) < 0.95) continue;
-        const h = Math.max(0, bil(terrain.h, mx, my)), hv = C.hash2(gx, gy, seed + 139);
-        const wd = 1.5 + Math.min(h, 1.6) * 1.5, snow = h > MT_SNOW_H;
-        if (hv > 0.62) {   // kadang puncak kembar kecil di belakang
-          const side = hv > 0.81 ? 1 : -1;
-          addPeak(list, mx + side * wd * 0.38, my - wd * 0.12, wd * 0.72, wd * 0.72 * (0.5 + hv * 0.2), snow, 1 - hv);
-        }
-        addPeak(list, mx, my, wd, wd * (0.5 + hv * 0.22 + Math.min(h, 1) * 0.16), snow, hv);
       }
       list.sort((a, b) => a.y - b.y || a.x - b.x);
       return list;
@@ -1379,12 +1355,13 @@
       return p;
     }
     function drawCoast() {
-      const s = view.scale, a = clamp01((s - 9) / 7);
+      // garis tinta biru tua tegas di setiap pantai/tepi danau (vektor -> tetap tajam di semua zoom, ala peta ilustrasi)
+      const s = view.scale, a = clamp01((s - 1.2) / 1.5);
       if (a <= 0) return;
       const vx0 = -view.ox / s, vy0 = -view.oy / s, vx1 = (cssW - view.ox) / s, vy1 = (cssH - view.oy) / s;
       ctx.save();
       ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * view.ox, dpr * view.oy);
-      ctx.globalAlpha = a; ctx.strokeStyle = "#535f66"; ctx.lineWidth = Math.max(0.1, 1.1 / (s * dpr)); ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.globalAlpha = a; ctx.strokeStyle = "#263a4c"; ctx.lineWidth = Math.max(1.3, Math.min(4.2, s * 0.3)) / s; ctx.lineCap = "round"; ctx.lineJoin = "round";
       forChunks(vx0 - 0.5, vy0 - 0.5, vx1 + 0.5, vy1 + 0.5, (ci) => { const p = coastPath(ci); if (p) ctx.stroke(p); });
       ctx.restore();
     }

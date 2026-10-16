@@ -1,6 +1,26 @@
-# Novelist Web — v0.13.5
+# Novelist Web — v0.13.6
 
-## Riwayat perubahan terbaru (v0.13.5) — paling baru di atas
+## Riwayat perubahan terbaru (v0.13.6) — paling baru di atas
+
+**Peta (Map) tampil ala ilustrasi seperti vvd, dan 3D jauh lebih ringan.**
+- **Gunung** tidak lagi berupa puluhan puncak kerucut berduri. Sekarang menjadi bukit batu abu-abu yang membulat:
+  - ketinggian medan berbentuk kubah halus dengan benjolan lembut;
+  - bayang-terang dipertegas di 2D, dengan guratan bongkah batu samar;
+  - tanpa pita lapisan tebing dan tanpa salju (salju hanya muncul di puncak yang ditinggikan sangat tinggi dengan alat Ketinggian).
+- **Air** berwarna biru muda terang dan bersih, bukan lagi biru tua yang buram. Setiap pantai/danau punya:
+  - **garis tinta biru tua tegas** yang digambar sebagai vektor, jadi tetap tajam di semua zoom;
+  - cincin pasir krem yang lebih lebar.
+
+  3D memakai warna dan garis yang sama.
+- **Pohon** lebih besar dan lebih jarang, dengan tajuk yang saling menutup seperti ilustrasi. Padang rumput kini didominasi
+  pohon rindang (bukan pinus kecil). Karena jumlah pohon jauh lebih sedikit, 2D maupun 3D ikut lebih cepat.
+- **Ladang** berpetak lebih besar dengan pematang hijau tua yang tegas.
+- **Rumput** tanpa bintik-bintik gelap.
+- **Performa 3D:**
+  - setelah ±2,5 detik tanpa interaksi tidak ada render sama sekali (sebelumnya terus menggambar ulang ±15 fps untuk riak
+    air walau diam);
+  - resolusi kanvas dibatasi 1,5× devicePixelRatio;
+  - puncak gunung InstancedMesh dihapus.
 
 **Tree Relations: seret "+" ke kartu lain kini selalu tersambung.** Sebelumnya, kalau garis dilepas di dekat tepi
 kartu atau di atas label nama, menu relasi terbuka lalu langsung tertutup lagi. Penyebabnya klik kanvas yang

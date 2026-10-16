@@ -2,9 +2,10 @@
 // Di-import dinamis oleh map-ui.js (import('./map3d.js')) saat pengguna pertama kali beralih ke tampilan 3D.
 // Membangun "slab" peta dari data NovelMapCore: permukaan medan (grid 2 vertex/sel + tekstur 8 px/sel bergaya 2D,
 // dipertajam & diberi detail halus di shader saat dekat; tebing batu berlapis menurut tinggi), dinding sisi berlapis tanah,
-// air transparan (garis tinta pantai, buih putih, cincin air dangkal), pohon & puncak gunung bergaya ilustrasi (InstancedMesh
-// toon + garis tepi cangkang terbalik), sungai/jalan/wilayah yang menempel medan, label peta (decal menempel medan) & pin
-// tempat (Sprite; nama dirapikan agar tidak bertumpuk).
+// air transparan (garis tinta pantai, buih putih, cincin air dangkal), pohon bergaya ilustrasi (InstancedMesh toon + garis
+// tepi cangkang terbalik; gunung = bukit batu membulat dari medan, tanpa puncak kerucut), sungai/jalan/wilayah yang menempel medan, label peta (decal menempel medan) & pin
+// tempat (Sprite; nama dirapikan agar tidak bertumpuk). Render hanya saat perlu: setelah ±2.5 dtk tanpa interaksi tidak ada
+// frame sama sekali (air berhenti beriak) supaya tidak membebani GPU; devicePixelRatio dibatasi MAX_PR.
 // Garis pantai & pola bioma memakai rumus yang sama dengan map2d.js supaya tampilan 2D dan 3D cocok.
 // Skala dunia: 1 unit = 1 sel (1 km); tinggi darat = terrain.h * 10; dasar laut diperdalam khusus 3D (x SEA_DEEP);
 //   muka air y = 0; dasar slab y = -13; peta berpusat di origin (x = cx - N/2, z = cy - N/2).
@@ -32,15 +33,15 @@ const SHORE_K = 9;            //   (sel; laut positif) -> jarak 0 tepat di garis
 const DCAP = 20;              // jarak pantai (sel) terjauh yang masih berpengaruh (tebing pantai, buih, pasir); lebih jauh = jenuh
 const STRATA_TOP = 20;        // batas atas tekstur lapisan tanah (unit dunia)
 const STRATA_TILE = 32;       // tekstur lapisan tanah berulang tiap 32 unit
-const SNOW_MIN = 9;           // salju di tanah mulai max(9 unit, 78% puncak tertinggi)
-const MT_GRID = 2.3;          // grid puncak gunung (sel) — sama dengan simbol gunung 2D
-const MT_SNOW_H = 0.74;       // terrain.h: puncak bertudung salju (sama dengan 2D)
+const SNOW_MIN = 14;          // salju di tanah mulai max(14 unit, 78% puncak tertinggi) — gunung biasa tanpa salju
 const FOV = 45;
 const ELEV = THREE.MathUtils.degToRad(24);        // sudut kamera awal dari horizontal (dilihat dari selatan), layar lebar
 const ELEV_TALL = THREE.MathUtils.degToRad(34);   // layar tegak (HP): sedikit lebih dari atas, sisi slab tetap terlihat
 const ELEV_EDIT = THREE.MathUtils.degToRad(37), ELEV_EDIT_TALL = THREE.MathUtils.degToRad(46);   // pose melukis: lebih miring & dekat
 const FIT_Y = 0.8;            // porsi tinggi layar (NDC) maksimum yang diisi slab saat kamera di-reset
-const IDLE_MS = 66;           // saat diam, air tetap beriak ±15 fps
+const IDLE_MS = 66;           // sesaat setelah interaksi, air tetap beriak ±15 fps…
+const IDLE_STOP = 2500;       // …lalu berhenti total (tidak ada render saat diam -> GPU/baterai hemat, tidak lag)
+const MAX_PR = 1.5;           // batas devicePixelRatio kanvas 3D (layar 2x/3x tetap tajam, beban piksel jauh lebih ringan)
 const INK_W = 0.06, INK_PX = 1.1;   // tebal garis tepi pohon: unit dunia (dekat) / px layar (jauh)
 const CREAM = "#f7f1e1", INK = "#2b2118", ACCENT = "#d7a86e";
 const SERIF = 'Georgia, "Times New Roman", serif';
@@ -63,10 +64,10 @@ const PLAIN = lin("#d8cfb6"), BEACH = lin("#eadcae"), SAND = lin("#d9c99a"), FLO
   SOIL = lin("#9a8064"), SEA_LINE = lin("#968a7e"), RIVER = "#5d95bf", ROAD = lin("#86633f"), TRAIL = lin("#a5885f");
 // warna tekstur permukaan (byte sRGB) — detail sama dengan 2D
 const T_SAND = rgb8("#e9dcae"), T_FLOOR = rgb8("#d9c99a"), T_DEEP = rgb8("#557580"), T_HIGH = rgb8("#a39a7e"),
-  T_SNOW = rgb8("#f3f5f6"), T_POOL = rgb8("#6a8a82"), T_HEDGE = rgb8("#7e7c45"), T_CRACK = rgb8("#83502c"), T_ROCK = rgb8("#877a6c");
+  T_SNOW = rgb8("#f3f5f6"), T_POOL = rgb8("#6a8a82"), T_HEDGE = rgb8("#5f7236"), T_CRACK = rgb8("#83502c"), T_ROCK = rgb8("#877a6c");
 // ladang: rona sama urutannya dengan 2D, sedikit lebih cerah/jenuh (ilustrasi referensi)
 const FIELD_TONES = ["#e0cb70", "#b7c865", "#9fbc5a", "#d7b061", "#cbda84", "#cc9d5c", "#dfcb78"].map(rgb8);
-const T_GRASS_D = rgb8("#a0b35d"), T_POOL_RIM = rgb8("#b2b985"), T_MT_GRASS = rgb8("#a9b864");
+const T_GRASS_D = rgb8("#a0b35d"), T_POOL_RIM = rgb8("#b2b985");
 
 // ---------- tekstur noise per seed (belang daratan, distorsi tepi, butiran) — sama dengan getFields map2d.js ----------
 let fieldCache = null;
@@ -135,7 +136,7 @@ export function createMap3D(container, opts) {
   }
 
   // ---------- renderer, scene, kamera, kontrol ----------
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PR));
   renderer.setClearColor(0x000000, 0);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -360,7 +361,7 @@ export function createMap3D(container, opts) {
         const SH = shore[a0] * w0 + shore[a1] * w1 + shore[a2] * w2 + shore[a3] * w3;
         const MT = mtLUT[bio[a0]] * w0 + mtLUT[bio[a1]] * w1 + mtLUT[bio[a2]] * w2 + mtLUT[bio[a3]] * w3;
         let v = HL + smooth(0.3, 1, SH) * wave[k] * 0.09;   // gelombang lembut
-        if (MT > 0) v += MT * ridge[k] * 0.2;                // punggung bergerigi
+        if (MT > 0) v += MT * ridge[k] * 0.05;   // tekstur batu tipis saja (gunung membulat, tidak bergerigi)
         v *= VSCALE;
         const bank = BANK * dist;
         H = Math.max(Math.min(v, bank), Math.min(bank, 0.08));
@@ -443,19 +444,18 @@ export function createMap3D(container, opts) {
       case PAT.grass:            // bercak hijau lebih tua + bintik rumput halus
         f = noise2(wu * 0.42, wv * 0.42, seed + 201);
         if (f > 0.55) { f = Math.min(1, (f - 0.55) * 3) * 0.45; r += (T_GRASS_D[0] - r) * f; g += (T_GRASS_D[1] - g) * f; b += (T_GRASS_D[2] - b) * f; }
-        if (gr > 0.9) { r *= 0.88; g *= 0.93; b *= 0.84; }
         break;
       case PAT.fields: {         // ladang petak-petak (letak sama dengan 2D) + pematang tegas + alur bajak
-        const fu = (wu * fieldAng.c - wv * fieldAng.s) / 1.7, fv = (wu * fieldAng.s + wv * fieldAng.c) / 1.15;
+        const fu = (wu * fieldAng.c - wv * fieldAng.s) / 3.4, fv = (wu * fieldAng.s + wv * fieldAng.c) / 2.4;   // petak ladang besar
         const row = Math.floor(fv), fu2 = fu + hash2(row, 7, seed) * 3.7, col = Math.floor(fu2);
         const fid = hash2(col, row, seed + 5), ex = fu2 - col, ey = fv - row;
         const tone = FIELD_TONES[(fid * FIELD_TONES.length) | 0];
         k = 0.97 + (m - 0.5) * 0.12;
         r = tone[0] * k; g = tone[1] * k; b = tone[2] * k;
-        k = 1 + Math.sin((fid > 0.5 ? ex * 1.7 : ey * 1.15) * TAU * 3.2) * 0.045;
+        k = 1 + Math.sin((fid > 0.5 ? ex * 3.4 : ey * 2.4) * TAU * 1.6) * 0.04;
         r *= k; g *= k; b *= k;
-        const e = Math.min(Math.min(ex, 1 - ex) * 1.7, Math.min(ey, 1 - ey) * 1.15);
-        f = (1 - smooth(0.03, 0.085, e)) * 0.8;
+        const e = Math.min(Math.min(ex, 1 - ex) * 3.4, Math.min(ey, 1 - ey) * 2.4);
+        f = (1 - smooth(0.06, 0.13, e)) * 0.85;
         if (f > 0) { r += (T_HEDGE[0] - r) * f; g += (T_HEDGE[1] - g) * f; b += (T_HEDGE[2] - b) * f; }
         break;
       }
@@ -494,20 +494,20 @@ export function createMap3D(container, opts) {
         if (f > 0) { r += (T_CRACK[0] - r) * f; g += (T_CRACK[1] - g) * f; b += (T_CRACK[2] - b) * f; }
         break;
       }
-      case PAT.mountain: {       // batu hangat: makin tinggi makin terang, tebing berlapis, kaki gunung berumput
+      case PAT.mountain: {       // bukit batu abu-abu: makin tinggi makin terang
         k = clamp01((hT - 0.2) / 0.75) * 0.75 + t * 0.25;
-        r = (cR[bi] + (aR[bi] - cR[bi]) * k) * 1.03; g = (cG[bi] + (aG[bi] - cG[bi]) * k) * 0.98; b = (cB[bi] + (aB[bi] - cB[bi]) * k) * 0.92;
-        // (lapisan tebing digambar shader medan menurut tinggi dunia -> tetap tegas di lereng curam)
-        const foot = 1.4 + (noise2(wu * 1.4, wv * 1.4, seed + 223) - 0.5) * 2.4 + (m - 0.5) * 1.4;
-        f = (1 - smooth(foot - 0.25, foot + 0.25, hw)) * 0.92;
-        if (f > 0) { r += (T_MT_GRASS[0] - r) * f; g += (T_MT_GRASS[1] - g) * f; b += (T_MT_GRASS[2] - b) * f; }
-        if (gr > 0.95) { r *= 0.93; g *= 0.93; b *= 0.93; }
+        r = cR[bi] + (aR[bi] - cR[bi]) * k; g = cG[bi] + (aG[bi] - cG[bi]) * k; b = cB[bi] + (aB[bi] - cB[bi]) * k;   // batu abu-abu netral
+        // bukit batu ala ilustrasi (sama dengan 2D): tepi tegas + guratan bongkah batu samar
+        const e = worleyEdge(wu * 0.35, wv * 0.35, seed + 87);
+        k = 0.96 + wCell * 0.09 - (1 - smooth(0.02, 0.09, e)) * 0.08;
+        r *= k; g *= k; b *= k;
+        if (gr > 0.95) { r *= 0.95; g *= 0.95; b *= 0.95; }
         break;
       }
     }
     if (p !== PAT.mountain && hT > 0.45) { f = clamp01((hT - 0.45) / 0.45) * 0.38; r += (T_HIGH[0] - r) * f; g += (T_HIGH[1] - g) * f; b += (T_HIGH[2] - b) * f; }
     // tebing curam jadi batu (bukan tepi pantai)
-    f = sl > 0.6 ? smooth(0.6, 1.4, sl) * (p === PAT.mountain ? 0.45 : 0.8) * smooth(0.8, 1.6, sd) : 0;
+    f = sl > 0.6 && p !== PAT.mountain ? smooth(0.6, 1.4, sl) * 0.8 * smooth(0.8, 1.6, sd) : 0;
     if (f > 0) { r += (T_ROCK[0] - r) * f; g += (T_ROCK[1] - g) * f; b += (T_ROCK[2] - b) * f; }
     // salju hanya di bagian puncak (relatif ke puncak tertinggi), tepinya berpetak
     f = hw < snowLine - 1.9 ? 0 : smooth(snowLine - 0.35, snowLine + 0.5, hw + (m - 0.5) * 2.4 + (pWarp[i] - 127.5) * 0.006) * (1 - smooth(2.6, 4, sl) * 0.5);
@@ -602,7 +602,7 @@ export function createMap3D(container, opts) {
 
   // bobot detail per pola bioma: [rumput, pasir, batu, salju]
   const DW_PAT = [[0.6, 0, 0, 0], [1, 0, 0, 0], [0.5, 0, 0.05, 0], [0.8, 0, 0, 0], [0.7, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0.15, 0.9],
-    [0, 0.3, 0.5, 0], [0.1, 0, 0.55, 0]];
+    [0, 0.3, 0.5, 0], [0.25, 0, 0.08, 0]];   // gunung: batu mulus (hampir tanpa pita lapisan tebing)
   function detailWeights(R) {
     const n = size, w = VW, bio = map.biome, out = dwData;
     for (let j = R.y0; j <= R.y1; j++) for (let i = R.x0; i <= R.x1; i++) {
@@ -612,7 +612,8 @@ export function createMap3D(container, opts) {
         const q = DW_PAT[pat[bio[Math.min(n - 1, (j / SUB) | 0) * n + Math.min(n - 1, (i / SUB) | 0)]]] || DW_PAT[0];
         R = q[0]; Gs = q[1]; B = q[2]; A = q[3];
         const beach = smooth(0.45, 0.1, SD[k]), steep = smooth(0.7, 1.4, SL[k]), snow = smooth(snowLine - 1, snowLine, hw);
-        R *= 1 - beach; Gs = Math.max(Gs, beach * 0.7); B = Math.max(B * (1 - steep * 0.5), steep * 0.35);   // lereng curam: tekstur meregang
+        R *= 1 - beach; Gs = Math.max(Gs, beach * 0.7);
+        if (q !== DW_PAT[PAT.mountain]) B = Math.max(B * (1 - steep * 0.5), steep * 0.35);   // lereng curam: tekstur meregang (bukan gunung)
         if (snow > 0) { R *= 1 - snow; Gs *= 1 - snow; B *= 1 - snow * 0.7; A = Math.max(A, snow); }
       }
       out[o] = R * 255; out[o + 1] = Gs * 255; out[o + 2] = B * 255; out[o + 3] = A * 255;
@@ -837,60 +838,17 @@ export function createMap3D(container, opts) {
   }
 
   // ---------- puncak gunung batu (posisi = simbol gunung 2D) ----------
+  // Gunung kini berupa bukit batu membulat dari medan itu sendiri (NovelMapCore.computeTerrain) — tanpa puncak kerucut
+  // bergerigi; grup dikosongkan saja (dipertahankan supaya alur bangun ulang tetap sama).
   function buildMountains() {
     clearGroup(G.mounts);
-    const n = size, half = n / 2, seed = map.seed, bio = map.biome, river = terrain.river, TH = terrain.h;
-    const lists = { rock: [], snow: [] };
-    const add = (x, y, wd, ht, snow, hv) => {
-      const r = wd * 0.46;
-      let base = sampleH(x, y);   // alas = titik terendah di bawah kerucut supaya tidak melayang di lereng
-      for (let a = 0; a < 5; a++) base = Math.min(base, sampleH(x + Math.cos(a * 1.257) * r * 0.8, y + Math.sin(a * 1.257) * r * 0.8));
-      if (base < 0.3) return;
-      lists[snow ? "snow" : "rock"].push(x - half, base - 0.15, y - half, r, ht * 1.05 + 0.25, hv);
-    };
-    const gN = Math.ceil(n / MT_GRID) + 1;
-    for (let gy = -1; gy <= gN; gy++) for (let gx = -1; gx <= gN; gx++) {
-      const mx = (gx + 0.5 + (hash2(gx, gy, seed + 131) - 0.5) * 0.7) * MT_GRID;
-      const my = (gy + 0.5 + (hash2(gx, gy, seed + 137) - 0.5) * 0.7) * MT_GRID;
-      if (mx < 0 || my < 0 || mx >= n || my >= n) continue;
-      const ci = (my | 0) * n + (mx | 0);
-      if (!mtLUT[bio[ci]] || river[ci] || landAtWarped(mx, my) < 0.95) continue;
-      const h = Math.max(0, bil(TH, mx, my)), hv = hash2(gx, gy, seed + 139);
-      const wd = 1.5 + Math.min(h, 1.6) * 1.5, snow = h > MT_SNOW_H;
-      if (hv > 0.62) {   // kadang puncak kembar kecil di belakang
-        const side = hv > 0.81 ? 1 : -1;
-        add(mx + side * wd * 0.38, my - wd * 0.12, wd * 0.72, wd * 0.72 * (0.5 + hv * 0.2), snow, 1 - hv);
-      }
-      add(mx, my, wd, wd * (0.5 + hv * 0.22 + Math.min(h, 1) * 0.16), snow, hv);
-    }
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), s = new THREE.Vector3(), c = new THREE.Color();
-    Object.keys(lists).forEach((kind) => {
-      const arr = lists[kind], count = arr.length / 6;
-      if (!count) return;
-      const pk = shared.peaks[kind], mesh = new THREE.InstancedMesh(pk.body, shared.treeMat, count);
-      for (let j = 0; j < count; j++) {
-        const o = j * 6, r = arr[o + 3], hv = arr[o + 5];
-        v.set(arr[o], arr[o + 1], arr[o + 2]);
-        q.setFromEuler(e.set((hv - 0.5) * 0.08, hv * TAU * 3.7, (0.5 - hv) * 0.08));
-        s.set(r * (0.9 + hv * 0.2), arr[o + 4], r * (1.1 - hv * 0.2));
-        mesh.setMatrixAt(j, m4.compose(v, q, s));
-        const k = 0.9 + hv * 0.16;
-        mesh.setColorAt(j, c.setRGB(k, k * 0.99, k * 0.97));
-      }
-      mesh.instanceMatrix.needsUpdate = true;
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-      mesh.castShadow = true; mesh.receiveShadow = true;
-      const ink = new THREE.InstancedMesh(pk.ink, shared.inkRockMat, 0);   // garis tepi: matriks instance dipakai bersama
-      ink.instanceMatrix = mesh.instanceMatrix; ink.count = count;
-      G.mounts.add(mesh, ink);
-    });
   }
 
   // ---------- pohon (InstancedMesh per jenis & per potongan TREE_CHUNK sel agar bisa di-cull; deterministik dengan hash2) ----------
   // Titik pohon = grid ber-jitter dengan jarak per bioma: hutan lebat rapat (tajuk saling menutup seperti ilustrasi),
   // bioma jarang (padang rumput, tundra, rawa) memakai peluang = treeDensity. Bioma pucat memakai pohon hijau muda/bersalju.
   const TREE_CHUNK = 32;
-  const TREE_GAP = { pine: 0.86, broad: 0.98, palm: 1.04 };   // jarak grid hutan lebat (sel)
+  const TREE_GAP = { pine: 1.1, broad: 1.5, palm: 1.4 };   // hutan lebat: tajuk besar saling menutup (ala ilustrasi)   // jarak grid hutan lebat (sel)
   const treeCfg = [];   // indeks bioma -> { s: jarak grid (sel), p: peluang, kind, mix }
   BIOMES.forEach((b, i) => {
     if (!b.land || !b.tree) return;
@@ -898,7 +856,7 @@ export function createMap3D(container, opts) {
     const pale = (c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11) / 255 > 0.62;   // sama dengan 2D
     const kind = b.tree === "pine" ? (pale ? "snowPine" : "pine") : b.tree === "broad" ? (pale ? "broadLight" : "broad") : b.tree;
     treeCfg[i] = { s: dense ? TREE_GAP[kind] || 0.8 : 1, p: dense ? 0.55 + dens * 0.5 : Math.min(0.6, dens * (b.tree === "reed" ? 2 : 1.25)),
-      kind, mix: b.tree === "broad" && pale };   // padang rumput: kebanyakan pinus kecil (seperti referensi)
+      kind, mix: b.tree === "broad" && pale, z: dense ? (b.tree === "broad" ? 1.6 : 1.3) : b.tree === "reed" ? 1 : 1.55 };   // z = pengali ukuran pohon (jarang = pohon besar)
   });
   // skala pohon [dasar, variasi] (tinggi pinus skala 1 ±1.7 sel)
   const TREE_SIZE = { pine: [1.06, 0.4], pineLight: [0.95, 0.32], snowPine: [1, 0.32], broad: [1.02, 0.34], broadLight: [0.95, 0.3], palm: [1.04, 0.32], reed: [0.95, 0.55] };
@@ -941,12 +899,12 @@ export function createMap3D(container, opts) {
         const sl = Math.abs(sampleH(x + 0.5, y) - sampleH(x - 0.5, y)) + Math.abs(sampleH(x, y + 0.5) - sampleH(x, y - 0.5));
         if (sl > 1.7) continue;
         const r1 = hash2(gx, gy, sd + 3), r2 = hash2(gx, gy, sd + 4), r3 = hash2(gx, gy, sd + 5);
-        const kind = cfg.mix ? (r3 < 0.72 ? "pineLight" : "broadLight") : cfg.kind;
+        const kind = cfg.mix ? (r3 < 0.35 ? "pineLight" : "broadLight") : cfg.kind;
         const key = kind + "|" + (((y / TREE_CHUNK) | 0) * CN + ((x / TREE_CHUNK) | 0));
         let arr = buckets.get(key);
         if (!arr) buckets.set(key, (arr = []));
         const sz = TREE_SIZE[kind], k = 0.86 + r2 * 0.24, tint = (r3 - 0.5) * 0.16;
-        arr.push(x - half, h - 0.06, y - half, sz[0] + sz[1] * r1, r2 * TAU * 3.1, 0.9 + r3 * 0.24, k * (1 + tint), k, k * (1 - tint * 1.3));
+        arr.push(x - half, h - 0.06, y - half, (sz[0] + sz[1] * r1) * cfg.z, r2 * TAU * 3.1, 0.9 + r3 * 0.24, k * (1 + tint), k, k * (1 - tint * 1.3));
       }
     });
     buckets.forEach((arr, key) => {
@@ -1406,6 +1364,7 @@ export function createMap3D(container, opts) {
   }
 
   // ---------- render loop (hanya saat aktif) ----------
+  let lastActive = 0;
   function requestRender() { needsRender = true; }
   function frame(now) {
     raf = requestAnimationFrame(frame);
@@ -1418,7 +1377,8 @@ export function createMap3D(container, opts) {
     if (clampTarget()) moved = true;
     if (moved && PAINT[tool]) cursorDirty = true;   // titik di bawah pointer & tebal cincin ikut kamera
     if (cursorDirty) updateCursor();
-    if (!moved && !needsRender && now - lastRender < IDLE_MS) return;
+    if (moved || needsRender) lastActive = now;
+    else if (now - lastRender < IDLE_MS || now - lastActive > IDLE_STOP) return;
     if (moved || layoutDirty) layoutNames();
     const t = now * 0.001;
     shared.waterNormal.offset.set(t * 0.011, t * 0.006);
@@ -1447,7 +1407,7 @@ export function createMap3D(container, opts) {
   function resize() {
     if (disposed) return;
     const w = Math.round(container.clientWidth), h = Math.round(container.clientHeight);
-    const pr = Math.min(window.devicePixelRatio || 1, 2);
+    const pr = Math.min(window.devicePixelRatio || 1, MAX_PR);
     if (pr !== renderer.getPixelRatio()) { renderer.setPixelRatio(pr); requestRender(); }
     if (w === width && h === height) return;
     width = w; height = h;
@@ -1998,16 +1958,16 @@ function makeShared(maxAniso, hash2) {
         // bercak awan (0.86..1) menggoyang tepi cincin dangkal & buih supaya tidak seperti garis kontur
         "\tfloat wob = texture2D(map, vMapUv * 2.7 + 0.31).r - 0.93;",
         "\tfloat tD = smoothstep(0.5, 4.2, dist + wob * 9.0);",
-        `\tdiffuseColor.rgb *= mix(${glsl("#8fc9df")}, ${glsl("#3f75a3")}, tD);`,
-        "\tdiffuseColor.a *= mix(0.86, 0.95, tD);",
+        `\tdiffuseColor.rgb *= mix(${glsl("#b3dfea")}, ${glsl("#7db7cf")}, tD);`,   // air terang ala ilustrasi (sama dengan 2D)
+        "\tdiffuseColor.a *= mix(0.9, 0.97, tD);",
         // buih putih lembut menempel pantai + riak tipis sejajar pantai (seperti 2D)
         "\tfloat foam = 1.0 - smoothstep(0.1, 1.25 + wob * 7.0, dist);",
         "\tfloat rip = (1.0 - smoothstep(0.0, 0.07, abs(dist - 2.1 - wob * 4.0))) * 0.08;",
-        `\tdiffuseColor.rgb = mix(diffuseColor.rgb, ${glsl("#f2f8f7")}, max(foam * foam * 0.95, rip));`,
+        `\tdiffuseColor.rgb = mix(diffuseColor.rgb, ${glsl("#e9f6f6")}, max(foam * foam * 0.95, rip));`,
         "\tdiffuseColor.a = mix(diffuseColor.a, 0.98, foam);",
-        // garis tinta tipis tepat di garis pantai (pulau seperti potongan ilustrasi)
-        "\tfloat coast = 1.0 - smoothstep(0.07, 0.17, dist);",
-        `\tdiffuseColor.rgb = mix(diffuseColor.rgb, ${glsl("#33424a")}, coast * 0.85);`,
+        // garis tinta biru tua tegas tepat di garis pantai (pulau seperti potongan ilustrasi)
+        "\tfloat coast = 1.0 - smoothstep(0.12, 0.28, dist);",
+        `\tdiffuseColor.rgb = mix(diffuseColor.rgb, ${glsl("#263a4c")}, coast * 0.95);`,
         "\tdiffuseColor.a = mix(diffuseColor.a, 1.0, coast);",
       ].join("\n"));
   };
