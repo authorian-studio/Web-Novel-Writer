@@ -1,6 +1,60 @@
-# Novelist Web — v0.11.2
+# Novelist Web — v0.12.2
 
-## Riwayat perubahan terbaru (v0.11.2) — paling baru di atas
+## Riwayat perubahan terbaru (v0.12.2) — paling baru di atas
+
+**Jejaring Tokoh berganti nama jadi Tree Relations** (`jejaring.js`, `jejaring.css`; id tab & data `data.jejaring`
+tetap sama, jadi tree lama langsung terbaca).
+- **Satu kartu → banyak kartu:** pilih kartu lalu tombol **Hubungkan** di bilah kartu (atau "+" → "Hubungkan ke kartu
+  lain…"), centang satu atau beberapa kartu di lembar itu (bisa dicari; yang sudah terhubung ditandai), lalu pilih jenis
+  relasinya (atau buat kustom / tanpa label). Semua garis dibuat sekaligus dan bisa diurungkan dengan sekali Ctrl+Z.
+- **Garis siku yang tidak saling tumpuk (ala vvd):** semua garis kini dirutekan bersama —
+  - garis yang keluar/masuk di sisi kartu yang sama mendapat titik sambung sendiri-sendiri, diurutkan menurut letak
+    kartu di ujung lainnya;
+  - ruas tengah yang sejajar di lorong yang sama diberi jalur berbeda (berjarak 9 px), dengan urutan yang dipilih
+    supaya persilangan sesedikit mungkin;
+  - sudut membulat, label relasi di tengah ruas tengah. Berlaku juga di pratinjau wizard.
+
+### v0.12.1
+
+**Timeline dirombak** (`timeline.js`, gaya di `style.css` bagian Timeline).
+- **Latar bintik samar** di kanvas (tema gelap & terang).
+- **Hover di garis waktu = tanggal lengkap** (mis. "12 Maret 1620"); klik di garis menambah event di tanggal itu.
+  Menggeser event juga menyimpan tanggal lengkap; klik event tanpa menggeser tidak lagi mengubah tanggalnya.
+- **Klik event → kartu kecil**: gambar, judul, tanggal, deskripsi, tag, "Edit" (panel edit) & "Buka scene". Kartu ikut
+  bergeser/zoom bersama kanvas; tutup dengan ×, Esc, atau klik area kosong.
+- Panel edit event punya **Gambar** (klik / seret; diperkecil otomatis) dan **Tag** (pisahkan dengan koma).
+  Data baru di event: `image`, `tags`.
+- **Tombol "+ 100 th" di kedua ujung garis**: tiap klik menambah 100 tahun sebelum awal / sesudah akhir (`start`/`end`
+  timeline). Bila ujungnya di luar layar, tombolnya menempel di tepi kanvas.
+- **Tombol mata/bulan di kanan dihapus** dari tab Timeline (kanvas memakai seluruh lebar).
+- **Sidebar daftar timeline bisa ditutup & dibuka** (tombol di kiri judul; diingat di perangkat).
+- **Ganti timeline lewat dropdown judul** (panah di samping judul): daftar timeline + jumlah event, "Timeline baru".
+  Judul tetap bisa diketik untuk ganti nama.
+
+### v0.12.0
+
+**Kodeks — wiki dunia cerita** (menggantikan tab Organize; `kodeks.js` + `kodeks.css`).
+- **9 jenis entri:** Karakter, Lokasi, Faksi, Benda, Makhluk, Budaya/Agama, Sistem Sihir, Sejarah, Catatan — plus
+  "Semua" untuk melihat & mencari lintas jenis. Tiap jenis punya warna & ikon sendiri.
+- **Templat isian per jenis** (mis. Karakter: peran, usia, gender, ras, pekerjaan, asal, penampilan, kepribadian,
+  motivasi, kekuatan & kelemahan, latar belakang; Sistem Sihir: sumber, pengguna, aturan, batasan & harga, tingkatan),
+  ditambah kolom bebas **Deskripsi & catatan** (isi Organize lama tetap di sini).
+- **Foto** (klik / seret gambar; diperkecil otomatis). Karakter tanpa foto memakai foto kartunya di Tree Relations (dulu Jejaring Tokoh).
+- **Nama lain / panggilan**, **tag** (saran dari tag yang sudah ada, filter tag), **folder** per jenis (buat, ganti
+  nama, hapus — entri tidak ikut terhapus; seret entri ke folder atau untuk mengurutkan).
+- **Pencarian** di nama, nama lain, isian templat, tag, folder & deskripsi.
+- **Disebut di:** daftar scene (dengan babnya) & chapter Quill yang menyebut nama atau nama lain entri — jumlah sebutan +
+  cuplikan bertanda; klik untuk membuka scene/chapter itu.
+- **Tampilan Daftar** (dikelompokkan per folder + panel detail), **Galeri** (kartu bergambar) dan **Tabel** (kolom
+  templat utama, folder, tag, jumlah sebutan; klik judul kolom untuk mengurutkan). Pilihan tampilan diingat di perangkat.
+  Di HP: jenis jadi chip mendatar, daftar ↔ detail bergantian.
+- **Data Organize lama tetap terbaca apa adanya** — data tetap di `data.organize` (kunci `characters`, `locations`,
+  `notes` sama; jenis baru `factions`, `items`, `creatures`, `cultures`, `magic`, `history` dibuat saat entri pertama
+  dibuat; isian baru: `fields`, `aliases`, `tags`, `folder`, `photo`; urutan/folder kosong di `organize.folders`).
+  Jejaring Tokoh, Quill (Kartu dunia), Beranda (titik jejak & kartu dokumen), riwayat tab & ekspor Word ikut mengenali
+  semua jenis baru.
+
+### v0.11.2
 
 **Perbaikan & penguatan sistem simpan Google Drive** (tulisan di Jejaring Tokoh yang tidak tersimpan).
 Penyebab yang ditemukan & diperbaiki:

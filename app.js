@@ -563,13 +563,14 @@ function binderToHtml(data) {
   let html = `<h1 style="font-family:Georgia,serif;">${escapeHtml(data.title)}</h1>`;
   html += `<h2 style="font-family:Georgia,serif;border-bottom:1px solid #ccc;">Manuskrip</h2>`;
   html += sceneNodesToHtml(data.scenes, 0);
-  const catLabels = { characters: "Karakter", locations: "Lokasi", notes: "Catatan" };
-  Object.keys(catLabels).forEach((cat) => {
-    const list = data.organize?.[cat] || [];
+  const kinds = window.NovelKodeks ? window.NovelKodeks.KINDS : [{ id: "characters", name: "Karakter" }, { id: "locations", name: "Lokasi" }, { id: "notes", name: "Catatan" }];
+  kinds.forEach((k) => {
+    const list = (data.organize?.[k.id] || []).filter((it) => it && typeof it === "object");
     if (list.length === 0) return;
-    html += `<h2 style="font-family:Georgia,serif;border-bottom:1px solid #ccc;">${catLabels[cat]}</h2>`;
+    html += `<h2 style="font-family:Georgia,serif;border-bottom:1px solid #ccc;">${escapeHtml(k.name)}</h2>`;
     list.forEach((it) => {
       html += `<h3 style="font-family:Georgia,serif;">${escapeHtml(it.title)}</h3>`;
+      if (window.NovelKodeks) html += `<div style="font-family:Georgia,serif;font-size:14px;">${window.NovelKodeks.exportHtml(it, k.id)}</div>`;
       html += `<div style="font-family:Georgia,serif;font-size:14px;">${it.content || ""}</div>`;
     });
   });
@@ -603,11 +604,8 @@ function openProject(id) {
   if (currentSceneId) { sceneHistory = [currentSceneId]; sceneHistoryIndex = 0; }
   renderSceneDetail();
   currentOrgCat = "characters";
-  document.querySelectorAll(".org-subtab").forEach((b) => b.classList.toggle("active", b.dataset.cat === "characters"));
-  el("organizeCatLabel").textContent = "KARAKTER";
-  renderOrganizeList();
   currentOrgItemId = null;
-  renderOrganizeDetail();
+  if (window.NovelKodeks) window.NovelKodeks.render();
   markSaved();
   restoreProjectTabs(p);   // TAB PROJECT: tab terbuka + tab aktif project ini (bawaan: Beranda)
   el("dashboardView").classList.add("hidden");
@@ -702,8 +700,8 @@ const TAB_DEFS = [
   { id: "home", panel: "home", name: "Beranda", icon: tiIcon("home"), desc: "Jejak semua dokumenmu & papan ide — zoom, susun, hubungkan" },
   { id: "write", panel: "write", name: "Tulis", icon: tiIcon("pencil"), desc: "Editor scene: bab & adegan bertingkat" },
   { id: "quill", panel: "write", name: "Quill", icon: tiIcon("feather"), desc: "Tulis cerita bergaya buku, lalu terbitkan" },
-  { id: "organize", panel: "organize", name: "Organize", icon: tiIcon("folders"), desc: "Karakter, lokasi & catatan dunia cerita" },
-  { id: "jejaring", panel: "jejaring", name: "Jejaring Tokoh", icon: tiIcon("affiliate"), desc: "Pohon relasi tokoh: keluarga, kantor, militer, istana" },
+  { id: "organize", panel: "organize", name: "Kodeks", icon: tiIcon("books"), desc: "Wiki dunia: karakter, lokasi, faksi, sihir, sejarah & lainnya" },
+  { id: "jejaring", panel: "jejaring", name: "Tree Relations", icon: tiIcon("affiliate"), desc: "Pohon relasi tokoh: keluarga, kantor, militer, istana" },
   { id: "timeline", panel: "timeline", name: "Timeline", icon: tiIcon("timeline"), desc: "Garis waktu peristiwa, terhubung ke scene" },
   { id: "map", panel: "map", name: "Map", icon: tiIcon("map"), desc: "Lukis peta dunia & lihat sebagai diorama 3D" },
   { id: "plot", panel: "plot", name: "Plot", icon: tiIcon("git-branch"), desc: "Susun alur & konflik cerita (segera hadir)" },
@@ -794,6 +792,7 @@ function showTabPanel(tab) {
   if (panel !== "map" && window.NovelMap) window.NovelMap.hide();   // hentikan render loop 3D
   if (panel === "timeline") openTimelineTab();
   if (panel === "map") openMapTab();
+  if (panel === "organize" && window.NovelKodeks) window.NovelKodeks.refresh();   // Kodeks: "Disebut di" ikut naskah terbaru
   if (!panel) renderTabEmpty();
 }
 // mode Scene/Quill kini mengikuti tab (Tulis / Quill) — tidak menandai project berubah (bukan isi cerita)
@@ -1130,7 +1129,7 @@ function tabCurrentDoc(tab) {
   if (!p) return null;
   if (tab === "write") { const s = currentSceneId ? findScene(currentSceneId) : null; return s && s.type !== "folder" ? { doc: s.id, kind: "scene", title: s.title } : null; }
   if (tab === "organize") {
-    const it = currentOrgItemId ? (p.data.organize[currentOrgCat] || []).find((x) => x.id === currentOrgItemId) : null;
+    const it = orgFindItem(p, currentOrgCat, currentOrgItemId);
     return it ? { doc: it.id, kind: currentOrgCat, title: it.title } : null;
   }
   const last = tabLastDoc[tab];
@@ -1500,7 +1499,7 @@ function openProjectDoc(kind, id) {
   if (!p || !id) return;
   if (kind === "scene") { openSceneInWrite(id); return; }
   if (kind === "folder") { openFolderInWrite(id); return; }
-  if (kind === "characters" || kind === "locations" || kind === "notes") { openTabHist({ k: "organize:" + id, tab: "organize", doc: id, kind }); return; }
+  if (window.NovelKodeks && window.NovelKodeks.isKind(kind)) { openTabHist({ k: "organize:" + id, tab: "organize", doc: id, kind }); return; }
   if (kind === "chapter") {
     const s = ((p.data.quill && p.data.quill.stories) || []).find((x) => x && Array.isArray(x.chapters) && x.chapters.some((c) => c && c.id === id));
     if (!s) return;
@@ -1533,12 +1532,12 @@ async function createProjectDoc(kind, title) {
     d.scenes.push(node);
     id = node.id;
     renderSceneList();
-  } else if (kind === "characters" || kind === "locations" || kind === "notes") {
+  } else if (window.NovelKodeks && window.NovelKodeks.isKind(kind)) {
     syncOrganizeFromDetail();
     const arr = d.organize[kind] || (d.organize[kind] = []);
     let nid = kind + "-" + stamp;
     while (arr.some((x) => x && x.id === nid)) nid = kind + "-" + stamp + "-" + Math.random().toString(36).slice(2, 6);
-    arr.push({ id: nid, title: t || { characters: "Karakter baru", locations: "Lokasi baru", notes: "Catatan baru" }[kind], content: "" });
+    arr.push({ id: nid, title: t || window.NovelKodeks.KINDS.find((k) => k.id === kind).one + " baru", content: "" });
     id = nid;
     if (currentOrgCat === kind) renderOrganizeList();
   } else if (kind === "timeline") {
@@ -1739,9 +1738,9 @@ function ensureJejaringLib() {
 }
 async function renderJejaringTab() {
   const box = el("jejaringCanvas");
-  if (!window.NovelJejaring) box.innerHTML = `<div class="home-loading">${tiPx(tiIcon("loader-2"), 18)}<span>Memuat Jejaring Tokoh…</span></div>`;
+  if (!window.NovelJejaring) box.innerHTML = `<div class="home-loading">${tiPx(tiIcon("loader-2"), 18)}<span>Memuat Tree Relations…</span></div>`;
   try { await ensureJejaringLib(); }
-  catch (e) { box.innerHTML = '<div class="home-loading">Jejaring Tokoh gagal dimuat. Periksa koneksi lalu buka tab ini lagi.</div>'; return; }
+  catch (e) { box.innerHTML = '<div class="home-loading">Tree Relations gagal dimuat. Periksa koneksi lalu buka tab ini lagi.</div>'; return; }
   if (el("tabJejaring").classList.contains("hidden") || el("editorView").classList.contains("hidden") || !currentProjectId) return;   // pengguna sudah pindah
   const p = getProject(currentProjectId);
   window.NovelJejaring.show({
@@ -1759,7 +1758,8 @@ async function renderJejaringTab() {
       if (!p.data.organize || currentOrgCat !== "characters") return;
       renderOrganizeList();
       const it = currentOrgItemId && (p.data.organize.characters || []).find((x) => x.id === currentOrgItemId);
-      if (it && el("orgTitleField")) el("orgTitleField").value = it.title;
+      const t = document.querySelector("#kodeksRoot .kx-title-in");
+      if (it && t) t.value = it.title;
     },
     openCharacter: (cid) => {   // "Buka kartu" -> tab Organize › Karakter, item itu terpilih
       switchTab("organize");
@@ -3236,100 +3236,24 @@ function closeFocusMode() {
   if (ed && !el("tabWrite").classList.contains("hidden")) ed.focus({ preventScroll: true });
 }
 
-// ---- ORGANIZE TAB ----
+// ---- KODEKS (tab "organize") ----
+// Wiki dunia cerita: UI & logikanya di kodeks.js (window.NovelKodeks). Fungsi bernama lama di bawah tetap ada karena
+// dipanggil modul lain (novelist-sync.js, quill-tiles.js, Jejaring, riwayat tab): currentOrgCat = jenis entri aktif,
+// currentOrgItemId = entri yang dibuka; data tetap di project.data.organize[jenis].
+function orgFindItem(p, kind, id) {
+  const list = p && p.data.organize && p.data.organize[kind];
+  return id && Array.isArray(list) ? list.find((x) => x && x.id === id) || null : null;
+}
 function switchOrganizeCat(cat) {
   syncOrganizeFromDetail();
+  if (window.NovelKodeks && !window.NovelKodeks.isKind(cat)) cat = "characters";
   currentOrgCat = cat;
   currentOrgItemId = null;
-  document.querySelectorAll(".org-subtab").forEach((b) => b.classList.toggle("active", b.dataset.cat === cat));
-  const labels = { characters: "KARAKTER", locations: "LOKASI", notes: "CATATAN" };
-  el("organizeCatLabel").textContent = labels[cat];
   renderOrganizeList(); renderOrganizeDetail();
 }
-let draggedOrgItemId = null;
-function renderOrganizeList() {
-  const p = getProject(currentProjectId);
-  const list = p.data.organize[currentOrgCat] || [];
-  const container = el("organizeList");
-  container.innerHTML = "";
-  list.forEach((item) => {
-    const card = document.createElement("div");
-    card.className = "scene-card" + (item.id === currentOrgItemId ? " active" : "");
-    card.draggable = true;
-    card.innerHTML = `
-      <div class="scene-card-top">
-        <span class="drag-handle" title="Seret untuk pindahkan urutan">${TREE_ICONS.grip}</span>
-        <div class="scene-card-title">${escapeHtml(item.title)}</div>
-        <div class="scene-card-icons">
-          <button class="scene-icon-btn scene-icon-danger" data-action="delete" title="Hapus" aria-label="Hapus">${tiPx(tiIcon("trash"), 14)}</button>
-        </div>
-      </div>`;
-    card.addEventListener("click", (e) => {
-      if (e.target.closest(".scene-icon-btn")?.dataset.action === "delete") { deleteOrganizeItem(item.id); return; }
-      syncOrganizeFromDetail(); currentOrgItemId = item.id; renderOrganizeList(); renderOrganizeDetail();
-    });
-    card.addEventListener("dragstart", (e) => { draggedOrgItemId = item.id; card.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; });
-    card.addEventListener("dragend", () => card.classList.remove("dragging"));
-    card.addEventListener("dragover", (e) => { e.preventDefault(); card.classList.add("drag-over"); });
-    card.addEventListener("dragleave", () => card.classList.remove("drag-over"));
-    card.addEventListener("drop", (e) => {
-      e.preventDefault(); card.classList.remove("drag-over");
-      if (!draggedOrgItemId || draggedOrgItemId === item.id) return;
-      reorderOrganizeItems(draggedOrgItemId, item.id);
-    });
-    container.appendChild(card);
-  });
-}
-function reorderOrganizeItems(draggedId, targetId) {
-  const p = getProject(currentProjectId);
-  const arr = p.data.organize[currentOrgCat];
-  const fromIdx = arr.findIndex((x) => x.id === draggedId);
-  const toIdx = arr.findIndex((x) => x.id === targetId);
-  if (fromIdx < 0 || toIdx < 0) return;
-  const [it] = arr.splice(fromIdx, 1);
-  arr.splice(toIdx, 0, it);
-  renderOrganizeList();
-  markDirtyAndSchedule();
-}
-function deleteOrganizeItem(id) {
-  if (!confirm("Hapus item ini?")) return;
-  const p = getProject(currentProjectId);
-  p.data.organize[currentOrgCat] = p.data.organize[currentOrgCat].filter((x) => x.id !== id);
-  if (currentOrgItemId === id) currentOrgItemId = null;
-  renderOrganizeList(); renderOrganizeDetail();
-  markDirtyAndSchedule();
-}
-function syncOrganizeFromDetail() {
-  if (!currentProjectId || !currentOrgItemId) return;
-  const p = getProject(currentProjectId);
-  const item = (p.data.organize[currentOrgCat] || []).find((x) => x.id === currentOrgItemId);
-  if (!item || !el("orgTitleField")) return;
-  item.title = el("orgTitleField").value;
-  item.content = el("orgEditor").innerHTML;
-}
-function renderOrganizeDetail() {
-  const p = getProject(currentProjectId);
-  const col = el("organizeDetailCol");
-  const item = (p.data.organize[currentOrgCat] || []).find((x) => x.id === currentOrgItemId);
-  if (!item) { col.innerHTML = '<div class="scene-empty-hint">Pilih atau buat item untuk mulai isi.</div>'; return; }
-  col.innerHTML = `
-    <div class="scene-detail-header"><input id="orgTitleField" class="scene-title-input" value="${escapeHtml(item.title)}" /></div>
-    <div id="orgEditor" class="organize-editor" contenteditable="true" spellcheck="false">${item.content || ""}</div>`;
-  el("orgTitleField").addEventListener("input", () => { item.title = el("orgTitleField").value; renderOrganizeList(); markDirtyAndSchedule(); });
-  el("orgEditor").addEventListener("input", () => { item.content = el("orgEditor").innerHTML; markDirtyAndSchedule(); });
-  noteTabDoc("organize", { doc: item.id, kind: currentOrgCat, title: item.title });   // TAB PROJECT: riwayat
-}
-function openAddOrganizeModal() { el("organizeFieldTitle").value = ""; el("organizeModal").classList.remove("hidden"); el("organizeFieldTitle").focus(); }
-function saveNewOrganizeItem() {
-  const p = getProject(currentProjectId);
-  const title = el("organizeFieldTitle").value.trim() || "Baru";
-  const item = { id: currentOrgCat + "-" + Date.now(), title, content: "" };
-  p.data.organize[currentOrgCat].push(item);
-  el("organizeModal").classList.add("hidden");
-  currentOrgItemId = item.id;
-  renderOrganizeList(); renderOrganizeDetail();
-  markDirtyAndSchedule();
-}
+function renderOrganizeList() { if (window.NovelKodeks) window.NovelKodeks.renderList(); }
+function renderOrganizeDetail() { if (window.NovelKodeks) window.NovelKodeks.renderDetail(); }
+function syncOrganizeFromDetail() { if (window.NovelKodeks) window.NovelKodeks.sync(); }
 
 // ---- PREVIEW ----
 function previewNodesToHtml(list) {
@@ -5351,12 +5275,6 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   el("focusColor").oninput = () => { document.execCommand("foreColor", false, el("focusColor").value); el("focusEditor").focus(); };
   document.addEventListener("selectionchange", () => { if (!el("focusOverlay").classList.contains("hidden")) updateFocusToolbarState(); });
-
-  // Organize tab
-  document.querySelectorAll(".org-subtab").forEach((btn) => btn.onclick = () => switchOrganizeCat(btn.dataset.cat));
-  el("btnAddOrganizeItem").onclick = openAddOrganizeModal;
-  el("btnCancelOrganize").onclick = () => el("organizeModal").classList.add("hidden");
-  el("btnSaveOrganize").onclick = saveNewOrganizeItem;
 
   // Backup modal
   el("btnCloseBackup").onclick = () => el("backupModal").classList.add("hidden");

@@ -215,8 +215,8 @@ body.light .hc-tile-art { background: rgba(0,0,0,.04); box-shadow: 0 3px 10px rg
 .hc-dl-back:hover { background: var(--hc-hover); color: var(--text); }
 .hc-dl-ic { display: flex; color: var(--kc); }
 body.light .hc-dl-ic { color: var(--kcl); }
-.hc-dl-seg { display: flex; gap: 2px; margin: 0 2px 6px; padding: 2px; border-radius: 9px; background: var(--hc-hover); }
-.hc-dl-segb { flex: 1; height: 28px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: none; border-radius: 7px; background: none; color: var(--text-dim); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 600; cursor: pointer; }
+.hc-dl-seg { display: flex; flex-wrap: wrap; gap: 2px; margin: 0 2px 6px; padding: 2px; border-radius: 9px; background: var(--hc-hover); }
+.hc-dl-segb { flex: 1 0 auto; height: 28px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: none; border-radius: 7px; background: none; color: var(--text-dim); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 600; cursor: pointer; }
 .hc-dl-segb:hover { color: var(--text); }
 .hc-dl-segb[aria-checked="true"] { background: var(--hc-pop); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.25); }
 .hc-dl-search { display: flex; align-items: center; gap: 7px; height: 34px; margin: 0 2px 6px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--hc-glass-b); background: var(--hc-hover); color: var(--text-dim); }

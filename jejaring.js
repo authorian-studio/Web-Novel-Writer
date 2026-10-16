@@ -226,7 +226,7 @@
     if (!sheets.length) sheets = [newSheetObj("Utama", true)];
     const id = idOk(d.id, 80) ? d.id : uid("j");
     return {
-      id, title: str(d.title, 80).trim() || "Jejaring", template: TPL[d.template] ? d.template : "kosong", types, tags, sheets,
+      id, title: str(d.title, 80).trim() || "Tree", template: TPL[d.template] ? d.template : "kosong", types, tags, sheets,
       activeSheet: sheets.some((s) => s.id === d.activeSheet) ? d.activeSheet : sheets[0].id,
     };
   }
@@ -432,7 +432,7 @@
     if (!c) return null;
     const txt = plain(c.content), snip = txt.slice(0, 150);
     return h("div", { className: "jj-tip-card" },
-      h("div", { className: "jj-tip-top" }, ic("#ti-id", 13), h("span", null, "Kartu Organize")),
+      h("div", { className: "jj-tip-top" }, ic("#ti-id", 13), h("span", null, "Kartu Kodeks")),
       h("div", { className: "jj-tip-title" }, charName(c)),
       h("p", { className: "jj-tip-snip" + (snip ? "" : " is-empty") }, snip ? snip + (txt.length > 150 ? "…" : "") : "Belum ada deskripsi."));
   }
@@ -459,7 +459,7 @@
         data.tags.length ? h("div", { className: "jj-tags" }, data.tags.slice(0, 2).map((t) => h("span", { key: t.id, className: "jj-tag", style: { "--c": COLORS[t.color] } }, t.name)),
           data.tags.length > 2 ? h("span", { className: "jj-tag is-more" }, "+" + (data.tags.length - 2)) : null) : null,
         m.emoji ? h("span", { className: "jj-badge", "aria-hidden": "true" }, m.emoji) : null,
-        data.linked ? h("span", { className: "jj-linked", title: "Tertaut ke kartu Organize" }, ic("#ti-link", 11)) : null),
+        data.linked ? h("span", { className: "jj-linked", title: "Tertaut ke kartu Kodeks" }, ic("#ti-link", 11)) : null),
       ed ? h(EditArea, { id: "name:" + id, value: name, single: true, className: "jj-name-edit", max: 80, placeholder: "Nama tokoh" })
         : h("button", { type: "button", className: "jj-name" + (name ? "" : " is-ph"), tabIndex: -1,
           onClick: (e) => { if (selected && can) { e.stopPropagation(); ui.setEditing("name:" + id); } } }, name || "Tambah nama"),
@@ -507,12 +507,116 @@
     if (b.cx >= a.cx) return { sx: a.x + a.w, sy: a.my, sp: P.Right, tx: b.x, ty: b.my, tp: P.Left };
     return { sx: a.x, sy: a.my, sp: P.Left, tx: b.x + b.w, ty: b.my, tp: P.Right };
   }
-  function RelEdge({ id, source, target, data, selected }) {
-    const s = RF.useStore(React.useCallback((st) => st.nodeInternals.get(source), [source]));
-    const t = RF.useStore(React.useCallback((st) => st.nodeInternals.get(target), [target]));
-    if (!s || !t || !s.width || !t.width) return null;
-    const r = route(s, t);
-    const [path, lx, ly] = RF.getSmoothStepPath({ sourceX: r.sx, sourceY: r.sy, sourcePosition: r.sp, targetX: r.tx, targetY: r.ty, targetPosition: r.tp, borderRadius: 10, offset: 16 });
+  // ---------- perute garis siku (ala vvd): semua garis dihitung bersama supaya tidak saling menumpuk ----------
+  //  1. tiap sisi kartu membagi titik sambungnya: garis yang keluar/masuk di sisi yang sama mendapat titik berbeda,
+  //     diurutkan menurut posisi kartu di ujung lainnya (garis tidak saling silang di dekat kartu);
+  //  2. ruas tengah (mendatar untuk garis atas-bawah, tegak untuk garis samping) yang berada di "lorong" yang sama dan
+  //     rentangnya bertumpuk diberi jalur (lane) berbeda, berjarak LANE px.
+  const LANE = 9, PORT_GAP = 13;
+  let routeMemo = { ni: null, es: null, res: null };
+  function routeAll(ni, es) {
+    if (routeMemo.ni === ni && routeMemo.es === es) return routeMemo.res;
+    const res = new Map(), items = [];
+    es.forEach((e) => {
+      const s = ni.get(e.source), t = ni.get(e.target);
+      if (!s || !t || !s.width || !t.width) return;
+      const r = route(s, t), vert = r.sp === P.Bottom || r.sp === P.Top;
+      items.push({ id: e.id, r, vert, sN: e.source, tN: e.target, sR: rectOf(s), tR: rectOf(t) });
+    });
+    // 1. titik sambung per sisi kartu
+    const sides = new Map();
+    const put = (node, side, it, end, other) => { const k = node + "|" + side; if (!sides.has(k)) sides.set(k, []); sides.get(k).push({ it, end, other }); };
+    items.forEach((it) => {
+      put(it.sN, it.r.sp, it, "s", it.vert ? it.tR.cx : it.tR.my);
+      put(it.tN, it.r.tp, it, "t", it.vert ? it.sR.cx : it.sR.my);
+    });
+    sides.forEach((list) => {
+      if (list.length < 2) return;
+      list.sort((a, b) => a.other - b.other || (a.it.id < b.it.id ? -1 : 1));
+      const it0 = list[0].it, rect = list[0].end === "s" ? it0.sR : it0.tR, vert = it0.vert;
+      const span = vert ? rect.w - 18 : Math.min(rect.h, PHOTO_H) - 22;
+      const gap = Math.min(PORT_GAP, span / (list.length - 1));
+      list.forEach((p, i) => {
+        const off = (i - (list.length - 1) / 2) * gap;
+        if (vert) { if (p.end === "s") p.it.r.sx += off; else p.it.r.tx += off; }
+        else { if (p.end === "s") p.it.r.sy += off; else p.it.r.ty += off; }
+      });
+    });
+    // 2. jalur ruas tengah
+    items.forEach((it) => {
+      const r = it.r;
+      // a = koordinat ujung atas (garis atas-bawah) / ujung kiri (garis samping), b = ujung satunya
+      if (it.vert) { it.mid = (r.sy + r.ty) / 2; it.a = r.sy <= r.ty ? r.sx : r.tx; it.b = r.sy <= r.ty ? r.tx : r.sx; it.room = Math.abs(r.ty - r.sy) / 2 - 8; }
+      else { it.mid = (r.sx + r.tx) / 2; it.a = r.sx <= r.tx ? r.sy : r.ty; it.b = r.sx <= r.tx ? r.ty : r.sy; it.room = Math.abs(r.tx - r.sx) / 2 - 8; }
+      it.lo = Math.min(it.a, it.b); it.hi = Math.max(it.a, it.b);
+    });
+    // urutan jalur (lebih dekat ke ujung atas/kiri dulu) dipilih supaya garis tidak saling silang:
+    // A di atas B menyilang bila ujung bawah A jatuh di rentang B, atau ujung atas B jatuh di rentang A
+    const inside = (v, it) => v > it.lo + 1 && v < it.hi - 1;
+    const cost = (A, B) => (inside(A.b, B) ? 1 : 0) + (inside(B.a, A) ? 1 : 0);
+    const lanes = (group) => {
+      const g = group.filter((it) => it.hi - it.lo >= 1);   // garis lurus tidak punya ruas tengah
+      const order = [];
+      g.sort((x, y) => x.lo - y.lo || x.hi - y.hi).forEach((it) => {   // sisip: posisi dengan silang paling sedikit
+        let best = 0, bestC = Infinity;
+        for (let k = 0; k <= order.length; k++) {
+          let c = 0;
+          for (let j = 0; j < order.length; j++) {
+            const o = order[j];
+            if (o.hi + 6 < it.lo || it.hi + 6 < o.lo) continue;
+            c += j < k ? cost(o, it) : cost(it, o);
+          }
+          if (c < bestC) { bestC = c; best = k; }
+        }
+        order.splice(best, 0, it);
+      });
+      let n = 0;
+      order.forEach((it, k) => {
+        let l = 0;
+        for (let j = 0; j < k; j++) { const o = order[j]; if (!(o.hi + 6 < it.lo || it.hi + 6 < o.lo)) l = Math.max(l, o.lane + 1); }
+        it.lane = l; n = Math.max(n, l + 1);
+      });
+      g.forEach((it) => { if (n > 1) it.mid += clamp((it.lane - (n - 1) / 2) * LANE, -Math.max(0, it.room), Math.max(0, it.room)); });
+    };
+    [true, false].forEach((v) => {
+      const list = items.filter((it) => it.vert === v).sort((a, b) => a.mid - b.mid);
+      let group = [];
+      list.forEach((it) => {   // lorong = garis dengan ruas tengah berdekatan (selisih < 30 px)
+        if (group.length && it.mid - group[group.length - 1].mid >= 30) { lanes(group); group = []; }
+        group.push(it);
+      });
+      if (group.length) lanes(group);
+    });
+    items.forEach((it) => {
+      const r = it.r;
+      const pts = it.vert ? [[r.sx, r.sy], [r.sx, it.mid], [r.tx, it.mid], [r.tx, r.ty]] : [[r.sx, r.sy], [it.mid, r.sy], [it.mid, r.ty], [r.tx, r.ty]];
+      res.set(it.id, pts);
+    });
+    routeMemo = { ni, es, res };
+    return res;
+  }
+  // titik-titik siku -> path SVG dengan sudut membulat; label di tengah ruas terpanjang bagian tengah
+  function orthoPath(pts) {
+    const q = pts.filter((p, i) => i === 0 || Math.abs(p[0] - pts[i - 1][0]) + Math.abs(p[1] - pts[i - 1][1]) > 0.5);
+    let d = "M" + q[0][0] + "," + q[0][1];
+    for (let i = 1; i < q.length - 1; i++) {
+      const [px, py] = q[i - 1], [x, y] = q[i], [nx, ny] = q[i + 1];
+      const r = Math.min(10, Math.hypot(x - px, y - py) / 2, Math.hypot(nx - x, ny - y) / 2);
+      const ax = x - Math.sign(x - px) * r, ay = y - Math.sign(y - py) * r, bx = x + Math.sign(nx - x) * r, by = y + Math.sign(ny - y) * r;
+      d += " L" + ax + "," + ay + " Q" + x + "," + y + " " + bx + "," + by;
+    }
+    d += " L" + q[q.length - 1][0] + "," + q[q.length - 1][1];
+    let best = null;
+    for (let i = 0; i < q.length - 1; i++) {
+      const len = Math.hypot(q[i + 1][0] - q[i][0], q[i + 1][1] - q[i][1]), w = len * (i === 1 || q.length === 2 ? 1.6 : 1);   // utamakan ruas tengah
+      if (!best || w > best.w) best = { w, x: (q[i][0] + q[i + 1][0]) / 2, y: (q[i][1] + q[i + 1][1]) / 2 };
+    }
+    return [d, best.x, best.y];
+  }
+  function RelEdge({ id, data, selected }) {
+    const pts = RF.useStore(React.useCallback((st) => routeAll(st.nodeInternals, st.edges).get(id), [id]));
+    if (!pts) return null;
+    const [path, lx, ly] = orthoPath(pts);
     const ty = data && data.ty, pv = !!(data && data.pv), col = ty && ty.color ? COLORS[ty.color] : "";
     const style = {};
     if (ty && ty.dashed) style.strokeDasharray = "6 5";
@@ -606,9 +710,10 @@
     const parts = [];
     if (one && one.t === "person") {
       const linked = !!(one.charId && charMap().get(one.charId));
-      parts.push(linked ? btn("opencard", "Buka kartu di Organize", ic("#ti-id", 14), { text: "Buka kartu", cls: "is-wide" })
-        : btn("makecard", "Buat kartu tokoh di Organize", ic("#ti-user-plus", 14), { text: "Buat kartu", cls: "is-wide" }));
+      parts.push(linked ? btn("opencard", "Buka kartu di Kodeks", ic("#ti-id", 14), { text: "Buka kartu", cls: "is-wide" })
+        : btn("makecard", "Buat kartu tokoh di Kodeks", ic("#ti-user-plus", 14), { text: "Buat kartu", cls: "is-wide" }));
       parts.push(btn("linkcard", linked ? "Ganti tautan kartu" : "Tautkan ke kartu tokoh", ic("#ti-link", 14), { text: linked ? "Ganti tautan" : "Tautkan kartu", cls: "is-wide", attrs: { "aria-haspopup": "menu" } }));
+      parts.push(btn("connect", "Hubungkan ke kartu lain (satu atau beberapa)", ic("#ti-arrows-split-2", 15), { attrs: { "aria-haspopup": "menu" } }));
       parts.push(sep(1));
       parts.push(btn("photo", one.photo ? "Foto" : "Tambah foto", ic("#ti-photo", 15)));
       parts.push(sep(2));
@@ -730,7 +835,7 @@
         attributionPosition: "bottom-left", className: "jj-rf is-" + t + (connecting ? " is-connecting" : "") + (props.focus ? " is-focus" : ""),
       },
         h(RF.Background, { variant: RF.BackgroundVariant.Dots, gap: 20, size: 1.3, color: "#8a8f99", className: "jj-bg" }),
-        props.mini ? h(RF.MiniMap, { pannable: true, zoomable: true, position: "bottom-right", className: "jj-minimap", ariaLabel: "Peta mini jejaring",
+        props.mini ? h(RF.MiniMap, { pannable: true, zoomable: true, position: "bottom-right", className: "jj-minimap", ariaLabel: "Peta mini tree",
           nodeColor: (n) => (n.type === "note" ? NOTE_COLORS[n.data.m.color] || NOTE_COLORS.yellow : n.type === "person" ? "#d7a86e" : "#8f97ab"), nodeBorderRadius: 3, nodeStrokeWidth: 0, maskColor: "rgba(0,0,0,0)" }) : null,
         sel && selN.length && !dragging && !editing && !boxSel && !connecting ? h(SelBar, { sel: selN }) : null,
         place ? h(PlaceLayer, { kind: t }) : null));
@@ -826,6 +931,22 @@
     const geo = !A || !B ? "side" : B.y + CARD_H + 6 <= A.y ? "up" : B.y >= A.y + CARD_H + 6 ? "down" : "side";
     const e = { id: uid("e"), source: a, target: b, type: typeId || null, dir: typeId ? dir || "side" : geo };
     mutate(() => { if (newType) doc.types.push(newType); sheet.edges.push(e); }, [b]);
+  }
+  // satu kartu -> banyak kartu sekaligus dengan jenis relasi yang sama (pasangan yang sudah terhubung dilewati)
+  function connectMany(a, targets, typeId, newType) {
+    const A = findNode(a);
+    if (!A) return;
+    const ty = newType || (typeId ? typeMap().get(typeId) : null);
+    const has = (b) => sheet.edges.some((x) => (x.source === a && x.target === b) || (x.source === b && x.target === a));
+    const list = targets.filter((b) => b !== a && findNode(b) && !has(b));
+    const skipped = targets.length - list.length;
+    if (!list.length) { toast(skipped ? "Kartu itu sudah terhubung semua." : "Tidak ada kartu yang dipilih."); return; }
+    const es = list.map((b) => {
+      const B = findNode(b), geo = B.y + CARD_H + 6 <= A.y ? "up" : B.y >= A.y + CARD_H + 6 ? "down" : "side";
+      return { id: uid("e"), source: a, target: b, type: ty ? ty.id : null, dir: ty ? ty.dir || "side" : geo };
+    });
+    mutate(() => { if (newType) doc.types.push(newType); es.forEach((e) => sheet.edges.push(e)); }, [a].concat(list));
+    toast(`${list.length} relasi${ty ? " " + ty.label : ""} dibuat` + (skipped ? ` · ${skipped} sudah terhubung, dilewati.` : "."));
   }
   function setEdgeType(edgeId, typeId, newType) {
     const e = sheet.edges.find((x) => x.id === edgeId);
@@ -991,7 +1112,7 @@
     o.characters.push(c);
     orgChanged();
     mutate(() => { m.charId = c.id; m.name = c.title; }, [m.id]);
-    toast(`Kartu "${c.title}" dibuat di Organize › Karakter.`);
+    toast(`Kartu "${c.title}" dibuat di Kodeks › Karakter.`);
     if (!name && api) setTimeout(() => api && api.setEditing("name:" + m.id), 30);
   }
   function linkCard(id, charId) {
@@ -1058,7 +1179,7 @@
   function addTag(name, assign) {
     const v = String(name || "").trim().slice(0, 30);
     if (!v) return null;
-    if (doc.tags.length >= 30) { toast("Maksimal 30 label per jejaring."); return null; }
+    if (doc.tags.length >= 30) { toast("Maksimal 30 label per tree."); return null; }
     const t = { id: uid("g"), name: v, color: nextTagColor() };
     const ps = assign ? selModels().filter((m) => m.t === "person") : [];
     mutate(() => { doc.tags.push(t); ps.forEach((m) => { m.tags = (m.tags || []).concat(t.id); }); });
@@ -1091,9 +1212,9 @@
       from.set(n.id, { x: n.x, y: n.y });
       if (n.x !== x || n.y !== y) { n.x = x; n.y = y; moved = true; }
     });
-    if (!moved) { toast("Jejaring sudah rapi."); return; }
+    if (!moved) { toast("Tree sudah rapi."); return; }
     pushUndo(s);
-    toast("Jejaring dirapikan — urungkan dengan " + MOD + "+Z.");
+    toast("Tree dirapikan — urungkan dengan " + MOD + "+Z.");
     const fin = () => { changed(null); setTimeout(fit, 40); };
     if (!api || reduceMotion()) { fin(); return; }
     cancelAnimationFrame(animRaf);
@@ -1144,7 +1265,7 @@
   }
   function newSheet() {
     if (!doc) return;
-    if (doc.sheets.length >= 20) { toast("Maksimal 20 lembar per jejaring."); return; }
+    if (doc.sheets.length >= 20) { toast("Maksimal 20 lembar per tree."); return; }
     const s = newSheetObj(uniqueName(doc.sheets, "Lembar " + (doc.sheets.length + 1), "name"), true);
     doc.sheets.push(s);
     save();
@@ -1153,7 +1274,7 @@
   }
   function dupSheet() {
     if (!doc || !sheet) return;
-    if (doc.sheets.length >= 20) { toast("Maksimal 20 lembar per jejaring."); return; }
+    if (doc.sheets.length >= 20) { toast("Maksimal 20 lembar per tree."); return; }
     const s = { id: uid("s"), name: uniqueName(doc.sheets, sheet.name + " (salinan)", "name").slice(0, 40), nodes: sheet.nodes.map(cloneN), edges: sheet.edges.map((e) => ({ ...e })), viewport: sheet.viewport };
     doc.sheets.splice(doc.sheets.indexOf(sheet) + 1, 0, s);
     save();
@@ -1162,7 +1283,7 @@
   }
   function deleteSheet() {
     if (!doc || !sheet) return;
-    if (doc.sheets.length < 2) { toast("Jejaring perlu minimal satu lembar."); return; }
+    if (doc.sheets.length < 2) { toast("Tree perlu minimal satu lembar."); return; }
     if (!confirm(`Hapus lembar "${sheet.name}"? Semua kartu di lembar ini ikut terhapus.`)) return;
     const i = doc.sheets.indexOf(sheet), id = sheet.id;
     doc.sheets.splice(i, 1);
@@ -1200,7 +1321,7 @@
   }
   function deleteDoc() {
     if (!doc) return;
-    if (!confirm(`Hapus jejaring "${doc.title}"? Semua lembar & kartunya ikut terhapus (kartu di Organize tetap ada).`)) return;
+    if (!confirm(`Hapus tree "${doc.title}"? Semua lembar & kartunya ikut terhapus (kartu di Kodeks tetap ada).`)) return;
     const j = data(), id = doc.id;
     j.docs = j.docs.filter((d) => d.id !== id);
     hist.delete(projId + "|" + id);
@@ -1208,7 +1329,7 @@
     save();
     if (j.docs.length) switchDoc(j.docs[0].id);
     else { j.active = null; renderFlow(); openWizard("new"); }
-    toast("Jejaring dihapus.");
+    toast("Tree dihapus.");
   }
   function startDocRename() {
     if (!dom || !doc) return;
@@ -1287,6 +1408,7 @@
       case "addperson": addPersonCenter(); break;
       case "makecard": { const m = one(); if (m) makeCard(m.id); break; }
       case "opencard": { const m = one(); if (m && m.charId && ctx.openCharacter) { const cid = m.charId; closeMenu(); setTimeout(() => ctx && ctx.openCharacter(cid), 0); } return; }
+      case "connect": { const m = one(); if (m) { relCtx = { mode: "pick", nodeId: m.id, view: "cards", targets: [] }; openMenu("rel", el); } return; }
       case "linkcard": { const m = one(); if (m) { relCtx = { mode: "link", nodeId: m.id, view: "chars" }; openMenu("rel", el); } return; }
       case "unlink": { const m = one(); if (m) unlinkCard(m.id); break; }
       case "photo": { const m = one(); if (!m) break; if (m.photo) { openMenu("photo", el); return; } pickPhoto(m.id); return; }
@@ -1331,6 +1453,7 @@
     closeMenu();
     if (r.mode === "new") addRelated(r.nodeId, r.side, typeId, r.at, r.char, newType);
     else if (r.mode === "connect") connectPair(r.nodeId, r.target, typeId, newType ? newType.dir : null, newType);
+    else if (r.mode === "multi") connectMany(r.nodeId, r.targets || [], typeId, newType);
     else if (r.mode === "edge") setEdgeType(r.edgeId, typeId, newType);
     relCtx = null;
   }
@@ -1342,16 +1465,25 @@
       const back = r.mode === "link" ? "" : `<button type="button" class="jj-pop-back" data-act="relgrid" aria-label="Kembali">${icS("#ti-arrow-left", 15)}</button>`;
       const m = findNode(r.nodeId);
       return `<div class="jj-pop-head">${back}<span>${r.mode === "link" ? "Tautkan kartu" : "Tautkan tokoh yang ada"}</span></div>` +
-        (cm.length ? `<label class="jj-search">${icS("#ti-search", 14)}<input type="search" class="jj-char-q" placeholder="Cari tokoh di Organize…" aria-label="Cari tokoh" autocomplete="off" spellcheck="false"></label>` : "") +
+        (cm.length ? `<label class="jj-search">${icS("#ti-search", 14)}<input type="search" class="jj-char-q" placeholder="Cari tokoh di Kodeks…" aria-label="Cari tokoh" autocomplete="off" spellcheck="false"></label>` : "") +
         `<div class="jj-mi-scroll jj-char-list">${charRowsHtml("")}</div>` +
         (r.mode === "link" && m && m.charId ? '<div class="jj-mi-sep" role="separator"></div>' + item({ act: "unlink", label: "Lepas tautan", ic: icS("#ti-unlink", 15) }) : "");
+    }
+    if (r.view === "cards") {
+      const n = (r.targets || []).length;
+      const back = r.mode === "pick" ? "" : `<button type="button" class="jj-pop-back" data-act="relgrid" aria-label="Kembali">${icS("#ti-arrow-left", 15)}</button>`;
+      return `<div class="jj-pop-head">${back}<span>Hubungkan ke kartu lain</span></div>` +
+        `<p class="jj-pop-sub">Pilih satu atau beberapa kartu, lalu jenis relasinya.</p>` +
+        `<label class="jj-search">${icS("#ti-search", 14)}<input type="search" class="jj-card-q" placeholder="Cari kartu di lembar ini…" aria-label="Cari kartu" autocomplete="off" spellcheck="false"></label>` +
+        `<div class="jj-mi-scroll jj-card-list">${cardRowsHtml(r.q || "")}</div>` +
+        `<div class="jj-pop-foot"><button type="button" class="jj-btn-sm jj-cards-go" data-act="relcardsgo"${n ? "" : " disabled"}>${n ? `Pilih relasi · ${n} kartu` : "Pilih kartu dulu"}</button></div>`;
     }
     if (r.view === "custom") {
       const d = r.mode === "new" ? sideDir(r.side) : "side";
       return `<div class="jj-pop-head"><button type="button" class="jj-pop-back" data-act="relgrid" aria-label="Kembali">${icS("#ti-arrow-left", 15)}</button><span>Relasi kustom</span></div>` +
         `<form class="jj-custom"><input class="jj-custom-in" maxlength="40" placeholder="Nama relasi, mis. Guru" aria-label="Nama relasi baru" autocomplete="off" spellcheck="false" required>` +
         `<button type="submit" class="jj-btn-sm">Buat</button></form>` +
-        `<p class="jj-pop-note">Ditambahkan ke jenis relasi jejaring ini · kartu baru ditaruh ${DIR_NAMES[d]}.</p>`;
+        `<p class="jj-pop-note">Ditambahkan ke jenis relasi tree ini · kartu baru ditaruh ${DIR_NAMES[d]}.</p>`;
     }
     const want = r.mode === "new" ? sideDir(r.side) : null;
     const types = doc.types.slice().sort((a, b) => (b.dir === want) - (a.dir === want));
@@ -1370,16 +1502,30 @@
       `${icS(typeIc(t), 15)}<span>${esc(t.label)}</span></button>`).join("")}</div>`
       : '<p class="jj-mi-empty">Belum ada jenis relasi — buat yang pertama.</p>';
     const rows = [{ act: "relcustom", label: "Buat kustom", ic: icS("#ti-plus", 15) }];
-    if (r.mode === "new") rows.push({ sep: 1 }, { act: "relchars", label: "Tautkan tokoh yang ada…", ic: icS("#ti-link", 15) }, { act: "relskip", label: "Lewati dulu", ic: icS("#ti-player-skip-forward", 15), sub: "Kartu baru tanpa label relasi" });
-    if (r.mode === "connect") rows.push({ sep: 1 }, { act: "relnone", label: "Tanpa label", ic: icS("#ti-line-dashed", 15) });
+    if (r.mode === "new") rows.push({ sep: 1 }, { act: "relcards", label: "Hubungkan ke kartu lain…", ic: icS("#ti-arrows-split-2", 15), sub: "Satu atau beberapa kartu di lembar ini" }, { act: "relchars", label: "Tautkan tokoh yang ada…", ic: icS("#ti-link", 15) }, { act: "relskip", label: "Lewati dulu", ic: icS("#ti-player-skip-forward", 15), sub: "Kartu baru tanpa label relasi" });
+    if (r.mode === "connect" || r.mode === "multi") rows.push({ sep: 1 }, { act: "relnone", label: "Tanpa label", ic: icS("#ti-line-dashed", 15) });
     if (r.mode === "edge") rows.push({ act: "relnone", label: "Tanpa label", ic: icS("#ti-line-dashed", 15), check: cur === null }, { act: "eflip", label: "Balik arah relasi", ic: icS("#ti-arrows-horizontal", 15) }, { sep: 1 }, { act: "edel", label: "Hapus relasi", ic: icS("#ti-trash", 15), danger: true });
+    if (r.mode === "multi") {
+      const cm = charMap(), names = (r.targets || []).map((id) => personName(findNode(id), cm) || "Tanpa nama");
+      sub = `<b>${esc(names.slice(0, 3).join(", "))}${names.length > 3 ? " +" + (names.length - 3) : ""}</b> adalah … dari ${esc(personName(findNode(r.nodeId), cm) || "tanpa nama")}`;
+      chip = `<div class="jj-relchip">${icS("#ti-arrows-split-2", 13)}<span>${names.length} kartu dipilih</span><button type="button" data-act="relcards" aria-label="Ubah pilihan kartu">${icS("#ti-pencil", 12)}</button></div>`;
+    }
     return `<div class="jj-pop-head is-cap"><span>${r.mode === "edge" ? "Ubah relasi" : "Relasi"}</span></div>` + (sub ? `<p class="jj-pop-sub">${sub}</p>` : "") + chip + grid + rows.map(item).join("");
+  }
+  function cardRowsHtml(q) {
+    const r = relCtx, cm = charMap(), qq = q.trim().toLowerCase(), on = new Set(r.targets || []);
+    const linked = new Set(sheet.edges.filter((e) => e.source === r.nodeId || e.target === r.nodeId).map((e) => (e.source === r.nodeId ? e.target : e.source)));
+    const all = sheet.nodes.filter((n) => n.t === "person" && n.id !== r.nodeId);
+    if (!all.length) return '<p class="jj-mi-empty">Belum ada kartu lain di lembar ini.</p>';
+    const rows = all.filter((n) => !qq || (personName(n, cm) || "").toLowerCase().includes(qq));
+    if (!rows.length) return '<p class="jj-mi-empty">Tidak ada kartu yang cocok.</p>';
+    return rows.map((n) => item({ act: "relcard", arg: n.id, label: personName(n, cm) || "Tanpa nama", ic: icS("#ti-user", 15), sub: linked.has(n.id) ? "Sudah terhubung" : "", check: on.has(n.id), disabled: linked.has(n.id) })).join("");
   }
   function charRowsHtml(q) {
     const r = relCtx, list = chars(), on = new Set(sheet.nodes.filter((n) => n.charId).map((n) => n.charId));
     const qq = q.trim().toLowerCase(), m = r && findNode(r.nodeId);
     const rows = list.filter((c) => !qq || charName(c).toLowerCase().includes(qq));
-    if (!list.length) return '<p class="jj-mi-empty">Belum ada tokoh di Organize › Karakter. Pakai "Buat kartu" untuk membuatnya dari kartu ini.</p>';
+    if (!list.length) return '<p class="jj-mi-empty">Belum ada tokoh di Kodeks › Karakter. Pakai "Buat kartu" untuk membuatnya dari kartu ini.</p>';
     if (!rows.length) return '<p class="jj-mi-empty">Tidak ada tokoh yang cocok.</p>';
     return rows.map((c) => item({ act: "relchar", arg: c.id, label: charName(c), ic: icS("#ti-user", 15), sub: on.has(c.id) ? "Sudah ada di lembar ini" : "", check: !!(m && m.charId === c.id) })).join("");
   }
@@ -1394,6 +1540,17 @@
       case "relchars": r.view = "chars"; openMenu("rel", menu && menu.anchor, menu && menu.at); return true;
       case "relcustom": r.view = "custom"; openMenu("rel", menu && menu.anchor, menu && menu.at); return true;
       case "relcharoff": r.char = null; openMenu("rel", menu && menu.anchor, menu && menu.at); return true;
+      case "relcards": r.view = "cards"; r.q = ""; if (r.mode !== "multi") r.targets = r.targets || []; openMenu("rel", menu && menu.anchor, menu && menu.at); return true;
+      case "relcard": {   // centang / batal centang; daftar diperbarui di tempat (pencarian & gulir tetap)
+        const t = r.targets || (r.targets = []), i = t.indexOf(arg);
+        if (i >= 0) t.splice(i, 1); else t.push(arg);
+        const l = dom.pop.querySelector(".jj-card-list"), qi = dom.pop.querySelector(".jj-card-q"), top = l ? l.scrollTop : 0;
+        if (l) { l.innerHTML = cardRowsHtml(qi ? qi.value : ""); l.scrollTop = top; const b = l.querySelector(`[data-arg="${CSS.escape(arg)}"]`); if (b) b.focus({ preventScroll: true }); }
+        const go = dom.pop.querySelector(".jj-cards-go");
+        if (go) { go.disabled = !t.length; go.textContent = t.length ? `Pilih relasi · ${t.length} kartu` : "Pilih kartu dulu"; }
+        return true;
+      }
+      case "relcardsgo": if (!(r.targets || []).length) return true; r.mode = "multi"; r.view = "grid"; openMenu("rel", menu && menu.anchor, menu && menu.at); return true;
       case "relchar":
         if (r.mode === "link") { closeMenu(); linkCard(r.nodeId, arg); relCtx = null; return true; }
         r.char = arg; r.view = "grid"; openMenu("rel", menu && menu.anchor, menu && menu.at); return true;
@@ -1450,7 +1607,7 @@
       w.classList.remove("hidden");
       w.innerHTML = `<div class="jj-wiz-dlg" role="dialog" aria-modal="true" aria-labelledby="jjWizT" aria-describedby="jjWizS">
         <div class="jj-wiz-left"></div>
-        <div class="jj-wiz-right"><div class="jj-pv" aria-label="Pratinjau jejaring" role="img"></div>
+        <div class="jj-wiz-right"><div class="jj-pv" aria-label="Pratinjau tree" role="img"></div>
           <div class="jj-pv-zoom" role="group" aria-label="Zoom pratinjau">
             <button type="button" class="jj-sbtn" data-w="pvin" aria-label="Perbesar pratinjau">${icS("#ti-zoom-in", 16)}</button>
             <button type="button" class="jj-sbtn" data-w="pvout" aria-label="Perkecil pratinjau">${icS("#ti-zoom-out", 16)}</button>
@@ -1472,15 +1629,15 @@
       : edit ? `<span class="jj-wiz-ic">${icS("#ti-adjustments-horizontal", 22)}</span>`
         : `<button type="button" class="jj-wiz-back" data-w="back" aria-label="Kembali ke pilihan templat" data-tip="Kembali">${icS("#ti-arrow-left", 18)}</button>`;
     const body = s1
-      ? `<div class="jj-tpls" role="radiogroup" aria-label="Jenis jejaring">${TEMPLATES.map((x) => `<button type="button" class="jj-tpl" role="radio" data-w="tpl" data-arg="${x.id}" aria-checked="${x.id === wiz.tpl}" tabindex="${x.id === wiz.tpl ? 0 : -1}">` +
+      ? `<div class="jj-tpls" role="radiogroup" aria-label="Jenis tree">${TEMPLATES.map((x) => `<button type="button" class="jj-tpl" role="radio" data-w="tpl" data-arg="${x.id}" aria-checked="${x.id === wiz.tpl}" tabindex="${x.id === wiz.tpl ? 0 : -1}">` +
         `<span class="jj-tpl-ic"${x.color ? ` style="--c:${x.color}"` : ""}>${icS(x.icon, 18)}</span><span class="jj-tpl-text"><b>${esc(x.name)}</b><small>${esc(x.desc || x.types.slice(0, 4).map((y) => y.label).join(" · "))}</small></span></button>`).join("")}</div>`
       : `<div class="jj-types" role="list">${wiz.types.map(typeRowHtml).join("") || '<p class="jj-types-empty">Belum ada jenis relasi. Tambahkan sekarang, atau nanti lewat "Buat kustom" di kartu.</p>'}</div>` +
         `<button type="button" class="jj-wiz-add" data-w="add">${icS("#ti-plus", 15)}<span>Tambah relasi</span></button>`;
-    left.innerHTML = `<div class="jj-wiz-head">${headIc}<div class="jj-wiz-titles"><h2 id="jjWizT">${edit ? "Jenis relasi" : "Jejaring Tokoh"}</h2>` +
-      `<p id="jjWizS">${s1 ? "Pilih jenis jejaring yang ingin kamu buat" : edit ? esc(doc.title) + " · ubah, tambah atau hapus relasi" : esc(t.sub)}</p></div>` +
+    left.innerHTML = `<div class="jj-wiz-head">${headIc}<div class="jj-wiz-titles"><h2 id="jjWizT">${edit ? "Jenis relasi" : "Tree Relations"}</h2>` +
+      `<p id="jjWizS">${s1 ? "Pilih jenis tree yang ingin kamu buat" : edit ? esc(doc.title) + " · ubah, tambah atau hapus relasi" : esc(t.sub)}</p></div>` +
       `${wiz.cancel ? `<button type="button" class="jj-wiz-x" data-w="close" aria-label="Tutup" data-tip="Tutup · Esc">${icS("#ti-x", 16)}</button>` : ""}</div>` +
       `<div class="jj-wiz-body" data-lenis-prevent>${body}</div>` +
-      `<div class="jj-wiz-foot"><button type="button" class="jj-btn-primary" data-w="${s1 ? "next" : "create"}">${s1 ? "Lanjut" : edit ? "Simpan" : "Buat jejaring"}</button></div>`;
+      `<div class="jj-wiz-foot"><button type="button" class="jj-btn-primary" data-w="${s1 ? "next" : "create"}">${s1 ? "Lanjut" : edit ? "Simpan" : "Buat tree"}</button></div>`;
   }
   function typeRowHtml(t, i) {
     const dirIc = t.dir === "up" ? icS("#ti-arrow-up", 15) : t.dir === "down" ? icS("#ti-arrow-down", 15) : icS("#ti-arrows-horizontal", 15);
@@ -1545,7 +1702,7 @@
       toast("Jenis relasi disimpan.");
       return;
     }
-    const j = data(), base = wiz.tpl === "kosong" ? "Jejaring baru" : "Jejaring " + TPL[wiz.tpl].name;
+    const j = data(), base = wiz.tpl === "kosong" ? "Tree baru" : "Tree " + TPL[wiz.tpl].name;
     const s = newSheetObj("Utama", true);
     const d = { id: uid("j"), title: uniqueName(j.docs, base, "title"), template: wiz.tpl, types, tags: [], sheets: [s], activeSheet: s.id };
     j.docs.push(d);
@@ -1594,16 +1751,16 @@
       <div class="jj-flow"></div>
       <header class="jj-head">
         <div class="jj-doc">
-          <button type="button" class="jj-doc-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Pilih jejaring">
+          <button type="button" class="jj-doc-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Pilih tree">
             <span class="jj-doc-ic">${icS("#ti-affiliate", 15)}</span><span class="jj-doc-title"></span>${icS("#ti-chevron-down", 14)}
           </button>
-          <input class="jj-doc-input hidden" maxlength="80" aria-label="Nama jejaring" spellcheck="false" autocomplete="off" />
+          <input class="jj-doc-input hidden" maxlength="80" aria-label="Nama tree" spellcheck="false" autocomplete="off" />
           <span class="jj-doc-sub"></span>
         </div>
         <div class="jj-head-right">
-          <button type="button" class="jj-ibtn" data-act="more" aria-haspopup="menu" aria-expanded="false" aria-label="Menu jejaring" data-tip="Lainnya">${icS("#ti-dots", 17)}</button>
+          <button type="button" class="jj-ibtn" data-act="more" aria-haspopup="menu" aria-expanded="false" aria-label="Menu tree" data-tip="Lainnya">${icS("#ti-dots", 17)}</button>
           <button type="button" class="jj-ibtn jj-max-btn" data-act="max" aria-pressed="false" aria-label="Perbesar panel" data-tip="Perbesar panel">${icS("#ti-arrows-maximize", 16)}${icS("#ti-arrows-minimize", 16)}</button>
-          <button type="button" class="jj-ibtn" data-act="close" aria-label="Tutup tab Jejaring Tokoh" data-tip="Tutup tab">${icS("#ti-x", 16)}</button>
+          <button type="button" class="jj-ibtn" data-act="close" aria-label="Tutup tab Tree Relations" data-tip="Tutup tab">${icS("#ti-x", 16)}</button>
         </div>
       </header>
       <div class="jj-side" role="group" aria-label="Tampilan kanvas">
@@ -1616,7 +1773,7 @@
       <div class="jj-bottom">
         <div class="jj-sheets" role="tablist" aria-label="Lembar"></div>
         <div class="jj-tools-wrap">
-          <div class="jj-tools" role="toolbar" aria-label="Alat jejaring">
+          <div class="jj-tools" role="toolbar" aria-label="Alat tree">
             ${tb("select", "Pilih", "V", icS("#ti-pointer", 18))}
             ${tb("hand", "Geser", "H", icS("#ti-hand-stop", 18))}
             <span class="jj-tsep" aria-hidden="true"></span>
@@ -1693,6 +1850,7 @@
     });
     dom.pop.addEventListener("keydown", onMenuKey);
     dom.pop.addEventListener("input", (e) => {
+      if (e.target.classList.contains("jj-card-q")) { const l = dom.pop.querySelector(".jj-card-list"); if (l) l.innerHTML = cardRowsHtml(e.target.value); }
       if (e.target.classList.contains("jj-char-q")) { const l = dom.pop.querySelector(".jj-char-list"); if (l) l.innerHTML = charRowsHtml(e.target.value); }
     });
     dom.pop.addEventListener("submit", (e) => {
@@ -1773,7 +1931,7 @@
     const j = data(), has = !!(j && j.docs.length && doc);
     dom.panel.classList.toggle("is-nodoc", !has);
     dom.panel.classList.toggle("is-max", maxed);
-    dom.docTitle.textContent = has ? doc.title : "Jejaring baru";
+    dom.docTitle.textContent = has ? doc.title : "Tree baru";
     dom.docBtn.classList.toggle("is-static", !has);
     dom.docBtn.setAttribute("aria-disabled", has ? "false" : "true");
     const ev = document.getElementById("editorView");
@@ -1841,13 +1999,13 @@
   function menuHtml(kind, o) {
     const x = doc ? H() : { undo: [], redo: [] };
     if (kind === "docs") {
-      return [{ head: "Jejaring" }].concat(data().docs.map((d) => ({
+      return [{ head: "Tree Relations" }].concat(data().docs.map((d) => ({
         act: "doc", arg: d.id, label: d.title, check: d === doc, radio: true, ic: icS(TPL[d.template].icon, 15),
         sub: `${TPL[d.template].name} · ${d.sheets.length} lembar`,
       })), [{ sep: 1 },
-        { act: "newdoc", label: "Jejaring baru", ic: icS("#ti-plus", 15) },
+        { act: "newdoc", label: "Tree baru", ic: icS("#ti-plus", 15) },
         { act: "rename", label: "Ganti nama", ic: icS("#ti-pencil", 15) },
-        { act: "deldoc", label: "Hapus jejaring", ic: icS("#ti-trash", 15), danger: true },
+        { act: "deldoc", label: "Hapus tree", ic: icS("#ti-trash", 15), danger: true },
       ]).map(item).join("");
     }
     if (kind === "more") {
@@ -1887,7 +2045,7 @@
     }
     if (kind === "tagsel" || kind === "labels") {
       const manage = kind === "labels";
-      return `<div class="jj-pop-head is-cap"><span>${manage ? "Label jejaring" : "Label kartu"}</span>${manage && focusTag ? `<button type="button" class="jj-link-btn" data-act="focusoff">Berhenti sorot</button>` : ""}</div>` +
+      return `<div class="jj-pop-head is-cap"><span>${manage ? "Label tree" : "Label kartu"}</span>${manage && focusTag ? `<button type="button" class="jj-link-btn" data-act="focusoff">Berhenti sorot</button>` : ""}</div>` +
         `<div class="jj-mi-scroll">${tagRowsHtml(manage)}</div>` +
         `<form class="jj-newtag"><span class="jj-dot" style="--c:${COLORS[nextTagColor()]}"></span><input maxlength="30" placeholder="Label baru…" aria-label="Nama label baru" autocomplete="off" spellcheck="false"><button type="submit" class="jj-btn-sm">Tambah</button></form>`;
     }
@@ -1895,8 +2053,8 @@
       const ms = selModels(), one = ms.length === 1 ? ms[0] : null;
       return [
         one ? { act: "edit", label: one.t === "person" ? "Ganti nama" : "Edit teks", ic: icS("#ti-cursor-text", 15), kbd: "Enter" } : null,
-        one && one.t === "person" && !one.charId ? { act: "makecard", label: "Buat kartu Organize", ic: icS("#ti-user-plus", 15) } : null,
-        one && one.t === "person" && one.charId ? { act: "opencard", label: "Buka kartu di Organize", ic: icS("#ti-id", 15) } : null,
+        one && one.t === "person" && !one.charId ? { act: "makecard", label: "Buat kartu Kodeks", ic: icS("#ti-user-plus", 15) } : null,
+        one && one.t === "person" && one.charId ? { act: "opencard", label: "Buka kartu di Kodeks", ic: icS("#ti-id", 15) } : null,
         { act: "dup", label: "Duplikat", ic: icS("#ti-copy-plus", 15), kbd: MOD + "+D" },
         { act: "copy", label: "Salin", ic: icS("#ti-copy", 15), kbd: MOD + "+C" },
         { sep: 1 },
@@ -1932,11 +2090,11 @@
         ["Roda / 2 jari", "Geser"], [MOD + " + roda / cubit", "Zoom"], ["Shift + seret", "Kotak pilih"], ["Klik 2× / Enter", "Ganti nama"],
         [MOD + "+D", "Duplikat"], [MOD + "+C / V", "Salin / tempel"], ["Delete", "Hapus"], [MOD + "+Z / Shift+Z", "Urungkan / ulangi"], ["Shift+1", "Pas layar"], ["Esc", "Batal / lepas pilihan"],
       ];
-      return `<div class="jj-help" role="document"><div class="jj-help-head">${icS("#ti-keyboard", 16)}<b>Pintasan jejaring</b></div><dl>${rows.map((r) => `<dt><kbd>${esc(r[0])}</kbd></dt><dd>${esc(r[1])}</dd>`).join("")}</dl></div>`;
+      return `<div class="jj-help" role="document"><div class="jj-help-head">${icS("#ti-keyboard", 16)}<b>Pintasan Tree Relations</b></div><dl>${rows.map((r) => `<dt><kbd>${esc(r[0])}</kbd></dt><dd>${esc(r[1])}</dd>`).join("")}</dl></div>`;
     }
     return "";
   }
-  const MENU_LABELS = { docs: "Jejaring", more: "Menu jejaring", sheet: "Menu lembar", rel: "Relasi", photo: "Foto", emoji: "Lencana", tagsel: "Label kartu", labels: "Label jejaring", node: "Menu kartu", pane: "Menu kanvas", wicon: "Ikon relasi", wcolor: "Warna garis", help: "Pintasan" };
+  const MENU_LABELS = { docs: "Tree Relations", more: "Menu tree", sheet: "Menu lembar", rel: "Relasi", photo: "Foto", emoji: "Lencana", tagsel: "Label kartu", labels: "Label tree", node: "Menu kartu", pane: "Menu kanvas", wicon: "Ikon relasi", wcolor: "Warna garis", help: "Pintasan" };
   function openMenu(kind, anchor, at, arg) {
     if (!dom) return;
     if ((kind !== "wicon" && kind !== "wcolor" && kind !== "help" && kind !== "docs") && !doc) return;
@@ -1967,7 +2125,7 @@
     } else { x = pr.width / 2 - pw / 2; y = pr.height / 2 - ph / 2; }
     pop.style.left = Math.round(clamp(x, 8, Math.max(8, pr.width - pw - 8))) + "px";
     pop.style.top = Math.round(clamp(y, 8, Math.max(8, pr.height - ph - 8))) + "px";
-    const f = pop.querySelector(".jj-custom-in, .jj-char-q, .jj-mi:not([disabled]), .jj-rel, .jj-pick, .jj-emoji, .jj-sw, .jj-tagname");
+    const f = pop.querySelector(".jj-custom-in, .jj-char-q, .jj-card-q, .jj-mi:not([disabled]), .jj-rel, .jj-pick, .jj-emoji, .jj-sw, .jj-tagname");
     if (f && kind !== "labels" && kind !== "tagsel") f.focus({ preventScroll: true });
     else if ((kind === "labels" || kind === "tagsel") && !doc.tags.length) { const i = pop.querySelector(".jj-newtag input"); if (i) i.focus({ preventScroll: true }); }
   }
