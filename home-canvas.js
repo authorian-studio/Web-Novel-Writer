@@ -58,6 +58,13 @@
     characters: { name: "Karakter", icon: "#ti-user", c: "#ec7fb0", cl: "#c24b80" },
     locations: { name: "Lokasi", icon: "#ti-map-pin", c: "#5fc3a0", cl: "#23866a" },
     notes: { name: "Catatan", icon: "#ti-note", c: "#f2d16b", cl: "#a8841a" },
+    // jenis Kodeks lainnya (kodeks.js)
+    factions: { name: "Faksi", icon: "#ti-flag", c: "#f08a5d", cl: "#c2562a" },
+    items: { name: "Benda", icon: "#ti-sword", c: "#e3c27a", cl: "#9c7420" },
+    creatures: { name: "Makhluk", icon: "#ti-dragon", c: "#9ccc65", cl: "#5a8a22" },
+    cultures: { name: "Budaya/Agama", icon: "#ti-building-church", c: "#c7a4ff", cl: "#8a5fd6" },
+    magic: { name: "Sistem Sihir", icon: "#ti-wand", c: "#7fb4ff", cl: "#3c74c9" },
+    history: { name: "Sejarah", icon: "#ti-hourglass", c: "#d9a066", cl: "#9a6224" },
     timeline: { name: "Timeline", icon: "#ti-timeline", c: "#6aa8ff", cl: "#2f6fcf" },
     map: { name: "Peta", icon: "#ti-map", c: "#3fb8c9", cl: "#1b8494" },
     story: { name: "Cerita", icon: "#ti-book-2", c: "#b58cff", cl: "#7d55d0" },
@@ -65,15 +72,15 @@
     jejaring: { name: "Jejaring", icon: "#ti-affiliate", c: "#f5a66b", cl: "#c86c2c" },
     board: { name: "Papan", icon: "#ti-layout-board", c: "#a3a8b4", cl: "#6c717c" },
   };
-  const ORG = ["characters", "locations", "notes"];
-  const CARD_KINDS = ["scene", "characters", "locations", "notes", "timeline", "map", "story", "jejaring", "board"];
+  const ORG = ["characters", "locations", "factions", "items", "creatures", "cultures", "magic", "history", "notes"];   // entri Kodeks
+  const CARD_KINDS = ["scene", "characters", "locations", "factions", "items", "creatures", "cultures", "magic", "history", "notes", "timeline", "map", "story", "jejaring", "board"];
   // ubin alat "Dokumen" (urutan seperti referensi: Kartu, Peta, Kanvas, Pohon relasi, ...)
   const TILES = [
     { id: "card", kind: "characters", name: "Kartu" }, { id: "map", kind: "map", name: "Peta" }, { id: "board", kind: "board", name: "Kanvas" },
     { id: "jejaring", kind: "jejaring", name: "Jejaring" }, { id: "timeline", kind: "timeline", name: "Timeline" },
     { id: "scene", kind: "scene", name: "Scene" }, { id: "story", kind: "story", name: "Cerita" },
   ];
-  const LIST_NAMES = { characters: "Kartu", locations: "Kartu", notes: "Kartu", map: "Peta", board: "Kanvas (papan)", jejaring: "Jejaring Tokoh", timeline: "Timeline", scene: "Scene", story: "Cerita Quill" };
+  const LIST_NAMES = { characters: "Kartu", locations: "Kartu", notes: "Kartu", factions: "Kartu", items: "Kartu", creatures: "Kartu", cultures: "Kartu", magic: "Kartu", history: "Kartu", map: "Peta", board: "Kanvas (papan)", jejaring: "Jejaring Tokoh", timeline: "Timeline", scene: "Scene", story: "Cerita Quill" };
   const NEW_NAMES = { characters: "karakter", locations: "lokasi", notes: "catatan", map: "peta", board: "papan", jejaring: "jejaring", timeline: "timeline", scene: "scene", story: "cerita" };
   // sampul Quill (salinan warna preset quill.js, untuk pratinjau kartu cerita)
   const COVERS = { midnight: ["#1c1f3b"], ink: ["#141418"], wine: ["#4b1627"], forest: ["#173a2b"], ocean: ["#123552"], clay: ["#7a3b26"], sand: ["#d8c49c"],
@@ -337,7 +344,8 @@
         const sc = flatScenes(o.children), w = sc.reduce((a, s) => a + wordsOf(plain(s.content)), 0);
         return { path: (r.path || []).join(" / ") || "Naskah", snip: sc.slice(0, 4).map((s) => String(s.title || "").trim()).filter(Boolean).join(" · "), meta: sc.length + " scene · " + fmt(w) + " kata" };
       }
-      case "characters": case "locations": case "notes": return { path: "Organize · " + KINDS[r.kind].name, snip: plain(o.content), meta: "" };
+      case "characters": case "locations": case "notes": case "factions": case "items": case "creatures": case "cultures": case "magic": case "history":
+        return { path: "Kodeks · " + KINDS[r.kind].name, snip: plain(o.content), meta: "" };
       case "timeline": {
         const ev = Array.isArray(o.events) ? o.events.filter(isObj) : [], ys = ev.map((e) => e.year).filter((y) => typeof y === "number" && isFinite(y));
         return { path: "Timeline", snip: ev.slice(0, 4).map((e) => String(e.title || "").trim()).filter(Boolean).join(" · "), meta: ev.length + " peristiwa" + (ys.length ? " · " + Math.min(...ys) + "–" + Math.max(...ys) : "") };
@@ -734,8 +742,8 @@
       case "story":
         return h("div", { className: "hc-doc-body is-row" }, h(BookMini, { s: o, title }),
           h("div", { className: "hc-doc-col" }, T, meta.path ? h("div", { className: "hc-doc-sub" }, meta.path) : null, M));
-      case "characters": case "locations": case "notes": {
-        const ph = r.kind === "characters" ? ix.photo.get(r.id) : null;
+      case "characters": case "locations": case "notes": case "factions": case "items": case "creatures": case "cultures": case "magic": case "history": {
+        const ph = (typeof o.photo === "string" && IMG_URL.test(o.photo) ? o.photo : null) || (r.kind === "characters" ? ix.photo.get(r.id) : null);
         return h("div", { className: "hc-doc-body is-row" },
           h("div", { className: "hc-doc-portrait" + (ph ? " has-photo" : ""), style: ph ? { backgroundImage: `url("${ph}")` } : null }, ph ? null : r.kind === "characters" ? initial(title) : ic(K.icon, 20)),
           h("div", { className: "hc-doc-col" }, T, S(meta.snip, "Belum ada deskripsi.")));

@@ -236,14 +236,21 @@
     characters: { label: "Karakter", icon: () => tiIcon("user") },
     locations: { label: "Lokasi", icon: () => tiIcon("map-pin") },
     notes: { label: "Catatan", icon: () => tiIcon("note") },
+    factions: { label: "Faksi", icon: () => tiIcon("flag") },
+    items: { label: "Benda", icon: () => tiIcon("sword") },
+    creatures: { label: "Makhluk", icon: () => tiIcon("dragon") },
+    cultures: { label: "Budaya/Agama", icon: () => tiIcon("building-church") },
+    magic: { label: "Sistem Sihir", icon: () => tiIcon("wand") },
+    history: { label: "Sejarah", icon: () => tiIcon("hourglass") },
   };
+  const ALL_KINDS = Object.keys(KINDS);   // semua jenis entri Kodeks
   function organizeOf(ctx) {
     const o = (ctx.getOrganize && ctx.getOrganize()) || (ctx.project && ctx.project.data && ctx.project.data.organize) || null;
     return isObj(o) ? o : null;
   }
   function entities(ctx, kinds) {
     const org = organizeOf(ctx) || {}, out = [];
-    (kinds || ["characters", "locations", "notes"]).forEach((k) => (Array.isArray(org[k]) ? org[k] : []).forEach((it) => {
+    (kinds || ALL_KINDS).forEach((k) => (Array.isArray(org[k]) ? org[k] : []).forEach((it) => {
       if (it && typeof it.id === "string") out.push({ id: it.id, kind: k, title: typeof it.title === "string" ? it.title : "", item: it });
     }));
     return out;
@@ -323,7 +330,7 @@
         <div class="qdt-pop-content">${empty ? '<p class="qdt-dim">Kartu ini belum punya isi.</p>' : html}</div>
         <div class="qdt-pop-actions">
           <button type="button" class="qd-btn qd-btn-accent qd-btn-sm" data-x="insert" data-autofocus${ent.title.trim() ? "" : " disabled"}>${px(tiIcon("cursor-text"), 15)}<span>Sisipkan nama</span></button>
-          <button type="button" class="qd-btn qd-btn-soft qd-btn-sm" data-x="organize">${px(tiIcon("external-link"), 15)}<span>Buka di Organize</span></button>
+          <button type="button" class="qd-btn qd-btn-soft qd-btn-sm" data-x="organize">${px(tiIcon("external-link"), 15)}<span>Buka di Kodeks</span></button>
         </div>`;
       pop.addEventListener("click", (e) => {
         const b = e.target.closest("[data-x]");
@@ -352,7 +359,7 @@
         st.ents = all;
         const q = normKey(st.q);
         const list = all.filter((e) => (st.kind === "all" || e.kind === st.kind) && (!q || normKey(e.title).includes(q) || (q.length >= 3 && itemText(e.item).toLowerCase().includes(q))));
-        if (!all.length) box.innerHTML = `<div class="qdt-empty">Belum ada kartu di dunia ini.<button type="button" class="qdt-link" data-x="org">Buat di Organize</button></div>`;
+        if (!all.length) box.innerHTML = `<div class="qdt-empty">Belum ada kartu di dunia ini.<button type="button" class="qdt-link" data-x="org">Buat di Kodeks</button></div>`;
         else if (!list.length) box.innerHTML = '<div class="qdt-empty">Tidak ada yang cocok.</div>';
         else box.innerHTML = list.slice(0, 300).map((e) => {
           const snip = itemText(e.item).slice(0, 90);
@@ -617,7 +624,7 @@
         const g = compute();
         st.ents = g.ents;
         if (!g.links.length) {
-          box.innerHTML = '<div class="qdt-empty">Tautkan beberapa dokumen dan dunianya akan terbentuk di sini<small>Sebut nama karakter atau lokasi dari Organize di chapter-mu.</small></div>';
+          box.innerHTML = '<div class="qdt-empty">Tautkan beberapa dokumen dan dunianya akan terbentuk di sini<small>Sebut nama karakter atau lokasi dari Kodeks di chapter-mu.</small></div>';
           return;
         }
         const W = Math.max(260, Math.round(box.clientWidth || 300)), row = 26, pad = 12;
@@ -1162,7 +1169,7 @@
         ctx.onChange();
         bridge.setNodes((ns) => ns.concat([toNode({ id: c.id, title: name })]));
         fillSelects(); drawAll();
-        note(`Karakter "${name}" ditambahkan ke Organize`, tiIcon("user-plus"));
+        note(`Karakter "${name}" ditambahkan ke Kodeks`, tiIcon("user-plus"));
       }
       // ---------- panel samping (DOM biasa) ----------
       side.innerHTML = `<section class="qdt-rs-block qdt-rs-sel hidden"></section>
@@ -1180,7 +1187,7 @@
         <section class="qdt-rs-block">
           <h3 class="qdt-rs-h">Karakter baru</h3>
           <form class="qdt-rs-char"><input class="qdt-input" maxlength="80" placeholder="Nama karakter" aria-label="Nama karakter baru"><button type="submit" class="qd-btn qd-btn-soft qd-btn-sm">${px(tiIcon("user-plus"), 15)}<span>Tambah</span></button></form>
-          <p class="qdt-hint">Karakter baru juga muncul di tab Organize.</p>
+          <p class="qdt-hint">Karakter baru juga muncul di tab Kodeks.</p>
         </section>`;
       const selBox = $(side, ".qdt-rs-sel"), allBox = $(side, ".qdt-rs-all"), fa = $(side, ".qdt-rs-a"), fb = $(side, ".qdt-rs-b");
       function fillSelects() {
@@ -1262,7 +1269,7 @@
         },
         h(RF.Background, { variant: RF.BackgroundVariant.Dots, gap: 20, size: 1.3, color: darkUi() ? "rgba(255,255,255,.13)" : "rgba(0,0,0,.16)" }),
         h(RF.Controls, { showInteractive: false, position: "bottom-left" }),
-        list.length ? null : h(RF.Panel, { position: "top-center", className: "qdt-flow-hint" }, "Belum ada karakter di Organize — tambahkan di panel samping."));
+        list.length ? null : h(RF.Panel, { position: "top-center", className: "qdt-flow-hint" }, "Belum ada karakter di Kodeks — tambahkan di panel samping."));
       };
       return h(App);
     });

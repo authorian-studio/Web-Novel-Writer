@@ -432,7 +432,7 @@
     if (!c) return null;
     const txt = plain(c.content), snip = txt.slice(0, 150);
     return h("div", { className: "jj-tip-card" },
-      h("div", { className: "jj-tip-top" }, ic("#ti-id", 13), h("span", null, "Kartu Organize")),
+      h("div", { className: "jj-tip-top" }, ic("#ti-id", 13), h("span", null, "Kartu Kodeks")),
       h("div", { className: "jj-tip-title" }, charName(c)),
       h("p", { className: "jj-tip-snip" + (snip ? "" : " is-empty") }, snip ? snip + (txt.length > 150 ? "…" : "") : "Belum ada deskripsi."));
   }
@@ -459,7 +459,7 @@
         data.tags.length ? h("div", { className: "jj-tags" }, data.tags.slice(0, 2).map((t) => h("span", { key: t.id, className: "jj-tag", style: { "--c": COLORS[t.color] } }, t.name)),
           data.tags.length > 2 ? h("span", { className: "jj-tag is-more" }, "+" + (data.tags.length - 2)) : null) : null,
         m.emoji ? h("span", { className: "jj-badge", "aria-hidden": "true" }, m.emoji) : null,
-        data.linked ? h("span", { className: "jj-linked", title: "Tertaut ke kartu Organize" }, ic("#ti-link", 11)) : null),
+        data.linked ? h("span", { className: "jj-linked", title: "Tertaut ke kartu Kodeks" }, ic("#ti-link", 11)) : null),
       ed ? h(EditArea, { id: "name:" + id, value: name, single: true, className: "jj-name-edit", max: 80, placeholder: "Nama tokoh" })
         : h("button", { type: "button", className: "jj-name" + (name ? "" : " is-ph"), tabIndex: -1,
           onClick: (e) => { if (selected && can) { e.stopPropagation(); ui.setEditing("name:" + id); } } }, name || "Tambah nama"),
@@ -606,8 +606,8 @@
     const parts = [];
     if (one && one.t === "person") {
       const linked = !!(one.charId && charMap().get(one.charId));
-      parts.push(linked ? btn("opencard", "Buka kartu di Organize", ic("#ti-id", 14), { text: "Buka kartu", cls: "is-wide" })
-        : btn("makecard", "Buat kartu tokoh di Organize", ic("#ti-user-plus", 14), { text: "Buat kartu", cls: "is-wide" }));
+      parts.push(linked ? btn("opencard", "Buka kartu di Kodeks", ic("#ti-id", 14), { text: "Buka kartu", cls: "is-wide" })
+        : btn("makecard", "Buat kartu tokoh di Kodeks", ic("#ti-user-plus", 14), { text: "Buat kartu", cls: "is-wide" }));
       parts.push(btn("linkcard", linked ? "Ganti tautan kartu" : "Tautkan ke kartu tokoh", ic("#ti-link", 14), { text: linked ? "Ganti tautan" : "Tautkan kartu", cls: "is-wide", attrs: { "aria-haspopup": "menu" } }));
       parts.push(sep(1));
       parts.push(btn("photo", one.photo ? "Foto" : "Tambah foto", ic("#ti-photo", 15)));
@@ -991,7 +991,7 @@
     o.characters.push(c);
     orgChanged();
     mutate(() => { m.charId = c.id; m.name = c.title; }, [m.id]);
-    toast(`Kartu "${c.title}" dibuat di Organize › Karakter.`);
+    toast(`Kartu "${c.title}" dibuat di Kodeks › Karakter.`);
     if (!name && api) setTimeout(() => api && api.setEditing("name:" + m.id), 30);
   }
   function linkCard(id, charId) {
@@ -1200,7 +1200,7 @@
   }
   function deleteDoc() {
     if (!doc) return;
-    if (!confirm(`Hapus jejaring "${doc.title}"? Semua lembar & kartunya ikut terhapus (kartu di Organize tetap ada).`)) return;
+    if (!confirm(`Hapus jejaring "${doc.title}"? Semua lembar & kartunya ikut terhapus (kartu di Kodeks tetap ada).`)) return;
     const j = data(), id = doc.id;
     j.docs = j.docs.filter((d) => d.id !== id);
     hist.delete(projId + "|" + id);
@@ -1342,7 +1342,7 @@
       const back = r.mode === "link" ? "" : `<button type="button" class="jj-pop-back" data-act="relgrid" aria-label="Kembali">${icS("#ti-arrow-left", 15)}</button>`;
       const m = findNode(r.nodeId);
       return `<div class="jj-pop-head">${back}<span>${r.mode === "link" ? "Tautkan kartu" : "Tautkan tokoh yang ada"}</span></div>` +
-        (cm.length ? `<label class="jj-search">${icS("#ti-search", 14)}<input type="search" class="jj-char-q" placeholder="Cari tokoh di Organize…" aria-label="Cari tokoh" autocomplete="off" spellcheck="false"></label>` : "") +
+        (cm.length ? `<label class="jj-search">${icS("#ti-search", 14)}<input type="search" class="jj-char-q" placeholder="Cari tokoh di Kodeks…" aria-label="Cari tokoh" autocomplete="off" spellcheck="false"></label>` : "") +
         `<div class="jj-mi-scroll jj-char-list">${charRowsHtml("")}</div>` +
         (r.mode === "link" && m && m.charId ? '<div class="jj-mi-sep" role="separator"></div>' + item({ act: "unlink", label: "Lepas tautan", ic: icS("#ti-unlink", 15) }) : "");
     }
@@ -1379,7 +1379,7 @@
     const r = relCtx, list = chars(), on = new Set(sheet.nodes.filter((n) => n.charId).map((n) => n.charId));
     const qq = q.trim().toLowerCase(), m = r && findNode(r.nodeId);
     const rows = list.filter((c) => !qq || charName(c).toLowerCase().includes(qq));
-    if (!list.length) return '<p class="jj-mi-empty">Belum ada tokoh di Organize › Karakter. Pakai "Buat kartu" untuk membuatnya dari kartu ini.</p>';
+    if (!list.length) return '<p class="jj-mi-empty">Belum ada tokoh di Kodeks › Karakter. Pakai "Buat kartu" untuk membuatnya dari kartu ini.</p>';
     if (!rows.length) return '<p class="jj-mi-empty">Tidak ada tokoh yang cocok.</p>';
     return rows.map((c) => item({ act: "relchar", arg: c.id, label: charName(c), ic: icS("#ti-user", 15), sub: on.has(c.id) ? "Sudah ada di lembar ini" : "", check: !!(m && m.charId === c.id) })).join("");
   }
@@ -1895,8 +1895,8 @@
       const ms = selModels(), one = ms.length === 1 ? ms[0] : null;
       return [
         one ? { act: "edit", label: one.t === "person" ? "Ganti nama" : "Edit teks", ic: icS("#ti-cursor-text", 15), kbd: "Enter" } : null,
-        one && one.t === "person" && !one.charId ? { act: "makecard", label: "Buat kartu Organize", ic: icS("#ti-user-plus", 15) } : null,
-        one && one.t === "person" && one.charId ? { act: "opencard", label: "Buka kartu di Organize", ic: icS("#ti-id", 15) } : null,
+        one && one.t === "person" && !one.charId ? { act: "makecard", label: "Buat kartu Kodeks", ic: icS("#ti-user-plus", 15) } : null,
+        one && one.t === "person" && one.charId ? { act: "opencard", label: "Buka kartu di Kodeks", ic: icS("#ti-id", 15) } : null,
         { act: "dup", label: "Duplikat", ic: icS("#ti-copy-plus", 15), kbd: MOD + "+D" },
         { act: "copy", label: "Salin", ic: icS("#ti-copy", 15), kbd: MOD + "+C" },
         { sep: 1 },

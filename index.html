@@ -9,6 +9,8 @@
      Juga berisi gaya komponen shadcn/ui. Bangun ulang: npm run build:css -->
 <link rel="stylesheet" href="vendor/tailwind.css" />
 <link rel="stylesheet" href="style.css" />
+<!-- Kodeks (tab "organize", kodeks.js): wiki dunia cerita -->
+<link rel="stylesheet" href="kodeks.css" />
 <!-- Quill (mode menulis cerita di tab Write): gaya tombol Scene | Quill + seluruh tampilan quill.js -->
 <link rel="stylesheet" href="quill.css" />
 <!-- Scrollbar modern overlay + scroll halus (smooth-scroll.js) -->
@@ -633,25 +635,9 @@
           </aside>
         </div>
 
-        <!-- ============ ORGANIZE TAB ============ -->
+        <!-- ============ KODEKS (id tab "organize"): wiki dunia cerita — dibangun kodeks.js (+ kodeks.css) ============ -->
         <div id="tabOrganize" class="tab-panel hidden">
-          <div class="scenes-col">
-            <div class="organize-subtabs">
-              <button class="org-subtab active" data-cat="characters"><svg class="ti" width="14" height="14" aria-hidden="true"><use href="#ti-user"></use></svg>Karakter</button>
-              <button class="org-subtab" data-cat="locations"><svg class="ti" width="14" height="14" aria-hidden="true"><use href="#ti-map-pin"></use></svg>Lokasi</button>
-              <button class="org-subtab" data-cat="notes"><svg class="ti" width="14" height="14" aria-hidden="true"><use href="#ti-notes"></use></svg>Catatan</button>
-            </div>
-            <div class="scenes-header">
-              <span id="organizeCatLabel">KARAKTER</span>
-              <div class="scenes-header-actions">
-                <button id="btnAddOrganizeItem" class="mini-icon-btn" title="Tambah" aria-label="Tambah"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-plus"></use></svg></button>
-              </div>
-            </div>
-            <div id="organizeList" class="scenes-list"></div>
-          </div>
-          <div class="scene-detail-col" id="organizeDetailCol">
-            <div class="scene-empty-hint">Pilih atau buat item untuk mulai isi.</div>
-          </div>
+          <div class="kx" id="kodeksRoot"></div>
         </div>
 
         <!-- ============ JEJARING TOKOH: pohon relasi tokoh (keluarga, kantor, militer, istana) di kanvas React Flow.
@@ -1045,8 +1031,8 @@
         <p>Susun alur besar cerita — babak, konflik, dan poin plot penting di luar isi tulisan scene.</p>
       </div>
       <div class="support-item">
-        <div class="support-item-title"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-folders"></use></svg>Organize</div>
-        <p>Simpan referensi pendukung: karakter, lokasi, atau catatan lain yang berkaitan dengan novelmu.</p>
+        <div class="support-item-title"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-books"></use></svg>Kodeks</div>
+        <p>Wiki dunia ceritamu: karakter, lokasi, faksi, benda, makhluk, budaya/agama, sistem sihir, sejarah & catatan. Tiap jenis punya templat isian, foto, tag & folder, bisa dilihat sebagai daftar, galeri atau tabel, dan "Disebut di" menunjukkan bab/scene yang menyebut namanya.</p>
       </div>
       <div class="support-item">
         <div class="support-item-title"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-calendar-time"></use></svg>Schedule</div>
@@ -1097,19 +1083,6 @@
     <div class="modal-buttons">
       <button id="btnCancelScene" class="btn-secondary">Cancel</button>
       <button id="btnSaveScene" class="btn-primary">Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- ============ ADD ORGANIZE ITEM MODAL ============ -->
-<div id="organizeModal" class="modal hidden">
-  <div class="modal-box">
-    <h3>Add item</h3>
-    <label class="field-label">Title</label>
-    <input id="organizeFieldTitle" class="field-input" autofocus />
-    <div class="modal-buttons">
-      <button id="btnCancelOrganize" class="btn-secondary">Cancel</button>
-      <button id="btnSaveOrganize" class="btn-primary">Save</button>
     </div>
   </div>
 </div>
@@ -1222,6 +1195,7 @@
 <!-- Lenis 1.3.26 (lenis.dev, MIT) -> window.Lenis; smooth-scroll.js memasang scroll halus + scrollbar overlay (window.NovelScroll) -->
 <script src="vendor/lenis-1.3.26.min.js"></script>
 <script src="smooth-scroll.js"></script>
+<script src="kodeks.js"></script>
 <script src="app.js"></script>
 <!-- Simpan di perangkat dulu + sinkron Google Drive dengan deteksi konflik (sama dengan aplikasi Android) -->
 <script src="novelist-sync.js"></script>

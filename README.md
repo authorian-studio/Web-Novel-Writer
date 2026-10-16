@@ -1,6 +1,29 @@
-# Novelist Web — v0.11.2
+# Novelist Web — v0.12.0
 
-## Riwayat perubahan terbaru (v0.11.2) — paling baru di atas
+## Riwayat perubahan terbaru (v0.12.0) — paling baru di atas
+
+**Kodeks — wiki dunia cerita** (menggantikan tab Organize; `kodeks.js` + `kodeks.css`).
+- **9 jenis entri:** Karakter, Lokasi, Faksi, Benda, Makhluk, Budaya/Agama, Sistem Sihir, Sejarah, Catatan — plus
+  "Semua" untuk melihat & mencari lintas jenis. Tiap jenis punya warna & ikon sendiri.
+- **Templat isian per jenis** (mis. Karakter: peran, usia, gender, ras, pekerjaan, asal, penampilan, kepribadian,
+  motivasi, kekuatan & kelemahan, latar belakang; Sistem Sihir: sumber, pengguna, aturan, batasan & harga, tingkatan),
+  ditambah kolom bebas **Deskripsi & catatan** (isi Organize lama tetap di sini).
+- **Foto** (klik / seret gambar; diperkecil otomatis). Karakter tanpa foto memakai foto kartunya di Jejaring Tokoh.
+- **Nama lain / panggilan**, **tag** (saran dari tag yang sudah ada, filter tag), **folder** per jenis (buat, ganti
+  nama, hapus — entri tidak ikut terhapus; seret entri ke folder atau untuk mengurutkan).
+- **Pencarian** di nama, nama lain, isian templat, tag, folder & deskripsi.
+- **Disebut di:** daftar scene (dengan babnya) & chapter Quill yang menyebut nama atau nama lain entri — jumlah sebutan +
+  cuplikan bertanda; klik untuk membuka scene/chapter itu.
+- **Tampilan Daftar** (dikelompokkan per folder + panel detail), **Galeri** (kartu bergambar) dan **Tabel** (kolom
+  templat utama, folder, tag, jumlah sebutan; klik judul kolom untuk mengurutkan). Pilihan tampilan diingat di perangkat.
+  Di HP: jenis jadi chip mendatar, daftar ↔ detail bergantian.
+- **Data Organize lama tetap terbaca apa adanya** — data tetap di `data.organize` (kunci `characters`, `locations`,
+  `notes` sama; jenis baru `factions`, `items`, `creatures`, `cultures`, `magic`, `history` dibuat saat entri pertama
+  dibuat; isian baru: `fields`, `aliases`, `tags`, `folder`, `photo`; urutan/folder kosong di `organize.folders`).
+  Jejaring Tokoh, Quill (Kartu dunia), Beranda (titik jejak & kartu dokumen), riwayat tab & ekspor Word ikut mengenali
+  semua jenis baru.
+
+### v0.11.2
 
 **Perbaikan & penguatan sistem simpan Google Drive** (tulisan di Jejaring Tokoh yang tidak tersimpan).
 Penyebab yang ditemukan & diperbaiki:
