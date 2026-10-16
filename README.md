@@ -2,10 +2,11 @@
 
 ## Riwayat perubahan terbaru (v0.14.2) — paling baru di atas
 
-**Halaman login: ilustrasi halftone reveal bisa dimatikan.** Menu tombol kiri-bawah (tempat "Unggah gambar…") kini
-punya saklar **Tampilkan ilustrasi**. Bila dimatikan, gambar halftone reveal di kolom kiri disembunyikan dan konteks
-WebGL-nya dilepas, sehingga lebih ringan. Form login pun pindah ke tengah layar. Pilihan ini tersimpan di perangkat ini.
-Bila kamu mengunggah gambar baru saat ilustrasi mati, ilustrasi otomatis dinyalakan lagi.
+**Halaman login: halftone reveal bisa dimatikan.** Menu tombol kiri-bawah (tempat "Unggah gambar…") kini punya
+tombol **Matikan halftone reveal**. Bila diklik, gambar halftone reveal di kolom kiri hilang dan konteks WebGL-nya
+dilepas, sehingga lebih ringan. Pilihan login tetap di kanan, tidak bergeser. Tombolnya lalu berganti menjadi
+**Nyalakan halftone reveal** untuk menampilkannya lagi. Pilihan ini tersimpan di perangkat ini. Bila kamu mengunggah
+gambar baru saat halftone reveal mati, ia otomatis dinyalakan lagi.
 
 **Tombol preview & tema pindah ke bar atas.** Tombol 👁 (Preview manuskrip) dan 🌙 (ganti tema) tidak lagi melayang di
 tepi kanan isi tab. Sekarang keduanya menjadi pil kecil di bar atas, tepat di kiri jam, di semua tab project kecuali

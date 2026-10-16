@@ -279,7 +279,8 @@ const LOGIN_I18N = {
     artChanged: "Gambar login diganti — tersimpan di perangkat ini.",
     artChangedTemp: "Gambar diganti, tapi browser menolak menyimpannya — akan kembali ke gambar bawaan saat halaman dimuat ulang.",
     artRestored: "Gambar bawaan dikembalikan.",
-    artShow: "Tampilkan ilustrasi", artShown: "Ilustrasi ditampilkan lagi.", artHidden: "Ilustrasi disembunyikan — tersimpan di perangkat ini.",
+    artTurnOff: "Matikan halftone reveal", artTurnOn: "Nyalakan halftone reveal",
+    artShown: "Halftone reveal dinyalakan.", artHidden: "Halftone reveal dimatikan — tersimpan di perangkat ini.",
     bgUpload: "Ganti background…", bgReset: "Hapus background", bgChanged: "Background halaman login diganti — tersimpan di perangkat ini.",
     bgRestored: "Background dihapus.", bgFailed: "Background tidak bisa dipasang. Coba gambar lain (JPG, PNG, atau WebP).",
     termsTitle: "Ketentuan Penggunaan",
@@ -313,7 +314,8 @@ const LOGIN_I18N = {
     artChanged: "Login image changed — saved on this device.",
     artChangedTemp: "Image changed, but your browser blocked saving it — it will go back to the default when the page reloads.",
     artRestored: "Default image restored.",
-    artShow: "Show illustration", artShown: "Illustration shown again.", artHidden: "Illustration hidden — saved on this device.",
+    artTurnOff: "Turn off halftone reveal", artTurnOn: "Turn on halftone reveal",
+    artShown: "Halftone reveal turned on.", artHidden: "Halftone reveal turned off — saved on this device.",
     bgUpload: "Change background…", bgReset: "Remove background", bgChanged: "Login page background changed — saved on this device.",
     bgRestored: "Background removed.", bgFailed: "Couldn't set that background. Try another image (JPG, PNG, or WebP).",
     termsTitle: "Terms of Use",
@@ -4999,8 +5001,8 @@ let loginArtCustom = null;    // { src, alpha, w, h, at } gambar pilihan penggun
 let loginArtTouched = false;  // pengguna sudah ganti/reset sebelum gambar tersimpan selesai dibaca -> abaikan hasil bacaan
 let loginArtBusy = false;
 
-// Ilustrasi HalftoneReveal bisa dimatikan dari menu kiri-bawah: kolom kiri disembunyikan, konteks WebGL dilepas,
-// form login pindah ke tengah. Disimpan di localStorage perangkat ini.
+// Ilustrasi HalftoneReveal bisa dimatikan dari menu kiri-bawah: kolom kiri dikosongkan (konteks WebGL dilepas),
+// form login tetap di kanan. Disimpan di localStorage perangkat ini.
 const LOGIN_ART_SHOW_KEY = "novelist_login_art_show";   // "off" = ilustrasi disembunyikan
 let loginArtShown = true;
 try { loginArtShown = localStorage.getItem(LOGIN_ART_SHOW_KEY) !== "off"; } catch (e) { loginArtShown = true; }
@@ -5118,7 +5120,12 @@ function syncLoginArtMenu() {
   const reset = el("btnLoginArtReset");
   if (reset) reset.classList.toggle("hidden", !loginArtCustom);
   const show = el("btnLoginArtShow");
-  if (show) show.setAttribute("aria-checked", String(loginArtShown));
+  if (show) {
+    show.querySelector("use").setAttribute("href", loginArtShown ? "#ti-photo-off" : "#ti-photo");
+    const label = show.querySelector("span");
+    label.dataset.i18n = loginArtShown ? "artTurnOff" : "artTurnOn";   // ikut diterjemahkan ulang saat bahasa diganti
+    label.textContent = lt(label.dataset.i18n);
+  }
   const view = el("loginView");
   if (view) view.classList.toggle("art-off", !loginArtShown);
 }
@@ -5187,7 +5194,7 @@ function initLoginArtPicker() {
   el("btnLoginBgReset").onclick = () => { setOpen(false); btn.focus(); resetLoginBg(); };
   bgIn.onchange = () => { const f = bgIn.files && bgIn.files[0]; bgIn.value = ""; if (f) changeLoginBg(f); };
   el("btnLoginArtReset").onclick = () => { setOpen(false); btn.focus(); resetLoginArt(); };
-  el("btnLoginArtShow").onclick = () => setLoginArtShown(!loginArtShown, true);   // menu tetap terbuka supaya saklarnya terlihat berubah
+  el("btnLoginArtShow").onclick = () => { setOpen(false); btn.focus(); setLoginArtShown(!loginArtShown, true); };
   input.onchange = () => { const f = input.files && input.files[0]; input.value = ""; if (f) changeLoginArt(f); };
   document.addEventListener("pointerdown", (e) => { if (!ctl.contains(e.target)) setOpen(false); });
   ctl.addEventListener("keydown", (e) => {
