@@ -1,6 +1,11 @@
-# Novelist Web — v0.13.2
+# Novelist Web — v0.13.3
 
-## Riwayat perubahan terbaru (v0.13.2) — paling baru di atas
+## Riwayat perubahan terbaru (v0.13.3) — paling baru di atas
+
+**Bilah kanan atas Beranda lebih rapi.** Di desktop, bilah **Pintasan · zoom · menu ··· · sembunyikan antarmuka · tutup**
+naik ke bar atas, tepat di sebelah kiri jam (posisinya mengikuti lebar jam, jadi pas untuk format 24 jam maupun
+AM/PM). Tombol mata **Preview manuskrip** di rail kanan dihapus (tetap ada di menu ···), dan ikon rail (zoom, pas ke layar,
+peta mini, filter & jejak terbaru) naik mengisi tempat yang kosong. Di HP tata letaknya tidak berubah.
 
 **Background halaman login pilihan sendiri.** Tombol kiri-bawah halaman login kini punya **Ganti background…** dan
 **Hapus background** (selain ganti gambar halftone). Gambarnya dipasang di belakang seluruh halaman login — bukan
