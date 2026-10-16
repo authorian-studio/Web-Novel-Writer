@@ -1,6 +1,23 @@
-# Novelist Web — v0.12.0
+# Novelist Web — v0.12.1
 
-## Riwayat perubahan terbaru (v0.12.0) — paling baru di atas
+## Riwayat perubahan terbaru (v0.12.1) — paling baru di atas
+
+**Timeline dirombak** (`timeline.js`, gaya di `style.css` bagian Timeline).
+- **Latar bintik samar** di kanvas (tema gelap & terang).
+- **Hover di garis waktu = tanggal lengkap** (mis. "12 Maret 1620"); klik di garis menambah event di tanggal itu.
+  Menggeser event juga menyimpan tanggal lengkap; klik event tanpa menggeser tidak lagi mengubah tanggalnya.
+- **Klik event → kartu kecil**: gambar, judul, tanggal, deskripsi, tag, "Edit" (panel edit) & "Buka scene". Kartu ikut
+  bergeser/zoom bersama kanvas; tutup dengan ×, Esc, atau klik area kosong.
+- Panel edit event punya **Gambar** (klik / seret; diperkecil otomatis) dan **Tag** (pisahkan dengan koma).
+  Data baru di event: `image`, `tags`.
+- **Tombol "+ 100 th" di kedua ujung garis**: tiap klik menambah 100 tahun sebelum awal / sesudah akhir (`start`/`end`
+  timeline). Bila ujungnya di luar layar, tombolnya menempel di tepi kanvas.
+- **Tombol mata/bulan di kanan dihapus** dari tab Timeline (kanvas memakai seluruh lebar).
+- **Sidebar daftar timeline bisa ditutup & dibuka** (tombol di kiri judul; diingat di perangkat).
+- **Ganti timeline lewat dropdown judul** (panah di samping judul): daftar timeline + jumlah event, "Timeline baru".
+  Judul tetap bisa diketik untuk ganti nama.
+
+### v0.12.0
 
 **Kodeks — wiki dunia cerita** (menggantikan tab Organize; `kodeks.js` + `kodeks.css`).
 - **9 jenis entri:** Karakter, Lokasi, Faksi, Benda, Makhluk, Budaya/Agama, Sistem Sihir, Sejarah, Catatan — plus

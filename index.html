@@ -648,7 +648,7 @@
 
         <!-- ============ TIMELINE TAB (React Flow: satu garis waktu horizontal, event menempel di garis) ============ -->
         <div id="tabTimeline" class="tab-panel hidden">
-          <aside class="tl-side">
+          <aside class="tl-side" id="tlSide">
             <div class="tl-side-top">
               <label class="tl-search">
                 <svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-search"></use></svg>
@@ -660,8 +660,18 @@
           </aside>
           <section class="tl-main">
             <header class="tl-head">
-              <input id="tlTitle" class="tl-title" aria-label="Nama timeline" />
-<span id="tlRangeText" class="tl-range-text" title="Garis waktu memanjang otomatis mengikuti event"></span>
+              <button id="tlSideToggle" class="tl-head-btn" title="Tutup daftar timeline" aria-label="Tutup daftar timeline" aria-expanded="true" aria-controls="tlSide">
+                <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-layout-sidebar-left-collapse"></use></svg>
+              </button>
+              <!-- judul timeline: ketik untuk ganti nama, panah = dropdown ganti timeline -->
+              <div class="tl-title-wrap">
+                <input id="tlTitle" class="tl-title" aria-label="Nama timeline" />
+                <button id="tlTitleMenu" class="tl-title-caret" title="Ganti timeline" aria-label="Ganti timeline" aria-haspopup="menu" aria-expanded="false">
+                  <svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-chevron-down"></use></svg>
+                </button>
+                <div id="tlMenu" class="tl-menu hidden" role="menu" aria-label="Pilih timeline"></div>
+              </div>
+              <span id="tlRangeText" class="tl-range-text" title="Tambah 100 tahun dengan tombol + di ujung garis; garis juga memanjang otomatis mengikuti event"></span>
               <button id="tlDelete" class="tl-head-btn" title="Hapus timeline ini" aria-label="Hapus timeline ini">
                 <svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-trash"></use></svg>
               </button>
@@ -705,7 +715,17 @@
                   <input id="tlEvYear" type="number" placeholder="Tahun" aria-label="Tahun" />
                 </div>
               </div>
-              <label class="tl-field"><span>Catatan</span><textarea id="tlEvDesc" rows="3"></textarea></label>
+              <div class="tl-field"><span>Gambar</span>
+                <div class="tl-img-row">
+                  <div id="tlEvImg" class="tl-img-prev" role="button" tabindex="0" title="Pilih gambar (atau seret gambar ke sini)" aria-label="Pilih gambar event">
+                    <svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-photo-plus"></use></svg>
+                  </div>
+                  <button id="tlEvImgDel" class="tl-btn tl-btn-sm" type="button">Hapus gambar</button>
+                  <input id="tlEvImgFile" type="file" accept="image/*" hidden />
+                </div>
+              </div>
+              <label class="tl-field"><span>Deskripsi</span><textarea id="tlEvDesc" rows="3"></textarea></label>
+              <label class="tl-field"><span>Tag <small>(pisahkan dengan koma)</small></span><input id="tlEvTags" placeholder="perang, kerajaan…" autocomplete="off" /></label>
               <label class="tl-field"><span>Scene terkait</span><select id="tlEvScene"></select></label>
               <div class="tl-field"><span>Warna</span><div id="tlEvColors" class="tl-colors"></div></div>
               <div class="tl-editor-actions">
