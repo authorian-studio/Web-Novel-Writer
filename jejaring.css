@@ -447,3 +447,6 @@ body.perf-boost .jj-pop, body.perf-boost .jj-wiz-dlg, body.perf-boost .jj-tip-ca
 .jj-pop-foot { display: flex; padding: 8px 6px 4px; margin-top: 4px; border-top: 1px solid var(--jj-line, rgba(255,255,255,.08)); }
 .jj-pop-foot .jj-btn-sm { flex: 1; }
 .jj-pop-foot .jj-btn-sm:disabled { opacity: .45; cursor: default; }
+/* label relasi di garis pendek (kartu berdekatan): cukup ikon, nama di tooltip */
+.jj-elabel.is-compact { width: 22px; padding: 0; justify-content: center; border-radius: 999px; }
+.jj-elabel.is-pv.is-compact { width: 16px; height: 16px; }

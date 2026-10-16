@@ -530,6 +530,7 @@
       put(it.sN, it.r.sp, it, "s", it.vert ? it.tR.cx : it.tR.my);
       put(it.tN, it.r.tp, it, "t", it.vert ? it.sR.cx : it.sR.my);
     });
+    sides.forEach((list) => list.forEach((p) => { p.it[p.end === "s" ? "sN1" : "tN1"] = list.length === 1; }));
     sides.forEach((list) => {
       if (list.length < 2) return;
       list.sort((a, b) => a.other - b.other || (a.it.id < b.it.id ? -1 : 1));
@@ -541,6 +542,18 @@
         if (vert) { if (p.end === "s") p.it.r.sx += off; else p.it.r.tx += off; }
         else { if (p.end === "s") p.it.r.sy += off; else p.it.r.ty += off; }
       });
+    });
+    // 1b. kedua ujung hampir segaris (selisih kecil) -> diluruskan, bukan belokan mini yang tampak miring. Ujung yang
+    //     berbagi sisi dengan garis lain tetap di titiknya; ujung lain ikut asal masih di dalam lebar/tinggi kartunya.
+    items.forEach((it) => {
+      const r = it.r, k1 = it.vert ? "sx" : "sy", k2 = it.vert ? "tx" : "ty";
+      if (Math.abs(r[k1] - r[k2]) < 0.5 || Math.abs(r[k1] - r[k2]) > 28) return;
+      const span = (R) => (it.vert ? [R.x + 10, R.x + R.w - 10] : [R.y + 10, R.y + Math.min(R.h, PHOTO_H) - 10]);
+      const [s0, s1] = span(it.sR), [t0, t1] = span(it.tR);
+      const lo = Math.max(it.sN1 ? s0 : r[k1], it.tN1 ? t0 : r[k2]), hi = Math.min(it.sN1 ? s1 : r[k1], it.tN1 ? t1 : r[k2]);
+      if (lo > hi) return;   // tidak ada posisi lurus yang menempel di kedua kartu
+      const v = clamp((r[k1] + r[k2]) / 2, lo, hi);
+      r[k1] = v; r[k2] = v;
     });
     // 2. jalur ruas tengah
     items.forEach((it) => {
@@ -597,7 +610,10 @@
   }
   // titik-titik siku -> path SVG dengan sudut membulat; label di tengah ruas terpanjang bagian tengah
   function orthoPath(pts) {
-    const q = pts.filter((p, i) => i === 0 || Math.abs(p[0] - pts[i - 1][0]) + Math.abs(p[1] - pts[i - 1][1]) > 0.5);
+    const q0 = pts.filter((p, i) => i === 0 || Math.abs(p[0] - pts[i - 1][0]) + Math.abs(p[1] - pts[i - 1][1]) > 0.5);
+    // titik di tengah ruas lurus (segaris dengan tetangganya) dibuang: garis lurus = satu ruas, label tepat di tengahnya
+    const q = q0.filter((p, i) => i === 0 || i === q0.length - 1 ||
+      !((Math.abs(q0[i - 1][0] - p[0]) < 0.5 && Math.abs(q0[i + 1][0] - p[0]) < 0.5) || (Math.abs(q0[i - 1][1] - p[1]) < 0.5 && Math.abs(q0[i + 1][1] - p[1]) < 0.5)));
     let d = "M" + q[0][0] + "," + q[0][1];
     for (let i = 1; i < q.length - 1; i++) {
       const [px, py] = q[i - 1], [x, y] = q[i], [nx, ny] = q[i + 1];
@@ -609,15 +625,17 @@
     let best = null;
     for (let i = 0; i < q.length - 1; i++) {
       const len = Math.hypot(q[i + 1][0] - q[i][0], q[i + 1][1] - q[i][1]), w = len * (i === 1 || q.length === 2 ? 1.6 : 1);   // utamakan ruas tengah
-      if (!best || w > best.w) best = { w, x: (q[i][0] + q[i + 1][0]) / 2, y: (q[i][1] + q[i + 1][1]) / 2 };
+      if (!best || w > best.w) best = { w, len, hz: Math.abs(q[i + 1][1] - q[i][1]) < 0.5, x: (q[i][0] + q[i + 1][0]) / 2, y: (q[i][1] + q[i + 1][1]) / 2 };
     }
-    return [d, best.x, best.y];
+    return [d, best.x, best.y, best.len, best.hz];
   }
   function RelEdge({ id, data, selected }) {
     const pts = RF.useStore(React.useCallback((st) => routeAll(st.nodeInternals, st.edges).get(id), [id]));
     if (!pts) return null;
-    const [path, lx, ly] = orthoPath(pts);
+    const [path, lx, ly, segLen, segHz] = orthoPath(pts);
     const ty = data && data.ty, pv = !!(data && data.pv), col = ty && ty.color ? COLORS[ty.color] : "";
+    // label tidak muat di ruasnya (kartu berdekatan) -> cukup ikon (nama relasi di tooltip), supaya tidak menutupi kartu
+    const fit = ty ? (segHz ? segLen >= (pv ? 18 + ty.label.length * 4.2 : 40 + ty.label.length * 6.6) : segLen >= (pv ? 20 : 34)) : true;
     const style = {};
     if (ty && ty.dashed) style.strokeDasharray = "6 5";
     if (col) style.stroke = col;
@@ -626,10 +644,10 @@
     return h(React.Fragment, null,
       h(RF.BaseEdge, { id, path, style, interactionWidth: pv ? 0 : 16 }),
       ty ? h(RF.EdgeLabelRenderer, null, pv
-        ? h("div", { className: "jj-elabel is-pv" + (col ? " has-c" : ""), style: chipStyle }, ic(typeIc(ty), 10), h("span", null, ty.label))
-        : h("button", { type: "button", className: "jj-elabel nopan nodrag" + (selected ? " is-sel" : "") + (col ? " has-c" : ""), style: chipStyle,
-          "aria-label": "Relasi " + ty.label + " — ubah", onClick: (e) => { e.stopPropagation(); edgeMenu(id, e.currentTarget); } },
-          ic(typeIc(ty), 11), h("span", null, ty.label))) : null);
+        ? h("div", { className: "jj-elabel is-pv" + (col ? " has-c" : "") + (fit ? "" : " is-compact"), style: chipStyle }, ic(typeIc(ty), 10), fit ? h("span", null, ty.label) : null)
+        : h("button", { type: "button", className: "jj-elabel nopan nodrag" + (selected ? " is-sel" : "") + (col ? " has-c" : "") + (fit ? "" : " is-compact"), style: chipStyle,
+          title: fit ? undefined : ty.label, "aria-label": "Relasi " + ty.label + " — ubah", onClick: (e) => { e.stopPropagation(); edgeMenu(id, e.currentTarget); } },
+          ic(typeIc(ty), 11), fit ? h("span", null, ty.label) : null)) : null);
   }
   const EDGE_TYPES = { rel: RelEdge };
 
