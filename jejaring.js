@@ -767,7 +767,7 @@
     const rf = RF.useReactFlow(), store = RF.useStoreApi();
     const box = sel && (props.shift || boxSel);
     React.useEffect(() => { store.setState({ multiSelectionActive: !!(sel && props.multi) }); }, [sel, props.multi]);
-    const first = React.useRef(true), drag = React.useRef(null), conn = React.useRef(null);
+    const first = React.useRef(true), drag = React.useRef(null), conn = React.useRef(null), connEndAt = React.useRef(0);
 
     React.useEffect(() => { api = { rf, store, setNodes, setEdges, setEditing }; return () => { if (api && api.rf === rf) api = null; }; }, [rf]);
     React.useEffect(() => { editingNow = editing; }, [editing]);
@@ -801,13 +801,29 @@
     };
     // seret dari "+" ke kartu lain = hubungkan (lalu pilih jenis relasi); dilepas di latar = kartu baru di titik itu
     const pt = (e) => { const tt = e && e.changedTouches && e.changedTouches[0]; return tt ? { x: tt.clientX, y: tt.clientY } : { x: e ? e.clientX : 0, y: e ? e.clientY : 0 }; };
+    // kartu tokoh di bawah titik layar q (atau dalam SNAP px dari tepinya), selain kartu asal
+    const personAt = (q, from) => {
+      const SNAP = 26;
+      const under = document.elementFromPoint(q.x, q.y), el = under && under.closest(".react-flow__node-person[data-id]");
+      if (el && el.dataset.id !== from) return el.dataset.id;
+      let best = null, bd = Infinity;
+      document.querySelectorAll(".jj-rf .react-flow__node-person[data-id]").forEach((n) => {
+        if (n.dataset.id === from) return;
+        const r = n.getBoundingClientRect(), dx = Math.max(r.left - q.x, 0, q.x - r.right), dy = Math.max(r.top - q.y, 0, q.y - r.bottom), d = Math.hypot(dx, dy);
+        if (d <= SNAP && d < bd) { bd = d; best = n.dataset.id; }
+      });
+      return best;
+    };
     const onConnectStart = (e, p) => { closeMenu(); const q = pt(e); conn.current = { nodeId: p.nodeId, side: p.handleId, x: q.x, y: q.y, made: null }; setConnecting(true); };
     const onConnect = (c) => { if (conn.current) conn.current.made = c; };
     const onConnectEnd = (e) => {
       const c = conn.current;
       conn.current = null; setConnecting(false);
       if (!c) return;
+      connEndAt.current = Date.now();   // klik pane yang menyusul mouseup ini jangan menutup menu relasi yang baru dibuka
       const q = pt(e);
+      // dilepas di atas label nama / tepi kartu (di luar pegangan React Flow) -> tetap sambung ke kartu terdekat
+      if (!c.made) { const tgt = personAt(q, c.nodeId); if (tgt) c.made = { source: c.nodeId, target: tgt }; }
       if (c.made) {
         if (c.made.source === c.made.target) return;
         if (sheet.edges.some((x) => (x.source === c.made.source && x.target === c.made.target) || (x.source === c.made.target && x.target === c.made.source))) { toast("Kedua tokoh ini sudah terhubung — klik garisnya untuk mengubah relasi."); return; }
@@ -838,7 +854,7 @@
         onConnect, onConnectStart, onConnectEnd, onNodeDoubleClick, onNodeDragStart, onNodeDragStop,
         onEdgeClick: (e, edge) => { if (t === "select" && !e.shiftKey && !e.ctrlKey && !e.metaKey) edgeMenu(edge.id, null, { x: e.clientX, y: e.clientY }); },
         onNodeContextMenu: ctxMenu("node"), onSelectionContextMenu: ctxMenu("sel"), onPaneContextMenu: ctxMenu("pane"), onEdgeContextMenu: ctxMenu("edge"),
-        onPaneClick: () => closeMenu(),
+        onPaneClick: () => { if (Date.now() - connEndAt.current > 350) closeMenu(); },
         onMoveEnd: (e, v) => saveViewport(v),
         defaultViewport: props.vp || undefined, fitView: !props.vp, fitViewOptions: { padding: 0.3, maxZoom: 1 },
         minZoom: MIN_Z, maxZoom: MAX_Z,
