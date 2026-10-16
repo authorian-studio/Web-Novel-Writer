@@ -14,11 +14,18 @@
 //     dokumen baru ditambahkan (ditaruh dekat titik sebelumnya, jalur berkelok, tidak bertumpuk), yang dihapus dibuang,
 //     judul selalu dibaca langsung dari dokumennya. Project lama disemai SEKALI dari waktu yang tertanam di id
 //     (Date.now()) / urutan yang ada — posisi titik scene lama dipakai — tanpa menandai project berubah.
-//   papan "home" (Beranda) = jejak + objek bebas; tidak bisa dihapus. Papan lain = kanvas bebas (scene bisa ditambahkan).
+//   DUA JENIS PAPAN:
+//   - "home" (Beranda) = GRAF JEJAK saja: titik dokumen yang sudah dibuat + benangnya; alat tambah objek tidak ada di
+//     sini (hanya Pilih / Geser, filter, zoom). Tidak bisa dihapus. Objek bebas yang dulu ada di Beranda dipindah SEKALI
+//     ke papan Brainstorm baru (migrateHome); penghubung ke titik jejak jadi kartu dokumen di papan itu.
+//   - papan lain = BRAINSTORM: kanvas bebas — kartu karakter / tempat / dokumen lain (baru atau yang sudah ada),
+//     catatan, bentuk, gambar, teks, frame, scene, disambung "benang" tipis (edge.style = "thread", bawaan papan ini)
+//     atau panah.
 //   node = { id, t, x, y, ... }  t = scene { sceneId } (papan lain) | shape { shape, color, text, w, h } | note { color, text, w, h }
 //          | image { src (WebP data URL, sisi terpanjang <= 1200px), w, h } | text { text, size, w } | frame { title, color, w, h }
 //          | doc { kind, ref, w, h }  (kartu dokumen dari alat "Dokumen": hanya rujukan, isinya dibaca dari dokumennya)
-//   edge = { id, source, target, label }  (penghubung buatan pengguna, berpanah; boleh ke titik jejak "s:<scene>" / "t:<jenis>:<id>")
+//   edge = { id, source, target, label, style? }  (penghubung buatan pengguna; style "thread" = benang tipis melengkung
+//          tanpa panah, selain itu panah; di Beranda boleh ke titik jejak "s:<scene>" / "t:<jenis>:<id>")
 //   Garis putus-putus urutan scene di Beranda (seq = true) dihitung dari urutan binder (tidak disimpan).
 // Per perangkat (localStorage, tidak memicu simpan ke Drive): viewport & papan aktif, filter jejak, peta mini, antarmuka
 // disembunyikan.
@@ -70,18 +77,18 @@
     story: { name: "Cerita", icon: "#ti-book-2", c: "#b58cff", cl: "#7d55d0" },
     chapter: { name: "Chapter", icon: "#ti-bookmark", c: "#d3c2ff", cl: "#8f78c9" },
     jejaring: { name: "Tree Relations", icon: "#ti-affiliate", c: "#f5a66b", cl: "#c86c2c" },
-    board: { name: "Papan", icon: "#ti-layout-board", c: "#a3a8b4", cl: "#6c717c" },
+    board: { name: "Brainstorm", icon: "#ti-bulb", c: "#a3a8b4", cl: "#6c717c" },
   };
   const ORG = ["characters", "locations", "factions", "items", "creatures", "cultures", "magic", "history", "notes"];   // entri Kodeks
   const CARD_KINDS = ["scene", "characters", "locations", "factions", "items", "creatures", "cultures", "magic", "history", "notes", "timeline", "map", "story", "jejaring", "board"];
   // ubin alat "Dokumen" (urutan seperti referensi: Kartu, Peta, Kanvas, Pohon relasi, ...)
   const TILES = [
-    { id: "card", kind: "characters", name: "Kartu" }, { id: "map", kind: "map", name: "Peta" }, { id: "board", kind: "board", name: "Kanvas" },
+    { id: "card", kind: "characters", name: "Kartu" }, { id: "map", kind: "map", name: "Peta" }, { id: "board", kind: "board", name: "Brainstorm" },
     { id: "jejaring", kind: "jejaring", name: "Tree" }, { id: "timeline", kind: "timeline", name: "Timeline" },
     { id: "scene", kind: "scene", name: "Scene" }, { id: "story", kind: "story", name: "Cerita" },
   ];
-  const LIST_NAMES = { characters: "Kartu", locations: "Kartu", notes: "Kartu", factions: "Kartu", items: "Kartu", creatures: "Kartu", cultures: "Kartu", magic: "Kartu", history: "Kartu", map: "Peta", board: "Kanvas (papan)", jejaring: "Tree Relations", timeline: "Timeline", scene: "Scene", story: "Cerita Quill" };
-  const NEW_NAMES = { characters: "karakter", locations: "lokasi", notes: "catatan", map: "peta", board: "papan", jejaring: "tree", timeline: "timeline", scene: "scene", story: "cerita" };
+  const LIST_NAMES = { characters: "Kartu", locations: "Kartu", notes: "Kartu", factions: "Kartu", items: "Kartu", creatures: "Kartu", cultures: "Kartu", magic: "Kartu", history: "Kartu", map: "Peta", board: "Papan brainstorm", jejaring: "Tree Relations", timeline: "Timeline", scene: "Scene", story: "Cerita Quill" };
+  const NEW_NAMES = { characters: "karakter", locations: "lokasi", notes: "catatan", map: "peta", board: "papan brainstorm", jejaring: "tree", timeline: "timeline", scene: "scene", story: "cerita" };
   // sampul Quill (salinan warna preset quill.js, untuk pratinjau kartu cerita)
   const COVERS = { midnight: ["#1c1f3b"], ink: ["#141418"], wine: ["#4b1627"], forest: ["#173a2b"], ocean: ["#123552"], clay: ["#7a3b26"], sand: ["#d8c49c"],
     cream: ["#efe6d1"], dusk: ["#3b1f4a", "#b04a5a"], aurora: ["#0e2a3b", "#1f6f6a", "#93cfa2"], ember: ["#2a0e0a", "#b8472a"], nebula: ["#140f30", "#3d2b7c", "#c2709c"],
@@ -219,7 +226,9 @@
       if (!okId(s) || !okId(t) || s === t || pairs.has(s + ">" + t)) return;
       const eid = typeof e.id === "string" && e.id && e.id.length <= 120 && !eids.has(e.id) ? e.id : uid("e");
       eids.add(eid); pairs.add(s + ">" + t);
-      edges.push({ id: eid, source: s, target: t, label: str(e.label, 200) });
+      const o = { id: eid, source: s, target: t, label: str(e.label, 200) };
+      if (e.style === "thread") o.style = "thread";
+      edges.push(o);
     });
     const title = typeof b.title === "string" && b.title.trim() ? b.title.trim().slice(0, 80) : (id === HOME_ID ? "Beranda" : "Papan");
     const vp = validVp(b.viewport) ? { x: Math.round(b.viewport.x), y: Math.round(b.viewport.y), zoom: +(+b.viewport.zoom).toFixed(3) } : null;
@@ -855,11 +864,17 @@
     const { a, b } = edgeGeom(s, t, seq ? 3 : 4);
     const path = `M${a.x},${a.y}L${b.x},${b.y}`;
     if (seq) return h(RF.BaseEdge, { id, path, interactionWidth: 0 });
-    const ed = ui.editing === "e:" + id, label = data && data.label;
-    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    const ed = ui.editing === "e:" + id, label = data && data.label, thread = !!(data && data.thread);
+    let mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, d = path;
+    if (thread) {   // benang: lengkung lembut (titik kendali digeser tegak lurus 12% panjang garis)
+      const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1, k = Math.min(60, L * 0.12);
+      const cx = mx - (dy / L) * k, cy = my + (dx / L) * k;
+      d = `M${a.x},${a.y}Q${cx},${cy} ${b.x},${b.y}`;
+      mx = (a.x + 2 * cx + b.x) / 4; my = (a.y + 2 * cy + b.y) / 4;
+    }
     return h(React.Fragment, null,
-      h(RF.BaseEdge, { id, path, interactionWidth: 18 }),
-      h("path", { d: arrowPath(a, b, 10, 5), className: "hc-arrow" }),
+      h(RF.BaseEdge, { id, path: d, interactionWidth: 18 }),
+      thread ? null : h("path", { d: arrowPath(a, b, 10, 5), className: "hc-arrow" }),
       label || ed ? h(RF.EdgeLabelRenderer, null, h("div", {
         className: "hc-elabel nopan nodrag" + (selected ? " is-sel" : "") + (ed ? " is-edit" : ""),
         style: { transform: `translate(-50%, -50%) translate(${mx}px, ${my}px)` },
@@ -940,7 +955,7 @@
     board.nodes.forEach((n) => vis.add(n.id));
     board.edges.forEach((e) => {
       if (!vis.has(e.source) || !vis.has(e.target)) return;   // ujungnya jenis jejak yang disembunyikan filter
-      out.push({ id: e.id, source: e.source, target: e.target, type: "link", selected: sel.has(e.id), data: { label: e.label || "" } });
+      out.push({ id: e.id, source: e.source, target: e.target, type: "link", selected: sel.has(e.id), className: e.style === "thread" ? "is-thread" : "", data: { label: e.label || "", thread: e.style === "thread" } });
     });
     return out;
   }
@@ -1106,7 +1121,9 @@
       if (!c.source || !c.target || c.source === c.target) return;
       if (board.edges.some((x) => (x.source === c.source && x.target === c.target) || (x.source === c.target && x.target === c.source))) { toast("Kedua objek ini sudah terhubung."); return; }
       const id = uid("e");
-      mutate(() => { board.edges.push({ id, source: c.source, target: c.target, label: "" }); }, [id]);
+      const e = { id, source: c.source, target: c.target, label: "" };
+      if (board.id !== HOME_ID) e.style = "thread";   // Brainstorm: benang tipis
+      mutate(() => { board.edges.push(e); }, [id]);
     };
     // klik kanan: objek / pilihan / garis / latar
     const ctxMenu = (kind) => (e, item) => {
@@ -1323,6 +1340,7 @@
     return true;
   }
   function pasteClip() {
+    if (!board || board.id === HOME_ID) return;
     if (!clip || !board) return;
     const info = sceneInfo();
     const on = new Set(board.nodes.filter((n) => n.t === "scene").map((n) => n.sceneId));
@@ -1505,7 +1523,7 @@
   function makeBoard(title) {
     const c = cvs();
     let t = String(title || "").trim().slice(0, 80);
-    if (!t) { let n = c.boards.length; do { t = "Papan " + n++; } while (c.boards.some((b) => b.title === t)); }
+    if (!t) { let n = c.boards.length; do { t = "Brainstorm " + n++; } while (c.boards.some((b) => b.title === t)); }
     const b = { id: uid("b"), title: t, nodes: [], edges: [], viewport: null, seq: true };
     c.boards.push(b);
     save();
@@ -1518,7 +1536,7 @@
       const b = makeBoard(title);
       syncNow(); rev++;
       startPlaceDoc("board", b.id, kbd);
-      toast(`Papan "${b.title}" dibuat.`);
+      toast(`Papan brainstorm "${b.title}" dibuat.`);
       return;
     }
     if (!ctx.createDoc) return;
@@ -1581,7 +1599,7 @@
   }
   function addImages(files, at) {
     files = Array.from(files || []).filter((f) => /^image\//.test(f.type || ""));
-    if (!files.length || !board) return;
+    if (!files.length || !board || board.id === HOME_ID) return;
     const b = board, room = MAX_IMG - b.nodes.filter((n) => n.t === "image").length;
     if (room <= 0) { toast(`Papan ini penuh (maks. ${MAX_IMG} gambar).`); return; }
     if (files.length > room) toast(`Hanya ${room} gambar lagi yang muat di papan ini.`);
@@ -1606,6 +1624,7 @@
     closeMenu();
     cancelWheelZoom();
     if (pendingDoc && tool === "doc") { pendingDoc = null; tool = "select"; }
+    if (b.id === HOME_ID && tool !== "select" && tool !== "hand") tool = "select";   // Beranda: hanya Pilih / Geser
     board = b;
     cvs().active = b.id;
     lsSet("novelist_hcboard_" + projId, b.id);
@@ -1615,6 +1634,35 @@
     rev++;
     renderFlow(); updateChrome();
     if (!quiet && ctx.onOpen) ctx.onOpen(b.id, b.title, b.id === HOME_ID);   // app.js: riwayat sidebar tab
+  }
+  // Beranda lama berisi objek bebas (catatan, bentuk, kartu, …) -> dipindah ke papan Brainstorm baru (sekali).
+  // Penghubung dari objek ke titik jejak menjadi penghubung ke KARTU dokumen yang sama di papan baru itu.
+  function migrateHome(cv) {
+    const home = cv.boards.find((b) => b.id === HOME_ID);
+    if (!home || !home.nodes.length) return null;
+    const moved = new Set(home.nodes.map((n) => n.id)), T = new Map(trailArr().map((e) => [tid(e), e])), cardFor = new Map();
+    let title = "Brainstorm", n = 2;
+    while (cv.boards.some((b) => b.title === title)) title = "Brainstorm " + n++;
+    const nb = { id: uid("b"), title, nodes: home.nodes.filter((m) => m.t !== "scene"), edges: [], viewport: home.viewport, seq: true };
+    const end = (x) => {
+      if (moved.has(x)) return nb.nodes.some((m) => m.id === x) ? x : null;
+      if (cardFor.has(x)) return cardFor.get(x);
+      const te = T.get(x);
+      if (!te || !CARD_KINDS.includes(te.kind) || !hasXY(te)) return null;
+      const id = uid("n");
+      nb.nodes.push({ id, t: "doc", kind: te.kind, ref: te.id, x: Math.round(te.x - DEF.doc.w / 2), y: Math.round(te.y + 24), w: DEF.doc.w, h: DEF.doc.h });
+      cardFor.set(x, id);
+      return id;
+    };
+    const keep = [];
+    home.edges.forEach((e) => {
+      if (!moved.has(e.source) && !moved.has(e.target)) { keep.push(e); return; }
+      const a = end(e.source), b = end(e.target);
+      if (a && b && a !== b) nb.edges.push(Object.assign({}, e, { source: a, target: b }));
+    });
+    home.nodes = []; home.edges = keep;
+    if (nb.nodes.length) cv.boards.splice(1, 0, nb);
+    return nb.nodes.length ? nb : null;
   }
   function newBoard() {
     const b = makeBoard("");
@@ -1697,6 +1745,7 @@
   }
   function zoom100() { zoomGoal = 0; cancelWheelZoom(); if (api) zoomTo(1, dur(220)); }
   function setTool(t) {
+    if (board && board.id === HOME_ID && t !== "select" && t !== "hand") return;   // Beranda = graf jejak saja
     if (t === "image") { pickImage(); return; }
     if (t === "doc" && !pendingDoc) { if (dom) openMenu("docs", dom.docBtn); return; }
     if (!["select", "hand", "connect"].concat(PLACE).includes(t)) return;
@@ -1777,6 +1826,9 @@
       case "adddoc": closeMenu(); setTool("doc"); return;
       case "selall": selectAll(); break;
       case "elabel": if (api && arg) api.setEditing("e:" + arg); break;
+      case "estyle": { const ee = board.edges.find((x) => x.id === arg); if (ee) mutate(() => { if (ee.style === "thread") delete ee.style; else ee.style = "thread"; }, [arg]); break; }
+      case "tobrain": { const bs = cvs().boards.filter((b) => b.id !== HOME_ID); if (bs.length) openMenu("boards", dom.boardBtn); else newBoard(); return; }
+      case "quickdoc": if (board.id !== HOME_ID && KINDS[arg]) { dm = { kind: arg, q: "" }; openMenu("doclist", dom.tools.querySelector(`[data-act="quickdoc"][data-arg="${arg}"]`) || dom.docBtn); } return;
       case "edel": if (arg) mutate(() => { board.edges = board.edges.filter((e) => e.id !== arg); }, []); break;
       // alat Dokumen
       case "doctile": {
@@ -1862,12 +1914,16 @@
           ${tb("select", "Pilih", "V", icS("#ti-pointer-filled", 18), "hc-t-sm")}
           ${tb("hand", "Geser", "H", icS("#ti-hand-stop", 18), "hc-t-sm")}
           <span class="hc-tsep" aria-hidden="true"></span>
+          <button type="button" class="hc-tool hc-t-cta hc-home-only" data-act="tobrain" aria-label="Brainstorm: tambah & sambungkan karakter, tempat, catatan" data-tip="Tambah & sambungkan ide di papan Brainstorm" data-tip-pos="top">${icS("#ti-bulb", 17)}<span>Brainstorm</span></button>
+          <button type="button" class="hc-tool hc-t-quick hc-brain-only" data-act="quickdoc" data-arg="characters" aria-haspopup="menu" aria-label="Tambah karakter (baru atau yang sudah ada)" data-tip="Karakter — baru / yang sudah ada" data-tip-pos="top">${icS("#ti-user-plus", 17)}<span>Karakter</span></button>
+          <button type="button" class="hc-tool hc-t-quick hc-brain-only" data-act="quickdoc" data-arg="locations" aria-haspopup="menu" aria-label="Tambah tempat (baru atau yang sudah ada)" data-tip="Tempat — baru / yang sudah ada" data-tip-pos="top">${icS("#ti-map-pin-plus", 17)}<span>Tempat</span></button>
+          <span class="hc-tsep hc-brain-only" aria-hidden="true"></span>
           ${tb("shape", "Bentuk", "S", `<span class="hc-shape-ic">${icS("#ti-triangle-filled", 26)}</span>`, "hc-t-big", ' aria-haspopup="menu"')}
           ${tb("doc", "Dokumen", "D", `<span class="hc-doc-prev" aria-hidden="true"><i></i><i>${icS("#ti-user", 12)}</i></span>`, "hc-t-big", ' aria-haspopup="menu" aria-expanded="false"')}
           ${tb("note", "Catatan tempel", "N", '<span class="hc-note-prev" aria-hidden="true"><i></i><i></i><i></i></span>', "hc-t-big")}
           <button type="button" class="hc-tool hc-t-big" data-act="image" aria-label="Gambar (I)" data-tip="Gambar · I" data-tip-pos="top"><span class="hc-img-prev" aria-hidden="true">${icS("#ti-photo", 16)}</span></button>
           <span class="hc-tsep" aria-hidden="true"></span>
-          ${tb("connect", "Penghubung", "C", `<span class="hc-conn-ic" aria-hidden="true">${icS("#ti-square-filled", 13)}${icS("#ti-circle-filled", 13)}${icS("#ti-arrow-up-right", 12)}</span>`)}
+          ${tb("connect", "Benang / penghubung", "C", `<span class="hc-conn-ic" aria-hidden="true">${icS("#ti-square-filled", 13)}${icS("#ti-circle-filled", 13)}${icS("#ti-arrow-up-right", 12)}</span>`)}
           ${tb("text", "Teks", "T", icS("#ti-letter-t", 19))}
           ${tb("frame", "Frame", "F", icS("#ti-app-window", 19))}
         </div>
@@ -1958,6 +2014,8 @@
     dom.bareBtn.setAttribute("aria-label", bareTip);
     dom.miniBtn.setAttribute("aria-pressed", mini ? "true" : "false");
     dom.trailSide.classList.toggle("hidden", !home);
+    dom.panel.classList.toggle("is-home", home);
+    dom.panel.classList.toggle("is-brain", !home);
     dom.filterBtn.classList.toggle("is-on", !!hidden || !tf.threads);
     dom.notePrev.style.setProperty("--c", NOTE_COLORS[noteColor]);
     const img = [...board.nodes].reverse().find((n) => n.t === "image");
@@ -1982,7 +2040,7 @@
         ? (T.length
           ? `<span class="hc-empty-ic">${icS("#ti-adjustments-horizontal", 22)}</span><p>Semua jejak disembunyikan</p><small>Buka filter jejak di tepi kanan untuk menampilkan jenis dokumen lagi.</small>`
           : `<span class="hc-empty-ic">${icS("#ti-route", 22)}</span><p>Belum ada jejak</p><small>Setiap scene, bab, karakter, peta, timeline, cerita & tree relasi yang kamu buat muncul di sini sebagai titik yang tersambung benang — klik titiknya untuk kembali ke dokumen itu.</small>`)
-        : `<span class="hc-empty-ic">${icS("#ti-layout-board", 22)}</span><p>Papan ini masih kosong</p><small>Pilih alat di bawah — dokumen, catatan, bentuk, gambar, teks atau frame. Seret latar untuk menggeser, roda mouse untuk zoom.</small>`;
+        : `<span class="hc-empty-ic">${icS("#ti-bulb", 22)}</span><p>Papan brainstorm masih kosong</p><small>Tambah <b>Karakter</b> atau <b>Tempat</b> (baru atau yang sudah ada), catatan, bentuk, gambar & teks dari bilah bawah, lalu sambungkan dengan alat <b>Benang</b> (C). Seret latar untuk menggeser, roda mouse untuk zoom.</small>`;
     }
   }
 
@@ -2017,15 +2075,18 @@
   function menuHtml(kind, o) {
     const home = board.id === HOME_ID, x = H();
     if (kind === "boards") {
-      return [{ head: "Papan" }].concat(cvs().boards.map((b) => ({
+      const row = (b) => ({
         act: "board", arg: b.id, label: b.title, check: b === board, radio: true,
-        ic: b.id === HOME_ID ? icS("#ti-home", 15) : icS("#ti-layout-board", 15),
-        sub: b.id === HOME_ID ? trailArr().length + " dokumen di jejak" : b.nodes.length + " objek",
-      })), [{ sep: 1 },
-        { act: "newboard", label: "Papan baru", ic: icS("#ti-plus", 15) },
+        ic: b.id === HOME_ID ? icS("#ti-home", 15) : icS("#ti-bulb", 15),
+        sub: b.id === HOME_ID ? "Graf · " + trailArr().length + " dokumen di jejak" : b.nodes.length + " objek",
+      });
+      const bs = cvs().boards.filter((b) => b.id !== HOME_ID);
+      return [{ head: "Beranda" }, row(cvs().boards.find((b) => b.id === HOME_ID))].concat([{ head: "Brainstorm" }], bs.map(row),
+        bs.length ? [] : [{ act: "newboard", label: "Belum ada papan brainstorm", ic: icS("#ti-bulb", 15), sub: "Klik untuk membuat yang pertama" }], [{ sep: 1 },
+        { act: "newboard", label: "Brainstorm baru", ic: icS("#ti-plus", 15) },
         { act: "rename", label: "Ganti nama papan", ic: icS("#ti-pencil", 15) },
         home ? null : { act: "addscenes", label: "Tambah scene ke papan…", ic: icS("#ti-file-plus", 15) },
-        { act: "delboard", label: "Hapus papan", ic: icS("#ti-trash", 15), danger: true, disabled: home, title: home ? "Papan Beranda tidak bisa dihapus" : "" },
+        home ? null : { act: "delboard", label: "Hapus papan", ic: icS("#ti-trash", 15), danger: true },
       ].filter(Boolean)).map(item).join("");
     }
     if (kind === "scenes") {
@@ -2076,7 +2137,18 @@
       ].filter(Boolean).map(item).join("");
     }
     if (kind === "edge") {
-      return [{ act: "elabel", arg: o.arg, label: "Edit label", ic: icS("#ti-pencil", 15) }, { act: "edel", arg: o.arg, label: "Hapus penghubung", ic: icS("#ti-trash", 15), danger: true }].map(item).join("");
+      const ee = board.edges.find((x) => x.id === o.arg), th = !!(ee && ee.style === "thread");
+      return [{ act: "elabel", arg: o.arg, label: "Edit label", ic: icS("#ti-pencil", 15) },
+        { act: "estyle", arg: o.arg, label: th ? "Jadikan panah" : "Jadikan benang tipis", ic: th ? icS("#ti-arrow-up-right", 15) : icS("#ti-line", 15) },
+        { act: "edel", arg: o.arg, label: "Hapus penghubung", ic: icS("#ti-trash", 15), danger: true }].map(item).join("");
+    }
+    if (kind === "pane" && home) {
+      return [
+        { act: "tobrain", label: "Buka papan Brainstorm…", ic: icS("#ti-bulb", 15) },
+        { sep: 1 },
+        { act: "selall", label: "Pilih semua", ic: icS("#ti-select-all", 15), kbd: MOD + "+A" },
+        { act: "fit", label: "Pas ke layar", ic: icS("#ti-focus-centered", 15), kbd: "Shift+1" },
+      ].map(item).join("");
     }
     if (kind === "pane") {
       return [
@@ -2294,7 +2366,7 @@
     if (k === "+" || k === "=") { zoomBy(1); return; }
     if (k === "-") { zoomBy(-1); return; }
     if (e.shiftKey) return;
-    const map = { v: "select", h: "hand", s: "shape", d: "doc", n: "note", i: "image", c: "connect", t: "text", f: "frame" };
+    const map = board && board.id === HOME_ID ? { v: "select", h: "hand" } : { v: "select", h: "hand", s: "shape", d: "doc", n: "note", i: "image", c: "connect", t: "text", f: "frame" };
     const tt = map[k.toLowerCase()];
     if (tt) { e.preventDefault(); closeMenu(); setTool(tt); }
   }
@@ -2515,6 +2587,7 @@
       const cv = canvasOf(c.project);
       syncNow();
       pruneHome();   // penghubung ke titik jejak yang tidak ada lagi
+      const moved = migrateHome(cv);   // Beranda = graf saja: objek bebas lama pindah ke papan Brainstorm
       const info = sceneInfo();
       cv.boards.forEach((b) => syncScenes(b, info));
       const want = fresh ? lsGet("novelist_hcboard_" + projId) : board && board.id;
@@ -2528,6 +2601,7 @@
       renderFlow();
       updateChrome();
       if (freshKeys.size) { setTimeout(revealFresh, 120); scheduleFreshClear(); }
+      if (moved) { save(); toast(`Beranda kini khusus graf dokumen — catatan & objek lainnya dipindah ke papan "${moved.title}".`); }
       if (fresh && board.id !== HOME_ID && ctx.onOpen) ctx.onOpen(board.id, board.title, false);
     },
     // tab lain tampil / keluar project / logout: simpan teks yang sedang diedit lalu lepas kanvas
