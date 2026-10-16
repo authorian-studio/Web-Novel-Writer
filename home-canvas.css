@@ -89,7 +89,7 @@ body.light .hc-board-sub { text-shadow: 0 0 6px rgba(255,255,255,.9); }
 .hc-panel.is-bare .hc-head-right > :not(.hc-bare-btn), .hc-panel.is-bare .react-flow__attribution { display: none !important; }
 
 /* ---- tepi kanan: tombol tampilan + filter jejak ---- */
-.hc-rail { position: absolute; z-index: 6; right: 12px; top: 102px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.hc-rail { position: absolute; z-index: 6; right: 12px; top: 58px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .hc-side { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px; border-radius: 12px; background: var(--hc-glass); border: 1px solid var(--hc-glass-b); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 .hc-sbtn { position: relative; width: 30px; height: 30px; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
 .hc-sbtn:hover, .hc-sbtn[aria-expanded="true"] { background: var(--hc-hover); color: var(--text); }
@@ -437,6 +437,10 @@ body.light .hc-minimap .react-flow__minimap-mask { fill: rgba(0,0,0,.08); }
 .hc-ghost.is-frame { border-style: solid; border-radius: 14px; background: rgba(255,255,255,.03); }
 .hc-ghost.is-doc { border-radius: 14px; }
 
+/* ---- desktop: Pintasan · zoom · menu · sembunyikan · tutup naik ke bar atas, di samping jam ---- */
+@media (min-width: 701px) {
+  .hc-head-right { position: absolute; top: -49px; right: calc(var(--proj-clock-w, 48px) + 8px); }
+}
 /* ---- status simpan di pojok kanan bawah Beranda (desktop) ---- */
 @media (min-width: 701px) { #editorView[data-tab="home"] .save-status { right: 18px; bottom: 18px; } }
 

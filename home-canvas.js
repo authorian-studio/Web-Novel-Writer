@@ -1894,8 +1894,6 @@
       </header>
       <div class="hc-rail">
         <div class="hc-side" role="group" aria-label="Tampilan kanvas">
-          <button type="button" class="hc-sbtn" data-act="preview" aria-label="Preview manuskrip" data-tip="Preview manuskrip">${icS("#ti-eye", 16)}</button>
-          <span class="hc-side-sep" aria-hidden="true"></span>
           <button type="button" class="hc-sbtn" data-act="zoomin" aria-label="Perbesar" data-tip="Perbesar · + / roda mouse">${icS("#ti-zoom-in", 16)}</button>
           <button type="button" class="hc-sbtn" data-act="zoomout" aria-label="Perkecil" data-tip="Perkecil · − / roda mouse">${icS("#ti-zoom-out", 16)}</button>
           <button type="button" class="hc-sbtn" data-act="fit" aria-label="Pas ke layar" data-tip="Pas ke layar · Shift+1">${icS("#ti-focus-centered", 16)}</button>

@@ -1778,7 +1778,12 @@ async function renderJejaringTab() {
 
 // jam kecil di pojok kanan atas (seperti vvd)
 let projClockHandle = null;
-function tickProjClock() { el("projClock").textContent = new Date().toLocaleTimeString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { hour: "2-digit", minute: "2-digit" }); }
+function tickProjClock() {
+  const c = el("projClock");
+  c.textContent = new Date().toLocaleTimeString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { hour: "2-digit", minute: "2-digit" });
+  // lebar jam -> bilah kanan Beranda (Pintasan · zoom · …) duduk tepat di sebelah kirinya
+  if (c.offsetWidth) document.documentElement.style.setProperty("--proj-clock-w", c.offsetWidth + "px");
+}
 function startProjClock() { tickProjClock(); stopProjClock(); projClockHandle = setInterval(tickProjClock, 15000); }
 function stopProjClock() { if (projClockHandle) clearInterval(projClockHandle); projClockHandle = null; }
 function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
