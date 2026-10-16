@@ -512,6 +512,8 @@
     // putar buku ke sisi depan / belakang (dipakai pilihan "Depan / Belakang" di editor sampul & tombol "Balik buku")
     stage.qdFlip = (back) => { clearTimeout(backT); BY = BY0 + (back ? 180 : 0); spin = 0; tx = BX; ty = BY; kick(); };
     stage.qdIsBack = () => BY !== BY0;
+    // sisi yang benar-benar menghadap pembaca saat ini (ikut putaran seret), dipakai saat gambar dilepas di atas buku
+    stage.qdFacingBack = () => Math.cos(ty * Math.PI / 180) < 0;
     apply();
   }
 
@@ -735,11 +737,23 @@
             <button type="button" role="switch" aria-checked="${b.showAuthor}" aria-label="Tampilkan nama penulis" class="qd-switch${b.showAuthor ? " is-on" : ""}" data-act="toggle-author"><span></span></button></div>`;
       }
     };
-    const setJacket = (f) => {
+    // side = sisi sampul yang dituju, dikunci saat gambar DIPILIH / DILEPAS (bukan saat selesai dibaca) supaya tidak
+    // tertukar ke sisi depan bila layar sempat dibangun ulang (mis. sinkron saat jendela fokus lagi setelah dialog file).
+    const setJacket = (f, side) => {
       if (!f) return;
+      const back = (side || route.side) === "back";
       stage.classList.add("is-busy");
       readImageFile(f, 1000, 1000)
-        .then((url) => { if (route.side === "back") d.book.backJacket = url; else d.book.jacket = url; if (route.tab !== "jacket") { route.tab = "jacket"; $$(scr, ".qd-tab").forEach((t) => { t.classList.toggle("is-active", t.dataset.tab === "jacket"); t.setAttribute("aria-selected", t.dataset.tab === "jacket"); }); } paintTab(); paintBook(); })
+        .then((url) => {
+          const live = route.view === "create" && route.draft && route.draft.forId === d.forId ? route.draft : d;
+          if (back) live.book.backJacket = url; else live.book.jacket = url;
+          route.tab = "jacket";
+          route.side = back ? "back" : "front";
+          if (!scr.isConnected) { if (live === route.draft) render(); return; }   // layar sudah diganti: gambar ulang dari draft
+          $$(scr, ".qd-tab").forEach((t) => { t.classList.toggle("is-active", t.dataset.tab === "jacket"); t.setAttribute("aria-selected", t.dataset.tab === "jacket"); });
+          if (stage.qdIsBack() !== back) stage.qdFlip(back);
+          paintTab(); paintBook();
+        })
         .catch((err) => toast(err.message || "Gambar gagal dibaca.", tiIcon("alert-triangle")))
         .finally(() => stage.classList.remove("is-busy"));
     };
@@ -751,9 +765,10 @@
     paintTab();
     attachTilt(stage);
     if (route.side === "back") stage.qdFlip(true);
-    dropZone(stage, (files) => setJacket(files[0]));
-    dropZone(panel, (files) => setJacket(files[0]));
-    file.addEventListener("change", () => { setJacket(file.files[0]); file.value = ""; });
+    dropZone(stage, (files) => setJacket(files[0], stage.qdFacingBack() ? "back" : "front"));   // dilepas di atas buku: sisi yang terlihat
+    dropZone(panel, (files) => setJacket(files[0], route.side));
+    let pickSide = "front";
+    file.addEventListener("change", () => { setJacket(file.files[0], pickSide); file.value = ""; });
     $(scr, ".qd-title-input").addEventListener("input", (e) => { d.title = e.target.value; paintBook(); });
     $(scr, ".qd-author-input").addEventListener("input", (e) => { d.author = e.target.value; paintBook(); });
     $(scr, ".qd-title-input").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $(scr, ".qd-author-input").focus(); } });
@@ -781,7 +796,7 @@
       else if (t.dataset.tcolor) b.titleColor = t.dataset.tcolor;
       else if (t.dataset.font) b.titleFont = t.dataset.font;
       else if (t.dataset.act === "toggle-author") b.showAuthor = !b.showAuthor;
-      else if (t.dataset.act === "jacket-pick") { file.click(); return; }
+      else if (t.dataset.act === "jacket-pick") { pickSide = route.side; file.click(); return; }
       else if (t.dataset.act === "jacket-remove") { if (route.side === "back") b.backJacket = null; else b.jacket = null; }
       else if (t.dataset.act === "flip") { route.side = stage.qdIsBack() ? "front" : "back"; if (route.tab !== "jacket") { route.tab = "jacket"; $$(scr, ".qd-tab").forEach((x) => { x.classList.toggle("is-active", x.dataset.tab === "jacket"); x.setAttribute("aria-selected", x.dataset.tab === "jacket"); }); } stage.qdFlip(route.side === "back"); paintTab(); return; }
       else if (t.dataset.act === "back") { route.draft = null; if (editing) go("story", { storyId: editing.id }); else go("library"); return; }

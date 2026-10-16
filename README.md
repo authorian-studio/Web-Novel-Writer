@@ -1,6 +1,15 @@
-# Novelist Web — v0.15.1
+# Novelist Web — v0.15.2
 
-## Riwayat perubahan terbaru (v0.15.1) — paling baru di atas
+## Riwayat perubahan terbaru (v0.15.2) — paling baru di atas
+
+**Quill: gambar sampul belakang tidak lagi nyasar ke sampul depan.** Sisi tujuan gambar kini dikunci saat gambar
+dipilih / dilepas, bukan saat gambar selesai diproses:
+- **Pilih file** dan seret ke panel → masuk ke sisi yang sedang dipilih (Depan / Belakang).
+- Seret ke **atas buku** → masuk ke sisi buku yang sedang menghadap pembaca.
+- Kalau layar sempat dibangun ulang saat dialog file terbuka (mis. sinkron Drive ketika jendela fokus lagi), gambar
+  tetap tersimpan di sisi yang benar dan langsung tampil (dulu bisa hilang).
+
+## v0.15.1
 
 **Quill: sampul belakang ikut diekspor.** Bila cerita punya gambar sampul belakang atau teks sampul belakang, sampul
 belakang digambar lengkap (warna sampul, gambar, dan teks blurb) lalu dipasang di akhir buku:
