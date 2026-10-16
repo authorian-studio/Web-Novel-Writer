@@ -733,6 +733,14 @@
                   <svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-chevron-down"></use></svg>
                 </button>
                 <div id="tlMenu" class="tl-menu hidden" role="menu" aria-label="Pilih timeline"></div>
+                <!-- cari di timeline ini: tahun / tanggal (mis. 1319, Des 1319, 21/12/1319, 200 SM) atau judul/tag event -> lompat ke sana -->
+                <div class="tl-find">
+                  <svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-search"></use></svg>
+                  <input id="tlFind" type="search" placeholder="Cari tanggal, tahun, atau event…" aria-label="Cari tanggal, tahun, atau event di timeline ini"
+                    autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="tlFindPop" aria-autocomplete="list" />
+                  <kbd class="tl-find-kbd" aria-hidden="true">/</kbd>
+                  <div id="tlFindPop" class="tl-find-pop hidden" role="listbox" aria-label="Hasil pencarian timeline"></div>
+                </div>
               </div>
               <span id="tlRangeText" class="tl-range-text" title="Tambah 100 tahun dengan tombol + di ujung garis; garis juga memanjang otomatis mengikuti event"></span>
               <button id="tlDelete" class="tl-head-btn" title="Hapus timeline ini" aria-label="Hapus timeline ini">

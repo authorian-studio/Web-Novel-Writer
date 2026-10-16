@@ -1,6 +1,17 @@
 /* i18n-en.js — kamus Bahasa Indonesia -> English untuk i18n.js (DIHASILKAN dari teks antarmuka di kode; boleh diedit
    manual). exact = teks utuh, patterns = teks dengan nilai dinamis ({} di sumber, {1} {2} … di terjemahan). */
-window.NOVELIST_EN = {"exact":{"Judul event":"Event title",
+window.NOVELIST_EN = {"exact":{"Cari tanggal, tahun, atau event…":"Search a date, year, or event…",
+"Cari tanggal, tahun, atau event di timeline ini":"Search a date, year, or event in this timeline",
+"Lompat ke tanggal ini":"Jump to this date",
+"Tidak ditemukan. Coba tahun (1319), bulan & tahun (Des 1319), tanggal lengkap (21/12/1319), atau judul event.":"Nothing found. Try a year (1319), month & year (Dec 1319), a full date (21/12/1319), or an event title.",
+"Event di sini":"Event here",
+"Tutup penanda":"Close marker",
+"Warna event":"Event color",
+"Terakhir dipakai":"Recently used",
+"Kode warna hex":"Hex color code",
+"Ambil warna dari layar":"Pick a color from the screen",
+"Hasil pencarian timeline":"Timeline search results",
+"Judul event":"Event title",
 "Detail lengkap (scene, warna)":"Full details (scene, color)",
 "Detail lengkap":"Full details",
 "Hapus event":"Delete event",
