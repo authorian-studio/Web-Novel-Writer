@@ -5,7 +5,7 @@
 **Halaman login: halftone reveal bisa dimatikan.** Menu tombol kiri-bawah (tempat "Unggah gambar…") kini punya
 tombol **Matikan halftone reveal**. Bila diklik, gambar halftone reveal di kolom kiri hilang dan konteks WebGL-nya
 dilepas, sehingga lebih ringan. Pilihan login tetap di kanan, tidak bergeser. Tombolnya lalu berganti menjadi
-**Nyalakan halftone reveal** untuk menampilkannya lagi. Pilihan ini tersimpan di perangkat ini. Bila kamu mengunggah
+**Nyalakan halftone reveal** untuk menampilkannya lagi (tanpa pesan di bawah tombol login, jadi form tidak bergeser sedikit pun). Pilihan ini tersimpan di perangkat ini. Bila kamu mengunggah
 gambar baru saat halftone reveal mati, ia otomatis dinyalakan lagi.
 
 **Tombol preview & tema pindah ke bar atas.** Tombol 👁 (Preview manuskrip) dan 🌙 (ganti tema) tidak lagi melayang di

@@ -280,7 +280,6 @@ const LOGIN_I18N = {
     artChangedTemp: "Gambar diganti, tapi browser menolak menyimpannya — akan kembali ke gambar bawaan saat halaman dimuat ulang.",
     artRestored: "Gambar bawaan dikembalikan.",
     artTurnOff: "Matikan halftone reveal", artTurnOn: "Nyalakan halftone reveal",
-    artShown: "Halftone reveal dinyalakan.", artHidden: "Halftone reveal dimatikan — tersimpan di perangkat ini.",
     bgUpload: "Ganti background…", bgReset: "Hapus background", bgChanged: "Background halaman login diganti — tersimpan di perangkat ini.",
     bgRestored: "Background dihapus.", bgFailed: "Background tidak bisa dipasang. Coba gambar lain (JPG, PNG, atau WebP).",
     termsTitle: "Ketentuan Penggunaan",
@@ -315,7 +314,6 @@ const LOGIN_I18N = {
     artChangedTemp: "Image changed, but your browser blocked saving it — it will go back to the default when the page reloads.",
     artRestored: "Default image restored.",
     artTurnOff: "Turn off halftone reveal", artTurnOn: "Turn on halftone reveal",
-    artShown: "Halftone reveal turned on.", artHidden: "Halftone reveal turned off — saved on this device.",
     bgUpload: "Change background…", bgReset: "Remove background", bgChanged: "Login page background changed — saved on this device.",
     bgRestored: "Background removed.", bgFailed: "Couldn't set that background. Try another image (JPG, PNG, or WebP).",
     termsTitle: "Terms of Use",
@@ -5130,7 +5128,7 @@ function syncLoginArtMenu() {
   if (view) view.classList.toggle("art-off", !loginArtShown);
 }
 
-function setLoginArtShown(on, notice) {
+function setLoginArtShown(on) {
   loginArtShown = on;
   try {
     if (on) localStorage.removeItem(LOGIN_ART_SHOW_KEY);
@@ -5138,7 +5136,6 @@ function setLoginArtShown(on, notice) {
   } catch (e) { /* diblokir: berlaku sampai halaman dimuat ulang */ }
   syncLoginArtMenu();
   if (loginArtSync) loginArtSync();
-  if (notice) showLoginNotice(lt(on ? "artShown" : "artHidden"));
 }
 
 // Ganti gambar halftone dengan file pilihan pengguna (dari tombol unggah atau seret-lepas).
@@ -5157,7 +5154,7 @@ async function changeLoginArt(file) {
     if (!rec || !isLoginArtRecord(rec) || !(await loginArtDecodes(rec.src))) { showLoginNotice(lt("artFailed")); return; }
     loginArtTouched = true;
     loginArtCustom = rec;
-    if (!loginArtShown) setLoginArtShown(true, false);   // baru saja pilih gambar -> tentu ingin melihatnya
+    if (!loginArtShown) setLoginArtShown(true);   // baru saja pilih gambar -> tentu ingin melihatnya
     applyLoginArt();
     syncLoginArtMenu();
     showLoginNotice(lt((await saveLoginArtCustom(rec)) ? "artChanged" : "artChangedTemp"));
@@ -5194,7 +5191,8 @@ function initLoginArtPicker() {
   el("btnLoginBgReset").onclick = () => { setOpen(false); btn.focus(); resetLoginBg(); };
   bgIn.onchange = () => { const f = bgIn.files && bgIn.files[0]; bgIn.value = ""; if (f) changeLoginBg(f); };
   el("btnLoginArtReset").onclick = () => { setOpen(false); btn.focus(); resetLoginArt(); };
-  el("btnLoginArtShow").onclick = () => { setOpen(false); btn.focus(); setLoginArtShown(!loginArtShown, true); };
+  // tanpa pesan di bawah tombol login: pesan itu menambah tinggi form sehingga form ikut bergeser
+  el("btnLoginArtShow").onclick = () => { setOpen(false); btn.focus(); setLoginArtShown(!loginArtShown); };
   input.onchange = () => { const f = input.files && input.files[0]; input.value = ""; if (f) changeLoginArt(f); };
   document.addEventListener("pointerdown", (e) => { if (!ctl.contains(e.target)) setOpen(false); });
   ctl.addEventListener("keydown", (e) => {
