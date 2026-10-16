@@ -2,12 +2,14 @@
 // Dimuat lazy oleh app.js (ensureTimelineLib) saat tab Timeline pertama kali dibuka, setelah React, ReactDOM &
 // React Flow (folder vendor/). Data disimpan di project: p.data.timelines = [{ id, title, start, end, events }]
 //   start/end = rentang dasar garis waktu (default 1500–1900); tombol + di kedua ujung garis menambah 100 tahun per klik
-//   event     = { id, title, year, month, day, desc, color, sceneId, image?, tags? }  (month/day boleh kosong;
+//   event     = { id, title, year, month, day, desc, color, sceneId, image?, tags?, cards? }  (month/day boleh kosong;
 //               image = data:image/... kecil, tags = ["tag", ...])
 // Aturan garis waktu (ala vvd):
 //   - garisnya selalu satu garis horizontal; event menempel di garis itu (hanya bisa digeser kiri/kanan)
 //   - arahkan kursor ke garis -> muncul tanggal lengkap (tanggal bulan tahun) + "klik untuk menambah"
-//   - klik event -> kartu kecil (gambar, judul, tanggal, deskripsi, tag); "Edit" membuka panel edit
+//   - klik garis -> event baru + kartu langsung muncul di atas titiknya (judul siap diketik); klik event -> kartu yang sama.
+//     Kartu bisa disunting di tempat: gambar, judul, tanggal, deskripsi, tag, kartu Kodeks yang ditautkan (ev.cards =
+//     [{ kind, id }]); tombol mata = panel detail lengkap (scene terkait, warna)
 //   - event di luar rentang dasar (mis. 1464 < 1500) membuat garis otomatis memanjang sampai tanggal itu
 // React hanya menggambar kanvas; sidebar daftar timeline, header & panel edit event memakai DOM biasa.
 (function () {
@@ -31,7 +33,8 @@
   let ctx = null;               // { project, onChange, getScenes, openScene }
   let tl = null;                // timeline yang sedang dibuka
   let selectedId = null;        // event yang sedang dipilih
-  let cardId = null;            // event yang kartunya sedang tampil (klik event)
+  let cardId = null;            // event yang kartunya sedang tampil (klik event / baru dibuat)
+  let freshId = null;           // event yang baru dibuat -> judul di kartu langsung terpilih untuk diketik
   let sideOpen = true;          // sidebar daftar timeline (disimpan di perangkat)
   try { sideOpen = localStorage.getItem("novelist_tlside") !== "0"; } catch (e) { /* abaikan */ }
   let rev = 0;                  // dinaikkan tiap data berubah -> node dibangun ulang
@@ -184,35 +187,107 @@
     changed();
   }
 
-  // ---------- kartu kecil event (muncul saat event diklik; mengikuti geser/zoom kanvas) ----------
-  function EventCard({ ev, range }) {
+  // ---------- kartu event (ala vvd): muncul tepat di atas titik event saat event diklik / baru dibuat ----------
+  // Bisa langsung disunting di tempat: gambar, judul, tanggal, deskripsi, tag & kartu Kodeks yang ditautkan.
+  // Tombol mata = panel detail lengkap (scene terkait, warna), tong sampah = hapus. Kartu mengikuti geser/zoom kanvas.
+  // ikon: #ti-calendar-event #ti-eye #ti-trash #ti-plus #ti-chevron-right #ti-x #ti-cards #ti-search #ti-photo
+  const ic = (name, n) => h("svg", { className: "ti", width: n || 14, height: n || 14, "aria-hidden": "true", focusable: "false" }, h("use", { href: "#ti-" + name }));
+  const cardsOf = (ev) => (Array.isArray(ev.cards) ? ev.cards.filter((c) => c && typeof c.id === "string" && typeof c.kind === "string") : []);
+  function kodeksItem(c) {
+    const K = window.NovelKodeks;
+    if (!K || !K.isKind(c.kind)) return null;
+    const it = K.find(c.kind, c.id);
+    return it ? { it, name: String(it.title || "").trim() || "(tanpa judul)", color: K.colorOf(c.kind, it), kindName: K.kindName(c.kind) } : null;
+  }
+  function CardPicker({ ev, onDone }) {
+    const [q, setQ] = React.useState("");
+    const K = window.NovelKodeks, have = new Set(cardsOf(ev).map((c) => c.kind + "|" + c.id)), nq = q.trim().toLowerCase();
+    const rows = [];
+    if (K) K.kindIds.forEach((kind) => K.entries(kind).forEach((it) => {
+      const name = String(it.title || "").trim() || "(tanpa judul)";
+      if (have.has(kind + "|" + it.id) || (nq && !name.toLowerCase().includes(nq))) return;
+      rows.push({ kind, it, name, color: K.colorOf(kind, it), kindName: K.kindName(kind) });
+    }));
+    const pick = (r) => { ev.cards = cardsOf(ev).concat([{ kind: r.kind, id: r.it.id }]); onDone(); changed(); };
+    return h("div", { className: "tl-ec-pick" },
+      h("label", { className: "tl-ec-pick-search" }, ic("search", 13),
+        h("input", { autoFocus: true, value: q, placeholder: "Cari kartu Kodeks…", "aria-label": "Cari kartu Kodeks", onChange: (e) => setQ(e.target.value),
+          onKeyDown: (e) => { if (e.key === "Escape") { e.stopPropagation(); onDone(); } else if (e.key === "Enter" && rows[0]) pick(rows[0]); } })),
+      h("div", { className: "tl-ec-pick-list" },
+        rows.length ? rows.slice(0, 60).map((r) => h("button", { key: r.kind + r.it.id, type: "button", className: "tl-ec-pick-row", style: { "--kc": r.color }, onClick: () => pick(r) },
+          h("i", { className: "tl-ec-kdot" }), h("span", { className: "tl-ec-pick-name" }, r.name), h("small", null, r.kindName)))
+          : h("p", { className: "tl-ec-pick-empty" }, K ? (nq ? "Tidak ada kartu yang cocok." : "Belum ada kartu di Kodeks.") : "Kodeks belum dimuat.")));
+  }
+  function EventCard({ ev, range, fresh }) {
     const [tx, ty, zoom] = RF.useStore((st) => st.transform);
     const width = RF.useStore((st) => st.width), height = RF.useStore((st) => st.height);
+    const [dateOpen, setDateOpen] = React.useState(false);
+    const [tagsOpen, setTagsOpen] = React.useState(tagsOf(ev).length > 0);
+    const [picking, setPicking] = React.useState(false);
+    const [tagText, setTagText] = React.useState("");
+    const titleRef = React.useRef(null), fileRef = React.useRef(null);
+    React.useEffect(() => { if (fresh && titleRef.current) { titleRef.current.focus(); titleRef.current.select(); } }, [ev.id]);
     const x = tx + fracToX(range, dateToFrac(ev)) * zoom;
     if (x < -40 || x > width + 40) return null;
     const W = Math.min(270, width - 24), cx = Math.max(12 + W / 2, Math.min(width - 12 - W / 2, x));
-    const below = height - ty > 230;   // cukup ruang di bawah garis? (label event ada di atas garis)
-    const tags = tagsOf(ev), scene = ev.sceneId && ctx.getScenes().find((s) => s.id === ev.sceneId);
-    // ikon: #ti-calendar-event #ti-x #ti-pencil #ti-file-text (ditulis lengkap untuk tools/build-icons.mjs)
-    const ic = (name, n) => h("svg", { className: "ti", width: n || 14, height: n || 14, "aria-hidden": "true", focusable: "false" }, h("use", { href: "#ti-" + name }));
-    const close = () => { cardId = null; rev++; renderFlow(); };
-    return h("div", {
-      className: "tl-card" + (below ? " is-below" : " is-above"), role: "dialog", "aria-label": "Event " + (ev.title || ""),
-      style: { left: cx, top: below ? ty + 34 : ty - 150, width: W, "--ev": ev.color || COLORS[0] },
-      onPointerDown: (e) => e.stopPropagation(), onWheel: (e) => e.stopPropagation(),
-      onKeyDown: (e) => { if (e.key === "Escape") close(); },
+    const above = ty > 300 || ty > height - ty;   // utamakan di atas garis (seperti vvd); di bawah bila ruang atas sempit
+    const close = () => { cardId = null; freshId = null; rev++; renderFlow(); };
+    const set = (fn) => { fn(ev); changed(); };
+    const setTags = (list) => { const seen = new Set(), t = list.map((v) => v.replace(/^#+/, "").replace(/\s+/g, " ").trim().slice(0, 40)).filter((v) => v && !seen.has(v.toLowerCase()) && seen.add(v.toLowerCase())); if (t.length) ev.tags = t; else delete ev.tags; changed(); };
+    const tags = tagsOf(ev), cards = cardsOf(ev);
+    const pickImg = (f) => { if (f) { selectedId = ev.id; setImage(f); } };
+    return h(React.Fragment, null, h("span", { className: "tl-ec-tail" + (above ? "" : " is-below"), style: { left: x, top: above ? ty - 26 : ty + 6 } }), h("div", {
+      className: "tl-ecard" + (above ? " is-above" : " is-below"), role: "dialog", "aria-label": "Event " + (ev.title || ""),
+      style: { left: cx, top: above ? ty - 26 : ty + 26, width: W, maxHeight: Math.max(160, above ? ty - 34 : height - ty - 34), "--ev": ev.color || COLORS[0] },
+      onPointerDown: (e) => e.stopPropagation(), onWheel: (e) => e.stopPropagation(), onDoubleClick: (e) => e.stopPropagation(),
+      onKeyDown: (e) => { if (e.key === "Escape" && !picking) { e.stopPropagation(); close(); } else e.stopPropagation(); },
     },
-      ev.image ? h("div", { className: "tl-card-img", style: { backgroundImage: `url("${ev.image}")` } }) : null,
-      h("div", { className: "tl-card-body" },
-        h("div", { className: "tl-card-top" },
-          h("span", { className: "tl-card-date" }, ic("calendar-event", 13), fmtLong(ev)),
-          h("button", { type: "button", className: "tl-card-x", title: "Tutup", "aria-label": "Tutup kartu", onClick: close }, ic("x", 14))),
-        h("div", { className: "tl-card-title" }, ev.title || "(tanpa judul)"),
-        ev.desc ? h("p", { className: "tl-card-desc" }, ev.desc) : h("p", { className: "tl-card-desc is-dim" }, "Belum ada deskripsi."),
-        tags.length ? h("div", { className: "tl-card-tags" }, tags.map((t) => h("span", { key: t, className: "tl-card-tag" }, "#" + t))) : null,
-        h("div", { className: "tl-card-acts" },
-          h("button", { type: "button", className: "tl-btn tl-btn-sm", autoFocus: true, onClick: () => { selectedId = ev.id; cardId = null; fillEditor(); rev++; renderFlow(); setTimeout(() => $("tlEvTitle").focus(), 0); } }, ic("pencil"), "Edit"),
-          scene ? h("button", { type: "button", className: "tl-btn tl-btn-sm", title: scene.title, onClick: () => ctx.openScene(scene.id) }, ic("file-text"), "Buka scene") : null)));
+      h("div", { className: "tl-ec-head" },
+        h("button", { type: "button", className: "tl-ec-img" + (ev.image ? " has-img" : ""), title: ev.image ? "Ganti gambar" : "Tambah gambar", "aria-label": ev.image ? "Ganti gambar" : "Tambah gambar",
+          style: ev.image ? { backgroundImage: `url("${ev.image}")` } : null, onClick: () => fileRef.current && fileRef.current.click(),
+          onDragOver: (e) => { if (Array.from(e.dataTransfer.types || []).includes("Files")) e.preventDefault(); },
+          onDrop: (e) => { e.preventDefault(); pickImg(e.dataTransfer.files && e.dataTransfer.files[0]); } },
+          ev.image ? null : ic("plus", 22)),
+        h("input", { ref: fileRef, type: "file", accept: "image/*", hidden: true, onChange: (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; pickImg(f); } }),
+        h("div", { className: "tl-ec-main" },
+          h("div", { className: "tl-ec-row" },
+            h("input", { ref: titleRef, className: "tl-ec-title", value: ev.title || "", placeholder: "Judul event", maxLength: 120, "aria-label": "Judul event",
+              onChange: (e) => set((v) => { v.title = e.target.value; }), onKeyDown: (e) => { if (e.key === "Enter") e.target.blur(); } }),
+            h("button", { type: "button", className: "tl-ec-ibtn", title: "Detail lengkap (scene, warna)", "aria-label": "Detail lengkap",
+              onClick: () => { selectedId = ev.id; cardId = null; freshId = null; fillEditor(); rev++; renderFlow(); } }, ic("eye", 15)),
+            h("button", { type: "button", className: "tl-ec-ibtn is-danger", title: "Hapus event", "aria-label": "Hapus event",
+              onClick: () => { tl.events = tl.events.filter((e) => e.id !== ev.id); if (selectedId === ev.id) { selectedId = null; hideEditor(); } cardId = null; freshId = null; changed(); } }, ic("trash", 15))),
+          h("button", { type: "button", className: "tl-ec-date" + (dateOpen ? " is-open" : ""), onClick: () => setDateOpen(!dateOpen), "aria-expanded": dateOpen }, ic("calendar-event", 13), fmtLong(ev)))),
+      dateOpen ? h("div", { className: "tl-ec-datef" },
+            h("input", { type: "number", min: 1, max: 31, placeholder: "Tgl", "aria-label": "Tanggal", value: ev.day || "", disabled: !ev.month,
+              onChange: (e) => set((v) => { const d = parseInt(e.target.value, 10); v.day = v.month && d >= 1 ? Math.min(d, MDAYS[v.month - 1]) : null; }) }),
+            h("select", { "aria-label": "Bulan", value: ev.month || "", onChange: (e) => set((v) => { const m = parseInt(e.target.value, 10); v.month = m >= 1 && m <= 12 ? m : null; if (!v.month) v.day = null; else if (v.day) v.day = Math.min(v.day, MDAYS[v.month - 1]); }) },
+              h("option", { value: "" }, "—"), MONTHS.map((m, i) => h("option", { key: m, value: i + 1 }, m))),
+            h("input", { type: "number", placeholder: "Tahun", "aria-label": "Tahun", value: ev.year,
+              onChange: (e) => { const y = parseInt(e.target.value, 10); if (!Number.isNaN(y)) set((v) => { v.year = y; }); } })) : null,
+      h("textarea", { className: "tl-ec-desc", value: ev.desc || "", placeholder: "Deskripsi", rows: 3, "aria-label": "Deskripsi",
+        onChange: (e) => { ev.desc = e.target.value; ctx.onChange(); rev++; renderFlow(); } }),
+      h("div", { className: "tl-ec-sec" },
+        h("button", { type: "button", className: "tl-ec-sec-head" + (tagsOpen ? " is-open" : ""), onClick: () => setTagsOpen(!tagsOpen), "aria-expanded": tagsOpen },
+          ic("chevron-right", 13), "Tag", tags.length ? h("b", null, tags.length) : null),
+        tagsOpen ? h("div", { className: "tl-ec-tags" },
+          tags.map((t) => h("span", { key: t, className: "tl-ec-tag" }, "#" + t,
+            h("button", { type: "button", "aria-label": "Hapus tag " + t, onClick: () => setTags(tags.filter((x) => x !== t)) }, ic("x", 11)))),
+          h("input", { className: "tl-ec-tagin", value: tagText, placeholder: tags.length ? "+ tag" : "Tambah tag, Enter…", "aria-label": "Tambah tag",
+            onChange: (e) => setTagText(e.target.value),
+            onKeyDown: (e) => {
+              if ((e.key === "Enter" || e.key === ",") && tagText.trim()) { e.preventDefault(); setTags(tags.concat(tagText.split(","))); setTagText(""); }
+              else if (e.key === "Backspace" && !tagText && tags.length) setTags(tags.slice(0, -1));
+            } })) : null),
+      cards.length ? h("div", { className: "tl-ec-cards" }, cards.map((c) => {
+        const k = kodeksItem(c);
+        if (!k) return null;
+        return h("span", { key: c.kind + c.id, className: "tl-ec-card", style: { "--kc": k.color }, title: k.kindName },
+          h("button", { type: "button", className: "tl-ec-card-open", onClick: () => ctx.openDoc && ctx.openDoc(c.kind, c.id) }, h("i", { className: "tl-ec-kdot" }), k.name),
+          h("button", { type: "button", className: "tl-ec-card-x", "aria-label": "Lepas kartu " + k.name, onClick: () => set((v) => { v.cards = cardsOf(v).filter((x) => !(x.kind === c.kind && x.id === c.id)); if (!v.cards.length) delete v.cards; }) }, ic("x", 11)));
+      })) : null,
+      picking ? h(CardPicker, { ev, onDone: () => setPicking(false) })
+        : h("button", { type: "button", className: "tl-ec-add", onClick: () => setPicking(true) }, ic("plus", 13), "Tautkan kartu")));
   }
 
   function FlowApp({ tlRev, panMode }) {
@@ -270,7 +345,7 @@
     // klik event -> kartu kecil (panel edit yang terbuka ikut pindah ke event ini)
     const onNodeClick = (_e, node) => {
       if (node.type !== "event") return;
-      selectedId = node.id;
+      selectedId = node.id; freshId = null;
       if (editorOpen()) { cardId = null; fillEditor(); }
       else cardId = cardId === node.id ? null : node.id;
       rev++; renderFlow();
@@ -305,7 +380,7 @@
     },
       h(AxisLayer, { range: rangeOf(tl) }),
       h(EndButtons, { range: rangeOf(tl) }),
-      cardId && findEvent(cardId) ? h(EventCard, { ev: findEvent(cardId), range: rangeOf(tl) }) : null,
+      cardId && findEvent(cardId) ? h(EventCard, { key: cardId, ev: findEvent(cardId), range: rangeOf(tl), fresh: freshId === cardId }) : null,
       h(Controls, { showInteractive: false, showFitView: false, position: "bottom-right", className: "tl-controls" }),
       ghost ? h("div", { className: "tl-ghost", style: { left: ghost.left, top: ghost.top } },
         h("span", { className: "tl-ghost-tip" + ghost.edge }, h("b", null, fmtLong(ghost.date)), " · klik untuk menambah"),
@@ -401,10 +476,9 @@
   function addEventAt(date) {
     const ev = { id: uid("ev"), title: "Event baru", year: date.year, month: date.month || null, day: date.day || null, desc: "", color: COLORS[0], sceneId: "" };
     tl.events.push(ev);
-    selectedId = ev.id; cardId = null;
-    fillEditor();
+    selectedId = ev.id; cardId = ev.id; freshId = ev.id;   // kartu langsung muncul di atas titik event, judul siap diketik
+    hideEditor();
     changed();
-    setTimeout(() => { $("tlEvTitle").focus(); $("tlEvTitle").select(); }, 0);
   }
   function addEventAtCenter() {
     if (!tl) return;
@@ -469,7 +543,7 @@
       const ev = tl && tl.events.find((e) => e.id === id);
       if (!ev) return;
       ev.image = src;
-      if (selectedId === id) fillEditor();
+      if (selectedId === id && editorOpen()) fillEditor();
       changed();
     }).catch((e) => { if (typeof toast === "function") toast(e.message || "Gambar gagal dipasang", tiIcon("alert-triangle")); });
   }
