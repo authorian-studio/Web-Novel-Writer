@@ -130,6 +130,7 @@
   // ---------- state modul ----------
   let ctx = null;             // dari app.js: { project, onChange, getCurrentSceneId, openScene, openDoc, createDoc, onOpen, closeTab, preview, toggleTheme }
   let projId = null;
+  let dataRef = null;         // p.data saat show() terakhir (diganti = versi project lain dimuat)
   let host = null, dom = null; // #homeCanvas & elemen panel
   let root = null;            // React root kanvas
   let board = null;           // papan aktif (objek di p.data.canvas.boards)
@@ -536,7 +537,8 @@
     pushUndo(s); save(); updateChrome();
   }
 
-  // kolom edit teks (klik dua kali / Enter). Uncontrolled: nilai dibaca saat selesai (blur, Esc, Ctrl+Enter)
+  // kolom edit teks (klik dua kali / Enter). Uncontrolled; ketikan langsung masuk data (liveInput, jeda singkat) supaya
+  // ikut autosave walau kolomnya belum ditutup. Selesai: blur, Esc, Ctrl+Enter.
   function EditArea({ id, value, single, className, autoGrow }) {
     const ref = React.useRef(null), done = React.useRef(false);
     React.useEffect(() => {
@@ -555,7 +557,8 @@
     const fin = () => { if (done.current) return; done.current = true; commitEdit(id, ref.current ? ref.current.value : value, false); };
     return h(single ? "input" : "textarea", {
       ref, className: "hc-edit nodrag nopan nowheel " + (className || ""), defaultValue: value || "", "data-id": id,
-      spellCheck: true, "aria-label": "Edit teks", maxLength: single ? 200 : 5000, onBlur: fin, onInput: grow,
+      spellCheck: true, "aria-label": "Edit teks", maxLength: single ? 200 : 5000, onBlur: fin,
+      onInput: (e) => { grow(); if (!done.current) liveInput(id, e.currentTarget.value); },
       onKeyDown: (e) => {
         e.stopPropagation();
         if (e.key === "Escape" || ((e.metaKey || e.ctrlKey) && e.key === "Enter") || (single && e.key === "Enter")) { e.preventDefault(); fin(); }
@@ -1354,13 +1357,46 @@
   }
   function startEdit(id) { if (api && findNode(id) && EDITABLE.includes(findNode(id).t)) api.setEditing(id); }
   // selesai mengedit teks (keepOpen = simpan saja, kolom tetap terbuka — dipakai flush() saat autosave)
+  // ---- ketikan langsung masuk data: jeda 300 ms (maks. 1 dtk saat mengetik terus), lalu commitEdit(keepOpen) ----
+  const LIVE_MS = 300, LIVE_MAX_MS = 1000;
+  let liveTimer = 0, livePend = null, liveSince = 0;
+  let liveUndoId = null;      // kolom edit yang sudah punya titik urungkan di sesi edit ini
+  function liveInput(id, value) {
+    if (!livePend) liveSince = Date.now();
+    livePend = { id, value };
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(flushLive, Date.now() - liveSince >= LIVE_MAX_MS ? 0 : LIVE_MS);
+  }
+  function flushLive() {
+    clearTimeout(liveTimer); liveTimer = 0;
+    const x = livePend;
+    livePend = null;
+    if (x) commitEdit(x.id, x.value, true);
+  }
+  function dropLive() { clearTimeout(liveTimer); liveTimer = 0; livePend = null; liveUndoId = null; }
+  // simpan isi kolom edit. keepOpen = kolom masih terbuka (ketikan / autosave): data + autosave saja, kanvas tidak
+  // dibangun ulang. Titik urungkan sekali per sesi edit (objek yang baru dibuat: titik saat dibuat).
   function commitEdit(id, value, keepOpen) {
     if (!board) return;
+    if (livePend && livePend.id === id) { clearTimeout(liveTimer); livePend = null; }   // nilai ini sudah yang terbaru
     if (!keepOpen && api) api.setEditing((cur) => (cur === id ? null : cur));
+    const live = liveUndoId === id;
+    if (!keepOpen && live) liveUndoId = null;
+    const refresh = () => { if (!keepOpen && live) { rev++; renderFlow(); updateChrome(); } };   // nilai sudah masuk saat diketik
+    const isNew = !!lastCreate && lastCreate.id === id;
+    const apply = (fn) => {
+      if (keepOpen) {
+        if (!live && !isNew) pushUndo(snap());
+        liveUndoId = id;
+        fn(); save();
+        return;
+      }
+      if (live) { fn(); changed(); } else mutate(fn);
+    };
     if (id.indexOf("e:") === 0) {
       const e = board.edges.find((x) => x.id === id.slice(2));
       const v = String(value || "").trim().slice(0, 200);
-      if (e && (e.label || "") !== v) mutate(() => { e.label = v; });
+      if (e && (e.label || "") !== v) apply(() => { e.label = v; }); else refresh();
       return;
     }
     const n = findNode(id);
@@ -1375,8 +1411,8 @@
       return;
     }
     if (!keepOpen) lastCreate = null;
-    if ((n[key] || "") === v) return;
-    mutate(() => { n[key] = v; });
+    if ((n[key] || "") === v) { refresh(); return; }
+    apply(() => { n[key] = v; });
   }
   // taruh objek baru (alat Bentuk/Catatan/Teks/Frame/Dokumen): a = titik awal, b = titik akhir (seret)
   function placeAt(kind, a, b, dragged) {
@@ -2288,10 +2324,10 @@
   }
   // kolom edit teks yang masih terbuka -> simpan isinya
   function flushEdit(keepOpen) {
-    if (!dom) return;
-    const ta = dom.flow.querySelector(".hc-edit");
+    const ta = dom && dom.flow.querySelector(".hc-edit");
     if (ta && ta.dataset.id) commitEdit(ta.dataset.id, ta.value, keepOpen);
     else if (editingNow && api && !keepOpen) api.setEditing(null);
+    flushLive();   // sisa ketikan yang belum masuk (kolomnya sudah tidak ada)
   }
 
   // ================= EKSPOR PNG (digambar ulang ke <canvas>) =================
@@ -2455,8 +2491,14 @@
     // dipanggil tiap kali tab Beranda tampil (juga saat pindah project)
     show(c) {
       const fresh = !ctx || ctx.project !== c.project;
+      // isi project diganti (versi dari perangkat lain / backup): riwayat urungkan milik data lama dibuang,
+      // papan dicari ulang lewat id di data baru (di bawah)
+      const replaced = !fresh && dataRef !== c.project.data;
       ctx = c;
+      dataRef = c.project.data;
       bindOnce();
+      if (fresh || replaced) dropLive();
+      if (replaced) { hist.clear(); lastCreate = null; pendingSel = null; }
       if (fresh) {
         projId = c.project.id;
         hist.clear(); clip = null; tool = "select"; space = false; lastCreate = null; pendingSel = null; pendingDoc = null;
@@ -2482,8 +2524,9 @@
     },
     // tab lain tampil / keluar project / logout: simpan teks yang sedang diedit lalu lepas kanvas
     hide() {
-      if (!root) return;
+      if (!root) { flushLive(); return; }
       flushEdit(false);
+      dropLive();
       closeMenu();
       cancelWheelZoom();
       if (api) saveViewport(api.rf.getViewport());
@@ -2512,7 +2555,7 @@
     // dari riwayat sidebar tab: buka papan tertentu
     open(id) { if (ctx && root && cvs() && cvs().boards.some((b) => b.id === id) && (!board || board.id !== id)) switchBoard(id, true); },
     // autosave / pindah tab: isi kolom edit yang masih terbuka + jejak yang belum dicatat ikut tersimpan
-    flush() { if (trackTimer) runTrack(); if (root) flushEdit(isShown()); },
+    flush() { if (trackTimer) runTrack(); flushEdit(!!root && isShown()); },
     boardTitle(p, id) { const c = p && p.data && p.data.canvas; const b = c && Array.isArray(c.boards) && c.boards.find((x) => x && x.id === id); return b ? b.title : null; },
   };
 })();

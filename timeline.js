@@ -361,7 +361,8 @@
       ctx = c;
       bindOnce();
       if (!sameProject) $("tlSearch").value = "";
-      const keep = sameProject && tl && timelines().includes(tl) ? tl.id : (timelines()[0] || {}).id;
+      // dicocokkan lewat id: data project bisa diganti (versi dari perangkat lain / backup) -> objek timeline-nya baru
+      const keep = sameProject && tl && timelines().some((t) => t.id === tl.id) ? tl.id : (timelines()[0] || {}).id;
       if (keep) openTimeline(keep);
       else { tl = null; selectedId = null; hideEditor(); renderList(); renderHead(); renderFlow(); }
     },
