@@ -142,7 +142,7 @@
   const editorVisible = () => !el("editorView").classList.contains("hidden");
   const dashVisible = () => !el("dashboardView").classList.contains("hidden");
   const isOpen = (p) => p && currentProjectId === p.id && editorVisible();
-  const nowTime = () => new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+  const nowTime = () => new Date().toLocaleTimeString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { hour: "2-digit", minute: "2-digit" });
   function isAuthError(e) { return !!e && (e.code === "auth" || /Sesi Google berakhir|Belum login/i.test(e.message || "")); }
   function isNetError(e) { return !!e && (e.name === "TypeError" || e.code === "offline" || !isOnline()); }
   function syncError(code, msg) { const e = new Error(msg); e.code = code; return e; }
@@ -900,7 +900,7 @@
       }
     }
     // simpan keduanya: salinan baru berisi versi di sini, project asli memakai versi lain
-    const stamp = new Date().toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+    const stamp = new Date().toLocaleString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
     const label = info.kind === "tab" ? "tab lain" : NovelistSync.deviceLabel;
     const copy = createProject(`${p.title} (versi ${info.kind === "tab" ? "tab ini" : label} ${stamp})`, p.description, p.template);
     const parsed = JSON.parse(localJson);

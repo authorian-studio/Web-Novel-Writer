@@ -112,7 +112,7 @@
   const fsScale = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--fs-scale")) || 1;
   const isEditable = (t) => !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ""));
   const hasXY = (e) => isFinite(e.x) && isFinite(e.y);
-  const fmt = (n) => Number(n || 0).toLocaleString("id-ID");
+  const fmt = (n) => Number(n || 0).toLocaleString((window.NovelI18n ? NovelI18n.locale : "id-ID"));
   const wordsOf = (t) => (t ? t.split(" ").length : 0);
   const ROMAN = [[1000, "M"], [900, "CM"], [500, "D"], [400, "CD"], [100, "C"], [90, "XC"], [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]];
   const roman = (n) => { let s = ""; ROMAN.forEach(([v, r]) => { while (n >= v) { s += r; n -= v; } }); return s || "I"; };
@@ -129,7 +129,7 @@
     if (s < 3600) return Math.floor(s / 60) + " menit lalu";
     if (s < 86400) return Math.floor(s / 3600) + " jam lalu";
     if (s < 86400 * 30) return Math.floor(s / 86400) + " hari lalu";
-    try { return new Date(t).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }); } catch (e) { return ""; }
+    try { return new Date(t).toLocaleDateString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { day: "numeric", month: "short", year: "numeric" }); } catch (e) { return ""; }
   }
   // HTML scene -> teks polos (untuk kartu hover & jumlah kata)
   const ENT = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", nbsp: " " };
@@ -595,7 +595,7 @@
         h("span", { className: "hc-tip-path" }, (data.path.length ? data.path.join(" / ") + " · " : "") + "#" + (data.idx + 1))),
       h("div", { className: "hc-tip-title" }, String(s.title || "").trim() || "(tanpa judul)"),
       h("p", { className: "hc-tip-snip" + (snip ? "" : " is-empty") }, snip ? snip + (src.length > 160 ? "…" : "") : "Belum ada sinopsis atau isi."),
-      h("div", { className: "hc-tip-foot" }, words.toLocaleString("id-ID") + " kata · klik untuk menulis"));
+      h("div", { className: "hc-tip-foot" }, words.toLocaleString((window.NovelI18n ? NovelI18n.locale : "id-ID")) + " kata · klik untuk menulis"));
   }
   // node scene di papan selain Beranda (di Beranda scene tampil sebagai titik jejak)
   const SceneNode = React.memo(function SceneNode({ data, selected, isConnectable }) {

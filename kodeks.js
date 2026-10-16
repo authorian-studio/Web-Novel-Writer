@@ -568,7 +568,7 @@
     const list = arr(kind, true), stamp = Date.now();
     let id = kind + "-" + stamp;
     while (findAny(id)) id = kind + "-" + stamp + "-" + Math.random().toString(36).slice(2, 6);
-    const it = { id, title: String(title || "").trim() || K[kind].one + " baru", content: "" };
+    const def = K[kind].one + " baru", it = { id, title: String(title || "").trim() || (window.NovelI18n ? NovelI18n.t(def) : def), content: "" };
     if (!st.all && st.folder && st.folder !== "\u0000") it.folder = st.folder;
     list.push(it);
     markDirtyAndSchedule();
@@ -850,7 +850,7 @@
     if (!list.length) { box.innerHTML = `<p class="kx-dim">Belum disebut di naskah. Nama yang dicari: ${names.map((n) => `<b>${esc(n)}</b>`).join(", ")}.</p>`; return; }
     box.innerHTML = list.map((h) => `<button type="button" class="kx-mention" data-d="mention" data-type="${h.src.type}" data-id="${esc(h.src.id)}">
         <span class="kx-mention-ic">${ic(h.src.type === "scene" ? "file-text" : "bookmark", 15)}</span>
-        <span class="kx-mention-main"><span class="kx-mention-title">${h.src.where ? `<span class="kx-mention-where">${esc(h.src.where)} ›</span> ` : ""}${esc(h.src.title)}</span><span class="kx-mention-snip">${snippet(h.src, h.at, h.len)}</span></span>
+        <span class="kx-mention-main"><span class="kx-mention-title">${h.src.where ? `<span class="kx-mention-where">${esc(h.src.where)} ›</span> ` : ""}${esc(h.src.title)}</span><span class="kx-mention-snip" data-no-i18n>${snippet(h.src, h.at, h.len)}</span></span>
         <span class="kx-mention-n">${h.n}×</span></button>`).join("");
   }
   function openMention(type, id) {

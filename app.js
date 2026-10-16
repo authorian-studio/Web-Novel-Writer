@@ -22,16 +22,18 @@ const COLOR_PAIRS = [
 ];
 const STATUS_LABELS = { todo: "Todo", draft: "Draft", done: "Done" };
 
+// teks bawaan yang menjadi DATA (nama dokumen baru) mengikuti bahasa antarmuka (i18n.js)
+const trT = (s) => (window.NovelI18n ? NovelI18n.t(s) : s);
 // ================= DATA MODEL =================
 function blankBinderData(title, template) {
   const data = {
     title,
-    scenes: [{ id: "scene-" + Date.now(), type: "scene", title: "Scene 1", synopsis: "", status: "todo", content: "" }],
+    scenes: [{ id: "scene-" + Date.now(), type: "scene", title: trT("Scene 1"), synopsis: "", status: "todo", content: "" }],
     organize: { characters: [], locations: [], notes: [] }
   };
   if (template === "standard") {
-    data.organize.characters.push({ id: "char-" + Date.now(), title: "Protagonis", content: "<p>Deskripsi karakter utama...</p>" });
-    data.organize.locations.push({ id: "loc-" + Date.now(), title: "Lokasi Utama", content: "<p>Deskripsi lokasi...</p>" });
+    data.organize.characters.push({ id: "char-" + Date.now(), title: trT("Protagonis"), content: "<p>" + trT("Deskripsi karakter utama...") + "</p>" });
+    data.organize.locations.push({ id: "loc-" + Date.now(), title: trT("Lokasi Utama"), content: "<p>" + trT("Deskripsi lokasi...") + "</p>" });
   }
   return data;
 }
@@ -320,11 +322,13 @@ const LOGIN_I18N = {
     ],
   },
 };
-let loginLang = "id";
+// bahasa login = bahasa antarmuka (i18n.js, bawaan English); ganti di sini = ganti bahasa seluruh aplikasi
+let loginLang = window.NovelI18n ? NovelI18n.lang : "en";
 function lt(key) { return LOGIN_I18N[loginLang][key]; }
 function applyLoginLang(lang) {
-  loginLang = LOGIN_I18N[lang] ? lang : "id";
+  loginLang = LOGIN_I18N[lang] ? lang : "en";
   try { localStorage.setItem(LOGIN_LANG_KEY, loginLang); } catch (e) { /* abaikan */ }
+  if (window.NovelI18n && NovelI18n.lang !== loginLang) { NovelI18n.set(loginLang); return; }   // muat ulang dengan bahasa baru
   document.querySelectorAll("#loginView [data-i18n]").forEach((n) => { n.textContent = lt(n.dataset.i18n); });
   el("loginLangLabel").textContent = loginLang.toUpperCase();
   document.documentElement.lang = loginLang;
@@ -335,9 +339,7 @@ function openLegalModal(kind) {
   el("legalModal").classList.remove("hidden");
 }
 function initLoginFooter() {
-  let saved = null;
-  try { saved = localStorage.getItem(LOGIN_LANG_KEY); } catch (e) { /* abaikan */ }
-  applyLoginLang(saved || "id");
+  applyLoginLang(window.NovelI18n ? NovelI18n.lang : "en");
   el("btnLoginHelp").onclick = () => el("supportModal").classList.remove("hidden");
   el("btnLoginTerms").onclick = () => openLegalModal("terms");
   el("btnLoginPrivacy").onclick = () => openLegalModal("privacy");
@@ -1542,7 +1544,7 @@ async function createProjectDoc(kind, title) {
     if (currentOrgCat === kind) renderOrganizeList();
   } else if (kind === "timeline") {
     if (!Array.isArray(d.timelines)) d.timelines = [];
-    const tl = { id: "tl-" + rid(), title: t || "Timeline Baru", start: 1500, end: 1900, events: [] };
+    const tl = { id: "tl-" + rid(), title: t || trT("Timeline Baru"), start: 1500, end: 1900, events: [] };
     d.timelines.push(tl);
     id = tl.id;
   } else if (kind === "map") {
@@ -1551,7 +1553,7 @@ async function createProjectDoc(kind, title) {
     if (!Array.isArray(d.maps)) d.maps = [];
     const names = new Set(d.maps.map((m) => m && m.title));
     let name = t;
-    if (!name) { name = "Peta Baru"; for (let i = 2; names.has(name); i++) name = "Peta Baru " + i; }   // sama dengan tab Map
+    if (!name) { const base = trT("Peta Baru"); name = base; for (let i = 2; names.has(name); i++) name = base + " " + i; }   // sama dengan tab Map
     const m = window.NovelMapCore.createMap(name);
     d.maps.push(window.NovelMapCore.serialize(m));
     id = m.id;
@@ -1772,7 +1774,7 @@ async function renderJejaringTab() {
 
 // jam kecil di pojok kanan atas (seperti vvd)
 let projClockHandle = null;
-function tickProjClock() { el("projClock").textContent = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }); }
+function tickProjClock() { el("projClock").textContent = new Date().toLocaleTimeString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { hour: "2-digit", minute: "2-digit" }); }
 function startProjClock() { tickProjClock(); stopProjClock(); projClockHandle = setInterval(tickProjClock, 15000); }
 function stopProjClock() { if (projClockHandle) clearInterval(projClockHandle); projClockHandle = null; }
 function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -1844,8 +1846,8 @@ function countAllNodes(list, isFolder) {
 // ---- helper Tulis ----
 function saveTwPrefs() { tabStoreSet(TW_PREFS_KEY, twPrefs); }
 function twAttr(s) { return escapeHtml(String(s == null ? "" : s)).replace(/"/g, "&quot;"); }
-function twFmt(n) { return Number(n || 0).toLocaleString("id-ID"); }
-function twShort(n) { return n >= 1000 ? (n / 1000).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + "k" : String(n); }
+function twFmt(n) { return Number(n || 0).toLocaleString((window.NovelI18n ? NovelI18n.locale : "id-ID")); }
+function twShort(n) { return n >= 1000 ? (n / 1000).toLocaleString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { maximumFractionDigits: 1 }) + "k" : String(n); }
 function twStatusOf(s) { return s && STATUS_LABELS[s.status] ? s.status : "todo"; }
 // hitung kata dari HTML: tag blok = pemisah kata, tag inline (<b>, <span>) tidak memotong kata
 function twCountWords(html) {
@@ -3304,7 +3306,7 @@ function markSaved(label, icon) {
   hasUnsyncedChanges = false; firstDirtyAt = null;
   setSaveStatus(label || "Tersimpan", icon, "synced");
 }
-const hhmm = () => new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+const hhmm = () => new Date().toLocaleTimeString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { hour: "2-digit", minute: "2-digit" });
 // masih ada yang belum sampai ke Drive? (dipakai peringatan "tinggalkan halaman")
 function hasPendingSave() {
   const ns = window.NovelistSync;
@@ -3590,7 +3592,7 @@ async function loadProjectsFromDrive(isInitialLogin = false) {
 // ================= CLOUD LIBRARY (manual send/receive, terpisah dari autosave) =================
 function formatDateTime(iso) {
   const d = new Date(iso);
-  return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) + " " + d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { day: "2-digit", month: "short", year: "numeric" }) + " " + d.toLocaleTimeString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { hour: "2-digit", minute: "2-digit" });
 }
 function openCloudLibrary() {
   closeAccountView();   // kembali dari Cloud Library = daftar project
@@ -3850,7 +3852,7 @@ function formatBytes(n) {
   const units = ["B", "KB", "MB", "GB", "TB"];
   let v = Number(n) || 0, i = 0;
   while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
-  return v.toLocaleString("id-ID", { maximumFractionDigits: i === 0 || v >= 100 ? 0 : 1 }) + " " + units[i];
+  return v.toLocaleString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { maximumFractionDigits: i === 0 || v >= 100 ? 0 : 1 }) + " " + units[i];
 }
 
 // ---- render ----
@@ -3885,7 +3887,7 @@ function renderAccountView() {
   el("accEmail").textContent = u.emailAddress || (failed ? "Info akun belum bisa dimuat — coba buka lagi nanti." : "");
   const since = accountInfo ? accountInfo.memberSince || readFirstSeen() : null;
   const sinceDate = since ? new Date(since) : null;
-  el("accSince").textContent = sinceDate && !isNaN(sinceDate) ? "Member sejak " + sinceDate.toLocaleDateString("id-ID", { month: "long", year: "numeric" }) : "";
+  el("accSince").textContent = sinceDate && !isNaN(sinceDate) ? "Member sejak " + sinceDate.toLocaleDateString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { month: "long", year: "numeric" }) : "";
   paintAvatar(el("accAvatar"), accountInfo ? accountAvatarSrc() : null, accountInfo ? name : "");
   el("accUsername").textContent = "@" + accountUsername();
   el("accEmailValue").textContent = u.emailAddress || "—";
@@ -4108,6 +4110,18 @@ function initAccount() {
   el("accRowUsername").onclick = openUsernameModal;
   el("accRowProfile").onclick = openProfileModal;
   el("accThemeSeg").querySelectorAll("button").forEach((b) => b.onclick = () => document.body.classList.toggle("light", b.dataset.theme === "light"));
+  // bahasa antarmuka (i18n.js): English / Indonesia — disimpan di perangkat, halaman dimuat ulang
+  el("accLangSeg").querySelectorAll("button").forEach((b) => {
+    const cur = window.NovelI18n ? NovelI18n.lang : "en";
+    b.setAttribute("aria-checked", String(b.dataset.lang === cur));
+    b.classList.toggle("is-on", b.dataset.lang === cur);
+    b.onclick = () => {
+      if (!window.NovelI18n || b.dataset.lang === NovelI18n.lang) return;
+      flushCurrentEdits();
+      if (typeof flushBeforeLeave === "function") flushBeforeLeave();
+      NovelI18n.set(b.dataset.lang);
+    };
+  });
   el("accGoogleDisconnect").onclick = () => { if (confirm("Putuskan Google dari Novelist? Kamu akan keluar dan perlu login lagi untuk membuka project-mu.")) driveSignOut(); };
   // (tombol "Keluar dari akun" dihapus dari halaman ini — keluar lewat rail & menu gear)
   initA11y();            // Aksesibilitas: ukuran teks, font disleksia, mode hemat performa

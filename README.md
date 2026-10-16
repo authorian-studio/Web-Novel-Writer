@@ -1,6 +1,23 @@
-# Novelist Web — v0.12.6
+# Novelist Web — v0.13.0
 
-## Riwayat perubahan terbaru (v0.12.6) — paling baru di atas
+## Riwayat perubahan terbaru (v0.13.0) — paling baru di atas
+
+**English is now the default interface language; Bahasa Indonesia stays available** (`i18n.js`, `i18n-en.js`).
+- Pilih bahasa di **Pengaturan Akun → Language / Bahasa** (English · Indonesia) atau di menu bahasa halaman login;
+  pilihan disimpan di perangkat (`localStorage "novelist_lang"`, bawaan `en`) lalu halaman dimuat ulang.
+- Cara kerja: kode tetap menulis teks antarmuka dalam Bahasa Indonesia; saat English aktif, `i18n.js` menerjemahkan
+  setiap teks yang tampil (simpul teks + atribut title / placeholder / aria-label / data-tip / alt) memakai kamus
+  `i18n-en.js` (±1.600 teks utuh + ±150 pola dengan nilai dinamis, mis. "{} scene · {} kata") lewat MutationObserver,
+  sebelum digambar. `alert` / `confirm` / `prompt` ikut diterjemahkan. Format angka, tanggal & jam ikut bahasa
+  (`NovelI18n.locale`).
+- **Tulisan pengguna tidak pernah diterjemahkan:** kolom ketik, editor (contenteditable) dan elemen `[data-no-i18n]`
+  (pratinjau naskah, cuplikan "Disebut di") dilewati. Nama bawaan dokumen BARU (Scene 1, karakter/lokasi contoh,
+  "New character", "New Timeline", "New Map") mengikuti bahasa yang aktif; data lama tidak diubah.
+- Menambah teks antarmuka baru: tulis seperti biasa, lalu tambahkan terjemahannya ke `i18n-en.js` (`exact` untuk teks
+  utuh, `patterns` dengan `{}` → `{1}`, `{2}`, … untuk teks berisi angka/nama). Teks yang belum ada di kamus tampil
+  dalam Bahasa Indonesia.
+
+### v0.12.6
 
 **Kodeks: warna kustom per entri.** Tombol **Warna** di detail entri (di samping folder): 14 warna siap pakai, pemilih
 warna bebas, dan "Warna bawaan <jenis>". Warnanya dipakai di foto/inisial, aksen detail (garis fokus, ikon, chip),
