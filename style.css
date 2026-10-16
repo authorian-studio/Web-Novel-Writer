@@ -2414,3 +2414,13 @@ body.light.perf-boost .tp-overlay { background: rgba(0,0,0,.4); }
 .acc-cur-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .acc-cur-opt-label { font-size: calc(12px * var(--fs-scale, 1)); color: var(--text-dim); }
 body.light .acc-cur-drop { border-color: rgba(0,0,0,.18); background: rgba(0,0,0,.02); }
+
+/* ============ BACKGROUND HALAMAN LOGIN (pilihan pengguna; app.js initLoginBg) ============ */
+.login-bg { position: absolute; inset: 0; z-index: 0; background: center / cover no-repeat; pointer-events: none; opacity: 0; transition: opacity .5s ease; }
+#loginView.has-bg .login-bg { opacity: 1; }
+/* lapisan gelap + dot-grid di atas gambar supaya form & halftone tetap terbaca dan gayanya menyatu */
+.login-bg::after { content: ""; position: absolute; inset: 0; background-color: rgba(10,10,12,.55);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Crect width='1' height='1' fill='%2391919a' fill-opacity='.55'/%3E%3C/svg%3E"); background-size: var(--l-dot-gap) var(--l-dot-gap); }
+/* .login-bg (z-index 0, paling awal di DOM) tergambar di bawah kolom art & form tanpa z-index tambahan — z-index pada
+   .login-panel akan membuat blend "screen" logo terisolasi (kotak hitam terlihat) */
+.login-art-menu-sep { height: 1px; margin: 4px 6px; background: rgba(255,255,255,.1); }

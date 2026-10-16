@@ -276,6 +276,8 @@ const LOGIN_I18N = {
     artChanged: "Gambar login diganti — tersimpan di perangkat ini.",
     artChangedTemp: "Gambar diganti, tapi browser menolak menyimpannya — akan kembali ke gambar bawaan saat halaman dimuat ulang.",
     artRestored: "Gambar bawaan dikembalikan.",
+    bgUpload: "Ganti background…", bgReset: "Hapus background", bgChanged: "Background halaman login diganti — tersimpan di perangkat ini.",
+    bgRestored: "Background dihapus.", bgFailed: "Background tidak bisa dipasang. Coba gambar lain (JPG, PNG, atau WebP).",
     termsTitle: "Ketentuan Penggunaan",
     termsBody: [
       ["Pemakaian", "Novelist adalah alat bantu menulis novel. Kamu bebas memakainya untuk karya pribadi maupun komersial."],
@@ -306,6 +308,8 @@ const LOGIN_I18N = {
     artChanged: "Login image changed — saved on this device.",
     artChangedTemp: "Image changed, but your browser blocked saving it — it will go back to the default when the page reloads.",
     artRestored: "Default image restored.",
+    bgUpload: "Change background…", bgReset: "Remove background", bgChanged: "Login page background changed — saved on this device.",
+    bgRestored: "Background removed.", bgFailed: "Couldn't set that background. Try another image (JPG, PNG, or WebP).",
     termsTitle: "Terms of Use",
     termsBody: [
       ["Use", "Novelist is a novel-writing tool. You're free to use it for personal and commercial work."],
@@ -4934,6 +4938,11 @@ function initLoginArtPicker() {
     if (open && e.detail === 0) items()[0].focus();   // dibuka lewat keyboard -> fokus ke item pertama
   };
   el("btnLoginArtUpload").onclick = () => { setOpen(false); input.value = ""; input.click(); };
+  // background halaman login (di belakang semuanya, bukan gambar halftone)
+  const bgIn = el("loginBgInput");
+  el("btnLoginBgUpload").onclick = () => { setOpen(false); bgIn.value = ""; bgIn.click(); };
+  el("btnLoginBgReset").onclick = () => { setOpen(false); btn.focus(); resetLoginBg(); };
+  bgIn.onchange = () => { const f = bgIn.files && bgIn.files[0]; bgIn.value = ""; if (f) changeLoginBg(f); };
   el("btnLoginArtReset").onclick = () => { setOpen(false); btn.focus(); resetLoginArt(); };
   input.onchange = () => { const f = input.files && input.files[0]; input.value = ""; if (f) changeLoginArt(f); };
   document.addEventListener("pointerdown", (e) => { if (!ctl.contains(e.target)) setOpen(false); });
@@ -4963,6 +4972,55 @@ function initLoginArtPicker() {
   const login = el("loginView");
   login.addEventListener("dragover", (e) => { if (hasFiles(e) && !host.contains(e.target)) { e.preventDefault(); e.dataTransfer.dropEffect = "none"; } });
   login.addEventListener("drop", (e) => { if (hasFiles(e) && !host.contains(e.target)) e.preventDefault(); });
+}
+
+// ---- BACKGROUND HALAMAN LOGIN (gambar pilihan pengguna di belakang seluruh halaman; IndexedDB "novelist"/kv) ----
+const LOGIN_BG_KEY = "loginBg";
+function applyLoginBg(src) {
+  const bg = el("loginBg");
+  if (!bg) return;
+  bg.style.backgroundImage = src ? `url("${src}")` : "";
+  el("loginView").classList.toggle("has-bg", !!src);
+  const r = el("btnLoginBgReset");
+  if (r) r.classList.toggle("hidden", !src);
+}
+// File -> JPEG (sisi terpanjang <= 2400 px) supaya tajam di layar besar tapi tetap ringan
+async function prepareLoginBg(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const k = Math.min(1, 2400 / Math.max(img.naturalWidth, img.naturalHeight));
+    const cv = document.createElement("canvas");
+    cv.width = Math.max(1, Math.round(img.naturalWidth * k)); cv.height = Math.max(1, Math.round(img.naturalHeight * k));
+    const g = cv.getContext("2d");
+    g.fillStyle = "#111"; g.fillRect(0, 0, cv.width, cv.height);
+    g.drawImage(img, 0, 0, cv.width, cv.height);
+    return cv.toDataURL("image/jpeg", 0.86);
+  } finally { URL.revokeObjectURL(url); }
+}
+async function changeLoginBg(file) {
+  const isImage = /^image\//i.test(file.type || "") || (!file.type && /\.(png|jpe?g|webp|gif|bmp|avif|svg)$/i.test(file.name || ""));
+  if (!isImage) { showLoginNotice(lt("artNotImage")); return; }
+  if (file.size > LOGIN_ART_MAX_BYTES) { showLoginNotice(lt("artTooBig")); return; }
+  let src = null;
+  try { src = await prepareLoginBg(file); } catch (e) { src = null; }
+  if (!src || !isLoginArtRecord({ src })) { showLoginNotice(lt("bgFailed")); return; }
+  applyLoginBg(src);
+  let ok = false;
+  try { await loginArtKv("readwrite", (s) => s.put({ src }, LOGIN_BG_KEY)); ok = true; } catch (e) { ok = false; }
+  showLoginNotice(lt(ok ? "bgChanged" : "artChangedTemp"));
+}
+async function resetLoginBg() {
+  applyLoginBg(null);
+  try { await loginArtKv("readwrite", (s) => s.delete(LOGIN_BG_KEY)); } catch (e) { /* abaikan */ }
+  showLoginNotice(lt("bgRestored"));
+}
+async function initLoginBg() {
+  let rec = null;
+  try { rec = await loginArtKv("readonly", (s) => s.get(LOGIN_BG_KEY)); } catch (e) { rec = null; }
+  if (isLoginArtRecord(rec)) applyLoginBg(rec.src);
 }
 
 async function initLoginArt() {
@@ -5203,6 +5261,7 @@ window.addEventListener("DOMContentLoaded", () => {
       text: "Penyimpanan di perangkat tidak aktif (novelist-sync.js gagal dimuat) — tulisan hanya tersimpan ke Google Drive. Muat ulang halaman." });
   }
   initLoginArt();
+  initLoginBg();   // background halaman login pilihan pengguna
   initLoginFooter();
   initRailLogo();
   initRailSidebar();   // rail kiri dashboard: buka/tutup lewat logo & tepi kiri layar

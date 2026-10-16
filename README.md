@@ -1,6 +1,14 @@
-# Novelist Web — v0.13.1
+# Novelist Web — v0.13.2
 
-## Riwayat perubahan terbaru (v0.13.1) — paling baru di atas
+## Riwayat perubahan terbaru (v0.13.2) — paling baru di atas
+
+**Background halaman login pilihan sendiri.** Tombol kiri-bawah halaman login kini punya **Ganti background…** dan
+**Hapus background** (selain ganti gambar halftone). Gambarnya dipasang di belakang seluruh halaman login — bukan
+gambar halftone — dengan lapisan gelap tipis + dot-grid supaya form & ilustrasi tetap terbaca; diperkecil ke sisi
+terpanjang 2400 px (JPEG) dan disimpan di perangkat ini (IndexedDB `novelist` / `kv` → `loginBg`).
+Logo animasi login kini menyatu dengan latar (tanpa kotak hitam).
+
+### v0.13.1
 
 **Kursor kustom** (`cursor.js`, CSS "KURSOR KUSTOM" di `style.css`).
 - **Kursor khas Novelist (bawaan):** mata pena kecil warna krem bergaris gelap dengan titik emas; di atas tombol,
