@@ -49,6 +49,8 @@
 
   <!-- ============ LOGIN GATE ============ -->
   <section id="loginView" class="view">
+    <!-- background halaman login pilihan pengguna (di belakang semuanya; disimpan di perangkat ini — initLoginBg di app.js) -->
+    <div id="loginBg" class="login-bg" aria-hidden="true"></div>
     <!-- Kolom kiri: HalftoneReveal (halftone-reveal.js) diisi lewat initLoginArt() di app.js. Disembunyikan di layar sempit. -->
     <aside id="loginArt" class="login-art" aria-hidden="true">
       <!-- sorotan saat file gambar diseret ke kolom ini (lihat initLoginArtPicker) -->
@@ -64,9 +66,13 @@
       <div id="loginArtMenu" class="login-lang-menu login-art-menu hidden" role="menu">
         <button id="btnLoginArtUpload" type="button" role="menuitem"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-upload"></use></svg><span data-i18n="artUpload">Unggah gambar…</span></button>
         <button id="btnLoginArtReset" type="button" role="menuitem" class="hidden"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-restore"></use></svg><span data-i18n="artReset">Kembalikan gambar bawaan</span></button>
+        <div class="login-art-menu-sep" role="separator"></div>
+        <button id="btnLoginBgUpload" type="button" role="menuitem"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-photo-plus"></use></svg><span data-i18n="bgUpload">Ganti background…</span></button>
+        <button id="btnLoginBgReset" type="button" role="menuitem" class="hidden"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-photo-off"></use></svg><span data-i18n="bgReset">Hapus background</span></button>
         <p class="login-art-menu-hint" aria-hidden="true" data-i18n="artHint">Atau seret gambar ke area ilustrasi</p>
       </div>
       <input id="loginArtInput" type="file" accept="image/*" hidden />
+      <input id="loginBgInput" type="file" accept="image/*" hidden />
     </div>
     <!-- Kolom kanan: form login -->
     <div class="login-panel">
