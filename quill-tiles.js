@@ -32,7 +32,7 @@
   const isObj = (o) => !!o && typeof o === "object" && !Array.isArray(o);
   const isNarrow = () => !!(window.matchMedia && matchMedia("(max-width: 900px)").matches);
   const isPhone = () => !!(window.matchMedia && matchMedia("(max-width: 700px)").matches);
-  const fmtNum = (n) => Number(n || 0).toLocaleString("id-ID");
+  const fmtNum = (n) => Number(n || 0).toLocaleString((window.NovelI18n ? NovelI18n.locale : "id-ID"));
   const DATA_IMG = /^data:image\/(png|jpeg|webp|gif);base64,[a-z0-9+/=]+$/i;
   const isEditable = (t) => !!(t && t.closest && t.closest("input, textarea, select, [contenteditable='true']"));
   function debounce(fn, ms) {
@@ -81,9 +81,9 @@
     if (d < 3600) return Math.floor(d / 60) + " menit lalu";
     if (d < 86400) return Math.floor(d / 3600) + " jam lalu";
     if (d < 86400 * 30) return Math.floor(d / 86400) + " hari lalu";
-    return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+    return new Date(iso).toLocaleDateString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { day: "numeric", month: "short", year: "numeric" });
   }
-  const fullDate = (iso) => { const d = new Date(iso); return isFinite(d) ? d.toLocaleString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : ""; };
+  const fullDate = (iso) => { const d = new Date(iso); return isFinite(d) ? d.toLocaleString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : ""; };
   // file gambar -> diperkecil (sisi terpanjang <= max) -> data URL WebP 0.82 (fallback JPEG)
   function readImage(file, max) {
     return new Promise((resolve, reject) => {

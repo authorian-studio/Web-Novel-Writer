@@ -86,7 +86,7 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const reduceMotion = () => !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   const isNarrow = () => !!(window.matchMedia && matchMedia("(max-width: 900px)").matches);
-  const fmtNum = (n) => Number(n || 0).toLocaleString("id-ID");
+  const fmtNum = (n) => Number(n || 0).toLocaleString((window.NovelI18n ? NovelI18n.locale : "id-ID"));
   const LS = {
     get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage diblokir */ } },
@@ -110,7 +110,7 @@
     if (d < 3600) return Math.floor(d / 60) + " menit lalu";
     if (d < 86400) return Math.floor(d / 3600) + " jam lalu";
     if (d < 86400 * 30) return Math.floor(d / 86400) + " hari lalu";
-    return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+    return new Date(iso).toLocaleDateString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { day: "numeric", month: "short", year: "numeric" });
   }
   const safeName = (s) => (String(s || "").replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "_").trim().slice(0, 80) || "cerita");
 
