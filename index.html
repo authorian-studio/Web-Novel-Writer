@@ -7,6 +7,8 @@
 <!-- Bahasa antarmuka: English (bawaan) / Bahasa Indonesia — kamus + penerjemah DOM, dimuat paling awal (i18n.js) -->
 <script src="i18n-en.js"></script>
 <script src="i18n.js"></script>
+<!-- Kursor kustom (Pengaturan Akun → Kursor) dipasang sebelum halaman tampil -->
+<script src="cursor.js"></script>
 <link rel="stylesheet" href="vendor/reactflow-11.11.4.css" />
 <!-- Tailwind CSS v4 (hasil kompilasi tailwind.input.css, tanpa preflight & di dalam @layer -> style.css tetap menang).
      Juga berisi gaya komponen shadcn/ui. Bangun ulang: npm run build:css -->
@@ -251,6 +253,33 @@
               <div id="accLangSeg" class="acc-seg" role="radiogroup" aria-labelledby="accLblLang" data-no-i18n>
                 <button role="radio" data-lang="en" aria-checked="true">English</button>
                 <button role="radio" data-lang="id" aria-checked="false">Indonesia</button>
+              </div>
+            </div>
+            <div class="acc-row is-static acc-cursor-row">
+              <span class="acc-row-text"><span class="acc-row-label" id="accLblCursor">Kursor</span><span class="acc-row-sub">Kursor mouse di seluruh aplikasi</span></span>
+              <div id="accCursorSeg" class="acc-seg" role="radiogroup" aria-labelledby="accLblCursor">
+                <button role="radio" data-cur="novelist" aria-checked="true"><span class="acc-cur-prev is-novelist" aria-hidden="true"></span>Novelist</button>
+                <button role="radio" data-cur="system" aria-checked="false">Sistem</button>
+                <button role="radio" data-cur="custom" aria-checked="false">Kustom</button>
+              </div>
+            </div>
+            <div id="accCursorCustom" class="acc-row is-static acc-cursor-custom hidden">
+              <div class="acc-cur-pick">
+                <button type="button" id="accCursorUpload" class="acc-cur-drop" title="Pilih gambar kursor (PNG, SVG, JPG…)">
+                  <span id="accCursorImg" class="acc-cur-img" aria-hidden="true"></span>
+                  <span class="acc-cur-drop-text"><b>Unggah gambar kursor</b><small>PNG transparan paling bagus · seret ke sini juga bisa</small></span>
+                </button>
+                <input id="accCursorFile" type="file" accept="image/*" hidden />
+              </div>
+              <div class="acc-cur-opts">
+                <span class="acc-cur-opt-label">Ukuran</span>
+                <div id="accCursorSize" class="acc-seg" role="radiogroup" aria-label="Ukuran kursor">
+                  <button role="radio" data-size="24">24</button><button role="radio" data-size="32">32</button><button role="radio" data-size="48">48</button>
+                </div>
+                <span class="acc-cur-opt-label">Titik tunjuk</span>
+                <div id="accCursorHot" class="acc-seg" role="radiogroup" aria-label="Titik tunjuk kursor">
+                  <button role="radio" data-hot="tl">Ujung kiri atas</button><button role="radio" data-hot="center">Tengah</button>
+                </div>
               </div>
             </div>
             <div class="acc-row is-static">

@@ -3921,6 +3921,53 @@ function renderAccountStorage(failed) {
   el("accStorageNote").innerHTML = `Semua project tersimpan di Google Drive-mu sendiri: folder <b>${escapeHtml(DRIVE_FOLDER_NAME)}</b>, backup otomatis di <b>${escapeHtml(DRIVE_BACKUP_FOLDER_NAME)}</b>, dan project yang dihapus di <b>${escapeHtml(DRIVE_TRASH_FOLDER_NAME)}</b>. Tidak ada yang disimpan di server kami.`;
 }
 function renderAccountAll() { renderAccountRail(); renderAccountView(); }
+// ---- KURSOR (cursor.js): Novelist / Sistem / Kustom (gambar sendiri, ukuran & titik tunjuk) — disimpan di perangkat ----
+let curMaster = null;   // gambar kustom ukuran besar (96 px) untuk membuat ulang saat ukuran diganti
+function syncCursorSettings() {
+  if (!window.NovelCursor) return;
+  const c = NovelCursor.get(), mode = c.mode === "system" || c.mode === "custom" ? c.mode : "novelist";
+  const seg = (id, attr, val) => el(id).querySelectorAll("button").forEach((b) => { const on = b.dataset[attr] === String(val); b.classList.toggle("is-on", on); b.setAttribute("aria-checked", String(on)); });
+  seg("accCursorSeg", "cur", mode);
+  seg("accCursorSize", "size", [24, 32, 48].includes(c.size) ? c.size : 32);
+  seg("accCursorHot", "hot", c.hot === "center" ? "center" : "tl");
+  el("accCursorCustom").classList.toggle("hidden", mode !== "custom");
+  const box = el("accCursorImg");
+  box.style.backgroundImage = c.img ? `url("${c.img}")` : "";
+  box.classList.toggle("is-empty", !c.img);
+}
+function setupCursorSettings() {
+  if (!window.NovelCursor) { el("accCursorSeg").closest(".acc-row").classList.add("hidden"); return; }
+  const save = (patch) => { NovelCursor.set(Object.assign({}, NovelCursor.get(), patch)); syncCursorSettings(); };
+  el("accCursorSeg").querySelectorAll("button").forEach((b) => b.onclick = () => {
+    const c = NovelCursor.get();
+    if (b.dataset.cur === "custom" && !c.img) { save({ mode: c.mode === "custom" ? "novelist" : c.mode }); el("accCursorCustom").classList.remove("hidden"); el("accCursorFile").click(); return; }
+    save({ mode: b.dataset.cur });
+  });
+  const useFile = (file) => {
+    const c = NovelCursor.get(), size = [24, 32, 48].includes(c.size) ? c.size : 32;
+    Promise.all([NovelCursor.readImage(file, 96), NovelCursor.readImage(file, size)]).then(([master, img]) => {
+      curMaster = master;
+      try { localStorage.setItem("novelist_cursor_master", master); } catch (e) { /* abaikan */ }
+      save({ mode: "custom", img, size });
+      toast("Kursor kustom dipasang", tiIcon("circle-check"));
+    }).catch((e) => toast(e.message || "Gambar tidak bisa dipakai", tiIcon("alert-triangle")));
+  };
+  el("accCursorUpload").onclick = () => el("accCursorFile").click();
+  el("accCursorFile").onchange = () => { const f = el("accCursorFile").files[0]; el("accCursorFile").value = ""; if (f) useFile(f); };
+  const drop = el("accCursorUpload");
+  drop.addEventListener("dragover", (e) => { if (Array.from(e.dataTransfer.types || []).includes("Files")) { e.preventDefault(); drop.classList.add("is-over"); } });
+  drop.addEventListener("dragleave", () => drop.classList.remove("is-over"));
+  drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("is-over"); const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) useFile(f); });
+  el("accCursorSize").querySelectorAll("button").forEach((b) => b.onclick = () => {
+    const size = Number(b.dataset.size), c = NovelCursor.get();
+    let master = curMaster;
+    try { master = master || localStorage.getItem("novelist_cursor_master"); } catch (e) { /* abaikan */ }
+    if (!master) { save({ size }); return; }
+    NovelCursor.resize(master, size).then((img) => save({ size, img })).catch(() => save({ size }));
+  });
+  el("accCursorHot").querySelectorAll("button").forEach((b) => b.onclick = () => save({ hot: b.dataset.hot }));
+  syncCursorSettings();
+}
 function syncAccountThemeSeg() {
   const light = document.body.classList.contains("light");
   el("accThemeSeg").querySelectorAll("button").forEach((b) => {
@@ -4110,6 +4157,7 @@ function initAccount() {
   el("accRowUsername").onclick = openUsernameModal;
   el("accRowProfile").onclick = openProfileModal;
   el("accThemeSeg").querySelectorAll("button").forEach((b) => b.onclick = () => document.body.classList.toggle("light", b.dataset.theme === "light"));
+  setupCursorSettings();
   // bahasa antarmuka (i18n.js): English / Indonesia — disimpan di perangkat, halaman dimuat ulang
   el("accLangSeg").querySelectorAll("button").forEach((b) => {
     const cur = window.NovelI18n ? NovelI18n.lang : "en";
