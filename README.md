@@ -1,6 +1,30 @@
-# Novelist Web — v0.13.9
+# Novelist Web — v0.14.0
 
-## Riwayat perubahan terbaru (v0.13.9) — paling baru di atas
+## Riwayat perubahan terbaru (v0.14.0) — paling baru di atas
+
+**Timeline: warna event bebas dengan pemilih warna modern, dan pencarian tanggal/tahun.**
+
+**Warna event**
+- Tombol bulatan warna di kartu event membuka pemilih warna:
+  - palet 16 warna;
+  - "Terakhir dipakai" untuk warna kustom lain di timeline ini;
+  - kotak saturasi/kecerahan yang bisa diseret dan slider hue;
+  - kode hex;
+  - pipet "ambil warna dari layar" (bila browser mendukung).
+- Warnanya langsung dipakai di kartu (gradasi & tepi), label pill, dan titik event di garis.
+
+**Cari di timeline**
+- Kotak pencarian baru di samping judul timeline. Tekan `/` untuk fokus. Bisa diketik:
+  - tahun (`1319`);
+  - bulan & tahun (`Des 1319`, `December 1319`);
+  - tanggal lengkap (`21 Des 1319`, `21/12/1319`, `1319-12-21`);
+  - tahun Sebelum Masehi (`200 SM`, `200 BC`, `-200`);
+  - judul, deskripsi, atau tag event.
+- Enter atau klik hasil akan melompat ke sana. Zoom menyesuaikan ketelitian tanggal, dan garis memanjang otomatis
+  (kelipatan 100 tahun) bila tanggalnya di luar rentang.
+- Penanda berdenyut muncul di tanggal itu dengan tombol **+ Event di sini**. Hasil berupa event langsung membuka kartunya.
+
+Nama bulan di timeline ikut bahasa antarmuka (English: December, BC).
 
 **Timeline: kartu event muncul tepat di atas titiknya (ala vvd).** Klik garis waktu: event baru langsung dibuat dan
 kartu kecil muncul di atas titiknya, dengan garis penunjuk ke titik di garis dan judul yang sudah terpilih untuk

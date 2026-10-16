@@ -23,8 +23,11 @@
   const DOT = 10, STEM_BASE = 14, LEVEL_GAP = 34, MAX_LEVELS = 4;
   const HOVER_BAND = 16;        // jarak (px layar) dari garis agar tooltip "klik untuk menambah" muncul
   const COLORS = ["#e8e8ec", "#d7a86e", "#4caf82", "#6aa8ff", "#c77dff", "#e15c5c"];
-  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
-  const MONTHS_FULL = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+  const EN = !!(window.NovelI18n && window.NovelI18n.lang === "en");   // nama bulan & era ikut bahasa antarmuka
+  const MONTHS = EN ? ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    : ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+  const MONTHS_FULL = EN ? ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    : ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
   const EXTEND_YEARS = 100;     // tombol + di ujung garis
   const IMG_PX = 640, MAX_IMG = 400000;
   const MDAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -34,6 +37,8 @@
   let tl = null;                // timeline yang sedang dibuka
   let selectedId = null;        // event yang sedang dipilih
   let cardId = null;            // event yang kartunya sedang tampil (klik event / baru dibuat)
+  let animUntil = 0;            // animasi kamera terprogram (lompat ke tanggal) sedang berjalan -> kunci tinggi garis dilewati
+  let findMark = null;          // hasil pencarian tanggal: { frac, date } -> penanda berdenyut di garis
   let freshId = null;           // event yang baru dibuat -> judul di kartu langsung terpilih untuk diketik
   let sideOpen = true;          // sidebar daftar timeline (disimpan di perangkat)
   try { sideOpen = localStorage.getItem("novelist_tlside") !== "0"; } catch (e) { /* abaikan */ }
@@ -57,7 +62,7 @@
     return prec === "month" ? { year, month: m + 1, day: null } : { year, month: m + 1, day: doy - CUM[m] + 1 };
   }
   const fmtDate = (d) => (d.month ? (d.day ? d.day + " " : "") + MONTHS[d.month - 1] + " " : "") + d.year;
-  const fmtLong = (d) => (d.month ? (d.day ? d.day + " " : "") + MONTHS_FULL[d.month - 1] + " " : "") + (d.year < 0 ? Math.abs(d.year) + " SM" : d.year);
+  const fmtLong = (d) => (d.month ? (d.day ? d.day + " " : "") + MONTHS_FULL[d.month - 1] + " " : "") + (d.year < 0 ? Math.abs(d.year) + (EN ? " BC" : " SM") : d.year);
   const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const tagsOf = (ev) => (Array.isArray(ev.tags) ? ev.tags.filter((t) => typeof t === "string" && t.trim()) : []);
   // rentang garis = rentang dasar, diperpanjang otomatis supaya semua event masuk
@@ -190,7 +195,7 @@
   // ---------- kartu event (ala vvd): muncul tepat di atas titik event saat event diklik / baru dibuat ----------
   // Bisa langsung disunting di tempat: gambar, judul, tanggal, deskripsi, tag & kartu Kodeks yang ditautkan.
   // Tombol mata = panel detail lengkap (scene terkait, warna), tong sampah = hapus. Kartu mengikuti geser/zoom kanvas.
-  // ikon: #ti-calendar-event #ti-eye #ti-trash #ti-plus #ti-chevron-right #ti-x #ti-cards #ti-search #ti-photo
+  // ikon: #ti-calendar-event #ti-eye #ti-trash #ti-plus #ti-chevron-right #ti-x #ti-cards #ti-search #ti-photo #ti-color-picker
   const ic = (name, n) => h("svg", { className: "ti", width: n || 14, height: n || 14, "aria-hidden": "true", focusable: "false" }, h("use", { href: "#ti-" + name }));
   const cardsOf = (ev) => (Array.isArray(ev.cards) ? ev.cards.filter((c) => c && typeof c.id === "string" && typeof c.kind === "string") : []);
   function kodeksItem(c) {
@@ -198,6 +203,15 @@
     if (!K || !K.isKind(c.kind)) return null;
     const it = K.find(c.kind, c.id);
     return it ? { it, name: String(it.title || "").trim() || "(tanpa judul)", color: K.colorOf(c.kind, it), kindName: K.kindName(c.kind) } : null;
+  }
+  // warna kustom yang sudah dipakai event lain di timeline ini (bukan dari palet), terbaru dulu
+  function recentColors(ev) {
+    const pal = new Set(PALETTE.map((c) => c.toLowerCase()).concat(COLORS)), out = [];
+    for (let i = tl.events.length - 1; i >= 0 && out.length < 8; i--) {
+      const c = String(tl.events[i].color || "").toLowerCase();
+      if (HEX6.test(c) && !pal.has(c) && !out.includes(c) && tl.events[i] !== ev) out.push(c);
+    }
+    return out;
   }
   function CardPicker({ ev, onDone }) {
     const [q, setQ] = React.useState("");
@@ -218,12 +232,56 @@
           h("i", { className: "tl-ec-kdot" }), h("span", { className: "tl-ec-pick-name" }, r.name), h("small", null, r.kindName)))
           : h("p", { className: "tl-ec-pick-empty" }, K ? (nq ? "Tidak ada kartu yang cocok." : "Belum ada kartu di Kodeks.") : "Kodeks belum dimuat.")));
   }
+  // ---------- pemilih warna modern: palet + warna bebas (kotak saturasi/kecerahan, slider hue, hex) ----------
+  const PALETTE = ["#e8e8ec", "#94a3b8", "#f87171", "#fb923c", "#fbbf24", "#d7a86e", "#a3e635", "#4ade80",
+    "#2dd4bf", "#38bdf8", "#60a5fa", "#818cf8", "#a78bfa", "#e879f9", "#f472b6", "#fb7185"];
+  const HEX6 = /^#[0-9a-f]{6}$/i;
+  function hexToHsv(hex) {
+    const v = parseInt(hex.slice(1), 16), r = ((v >> 16) & 255) / 255, g = ((v >> 8) & 255) / 255, b = (v & 255) / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    let hh = 0;
+    if (d) hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return { h: ((hh * 60) + 360) % 360, s: mx ? d / mx : 0, v: mx };
+  }
+  function hsvToHex({ h: hh, s: ss, v: vv }) {
+    const f = (n) => { const k = (n + hh / 60) % 6; return vv - vv * ss * Math.max(0, Math.min(k, 4 - k, 1)); };
+    return "#" + [f(5), f(3), f(1)].map((x) => Math.round(x * 255).toString(16).padStart(2, "0")).join("");
+  }
+  function ColorPicker({ value, recent, onPick }) {
+    const cur = HEX6.test(value || "") ? value.toLowerCase() : COLORS[0];
+    const [hsv, setHsv] = React.useState(() => hexToHsv(cur));
+    const [hex, setHex] = React.useState(cur);
+    const svRef = React.useRef(null);
+    const apply = (n) => { setHsv(n); const x = hsvToHex(n); setHex(x); onPick(x); };
+    const dragSV = (e) => {
+      const box = svRef.current.getBoundingClientRect();
+      const move = (ev) => apply({ h: hsv.h, s: Math.max(0, Math.min(1, (ev.clientX - box.left) / box.width)), v: 1 - Math.max(0, Math.min(1, (ev.clientY - box.top) / box.height)) });
+      move(e);
+      const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+      window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+    };
+    const pickHex = (x) => { setHsv(hexToHsv(x)); setHex(x); onPick(x); };
+    const sw = (c, extra) => h("button", { key: c + (extra || ""), type: "button", className: "tl-cp-sw" + (c.toLowerCase() === cur ? " is-on" : ""), style: { "--c": c }, title: c, "aria-label": "Warna " + c, onClick: () => pickHex(c.toLowerCase()) });
+    return h("div", { className: "tl-cp", role: "group", "aria-label": "Warna event" },
+      h("div", { className: "tl-cp-grid" }, PALETTE.map((c) => sw(c))),
+      recent.length ? h("div", { className: "tl-cp-recent" }, h("span", null, "Terakhir dipakai"), recent.map((c) => sw(c, "r"))) : null,
+      h("div", { ref: svRef, className: "tl-cp-sv", style: { "--hue": `hsl(${Math.round(hsv.h)} 100% 50%)` }, onPointerDown: (e) => { e.preventDefault(); dragSV(e); } },
+        h("span", { className: "tl-cp-thumb", style: { left: hsv.s * 100 + "%", top: (1 - hsv.v) * 100 + "%", background: hex } })),
+      h("input", { type: "range", className: "tl-cp-hue", min: 0, max: 359, value: Math.round(hsv.h), "aria-label": "Hue", onChange: (e) => apply({ ...hsv, h: Number(e.target.value), s: hsv.s || 0.6, v: hsv.v || 0.9 }) }),
+      h("div", { className: "tl-cp-row" },
+        h("span", { className: "tl-cp-prev", style: { background: hex } }),
+        h("input", { className: "tl-cp-hex", value: hex, maxLength: 7, spellCheck: false, "aria-label": "Kode warna hex",
+          onChange: (e) => { let x = e.target.value.trim(); if (x && x[0] !== "#") x = "#" + x; setHex(x); if (HEX6.test(x)) { setHsv(hexToHsv(x)); onPick(x.toLowerCase()); } } }),
+        window.EyeDropper ? h("button", { type: "button", className: "tl-ec-ibtn", title: "Ambil warna dari layar", "aria-label": "Ambil warna dari layar",
+          onClick: () => new window.EyeDropper().open().then((r) => r && r.sRGBHex && pickHex(r.sRGBHex.toLowerCase())).catch(() => {}) }, ic("color-picker", 15)) : null));
+  }
   function EventCard({ ev, range, fresh }) {
     const [tx, ty, zoom] = RF.useStore((st) => st.transform);
     const width = RF.useStore((st) => st.width), height = RF.useStore((st) => st.height);
     const [dateOpen, setDateOpen] = React.useState(false);
     const [tagsOpen, setTagsOpen] = React.useState(tagsOf(ev).length > 0);
     const [picking, setPicking] = React.useState(false);
+    const [colorOpen, setColorOpen] = React.useState(false);
     const [tagText, setTagText] = React.useState("");
     const titleRef = React.useRef(null), fileRef = React.useRef(null);
     React.useEffect(() => { if (fresh && titleRef.current) { titleRef.current.focus(); titleRef.current.select(); } }, [ev.id]);
@@ -253,6 +311,8 @@
           h("div", { className: "tl-ec-row" },
             h("input", { ref: titleRef, className: "tl-ec-title", value: ev.title || "", placeholder: "Judul event", maxLength: 120, "aria-label": "Judul event",
               onChange: (e) => set((v) => { v.title = e.target.value; }), onKeyDown: (e) => { if (e.key === "Enter") e.target.blur(); } }),
+            h("button", { type: "button", className: "tl-ec-ibtn tl-ec-colorbtn" + (colorOpen ? " is-on" : ""), title: "Warna event", "aria-label": "Warna event", "aria-expanded": colorOpen,
+              onClick: () => setColorOpen(!colorOpen) }, h("span", { className: "tl-ec-cdot" })),
             h("button", { type: "button", className: "tl-ec-ibtn", title: "Detail lengkap (scene, warna)", "aria-label": "Detail lengkap",
               onClick: () => { selectedId = ev.id; cardId = null; freshId = null; fillEditor(); rev++; renderFlow(); } }, ic("eye", 15)),
             h("button", { type: "button", className: "tl-ec-ibtn is-danger", title: "Hapus event", "aria-label": "Hapus event",
@@ -265,6 +325,7 @@
               h("option", { value: "" }, "—"), MONTHS.map((m, i) => h("option", { key: m, value: i + 1 }, m))),
             h("input", { type: "number", placeholder: "Tahun", "aria-label": "Tahun", value: ev.year,
               onChange: (e) => { const y = parseInt(e.target.value, 10); if (!Number.isNaN(y)) set((v) => { v.year = y; }); } })) : null,
+      colorOpen ? h(ColorPicker, { value: ev.color, recent: recentColors(ev), onPick: (c) => set((v) => { v.color = c; }) }) : null,
       h("textarea", { className: "tl-ec-desc", value: ev.desc || "", placeholder: "Deskripsi", rows: 3, "aria-label": "Deskripsi",
         onChange: (e) => { ev.desc = e.target.value; ctx.onChange(); rev++; renderFlow(); } }),
       h("div", { className: "tl-ec-sec" },
@@ -290,6 +351,120 @@
         : h("button", { type: "button", className: "tl-ec-add", onClick: () => setPicking(true) }, ic("plus", 13), "Tautkan kartu")));
   }
 
+  // ---------- CARI DI TIMELINE: tahun / tanggal / judul event -> lompat & tandai ----------
+  // Format tanggal: "1319", "Des 1319", "Desember 1319", "21 Des 1319", "Dec 21 1319", "21/12/1319", "12/1319",
+  // "1319-12-21", "200 SM" / "200 BC" / "-200". Bulan Indonesia & Inggris (nama lengkap atau 3 huruf).
+  const MON_ALIASES = [["jan", "januari", "january"], ["feb", "februari", "february", "pebruari"], ["mar", "maret", "march"], ["apr", "april"],
+    ["mei", "may"], ["jun", "juni", "june"], ["jul", "juli", "july"], ["agu", "agustus", "aug", "august", "agt"], ["sep", "sept", "september"],
+    ["okt", "oktober", "oct", "october"], ["nov", "november", "nop"], ["des", "desember", "dec", "december"]];
+  const monthOf = (w) => { w = w.toLowerCase().replace(/\./g, ""); const i = MON_ALIASES.findIndex((a) => a.includes(w)); return i < 0 ? 0 : i + 1; };
+  function parseDateQuery(q) {
+    let t = q.trim().toLowerCase().replace(/,/g, " ").replace(/\s+/g, " ");
+    if (!t) return null;
+    let neg = false;
+    const era = t.match(/\s*(sm|bc|bce|s\.m\.)$/);
+    if (era) { neg = true; t = t.slice(0, era.index).trim(); }
+    if (/^-\d+$/.test(t)) { neg = true; t = t.slice(1); }
+    const Y = (y) => (neg ? -Math.abs(y) : y);
+    let m;
+    if ((m = t.match(/^(\d{1,6})$/))) return { year: Y(+m[1]), month: null, day: null };
+    if ((m = t.match(/^(\d{1,6})-(\d{1,2})-(\d{1,2})$/))) return mk(Y(+m[1]), +m[2], +m[3]);   // 1319-12-21
+    if ((m = t.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{1,6})$/))) return mk(Y(+m[3]), +m[2], +m[1]);   // 21/12/1319
+    if ((m = t.match(/^(\d{1,2})[/.-](\d{1,6})$/))) return mk(Y(+m[2]), +m[1], null);   // 12/1319
+    if ((m = t.match(/^(\d{1,2}) ([a-z.]+) (\d{1,6})$/))) return mk(Y(+m[3]), monthOf(m[2]), +m[1]);   // 21 des 1319
+    if ((m = t.match(/^([a-z.]+) (\d{1,2}) (\d{1,6})$/))) return mk(Y(+m[3]), monthOf(m[1]), +m[2]);   // dec 21 1319
+    if ((m = t.match(/^([a-z.]+) (\d{1,6})$/))) return mk(Y(+m[2]), monthOf(m[1]), null);   // des 1319
+    return null;
+    function mk(y, mo, d) {
+      if (!(mo >= 1 && mo <= 12)) return null;
+      if (d != null && !(d >= 1 && d <= MDAYS[mo - 1])) return null;
+      return { year: y, month: mo, day: d || null };
+    }
+  }
+  function findResults(q) {
+    const out = [], date = parseDateQuery(q), nq = q.trim().toLowerCase();
+    if (date) out.push({ kind: "date", date, label: fmtLong(date) });
+    if (nq) tl.events.filter((ev) => [ev.title, ev.desc, tagsOf(ev).join(" "), fmtLong(ev), fmtDate(ev)].join(" \u0001 ").toLowerCase().includes(nq))
+      .sort((a, b) => dateToFrac(a) - dateToFrac(b)).slice(0, 8).forEach((ev) => out.push({ kind: "event", ev, label: ev.title || "(tanpa judul)", sub: fmtLong(ev) }));
+    return out;
+  }
+  // lompat ke tanggal: garis memanjang (kelipatan 100 th) bila di luar rentang; zoom menyesuaikan ketelitian tanggal
+  function jumpTo(date, evId) {
+    if (!tl || !api) return;
+    const f = dateToFrac(date), r0 = rangeOf(tl);
+    if (f < r0.start) tl.start = Math.floor(f / EXTEND_YEARS) * EXTEND_YEARS;
+    if (f > r0.end) tl.end = Math.ceil((f + 1) / EXTEND_YEARS) * EXTEND_YEARS;
+    if (f < r0.start || f > r0.end) ctx.onChange();
+    findMark = evId ? null : { frac: f + (date.month ? (date.day ? 0.5 : 15) / 365 : 0.5), date };
+    if (evId) { selectedId = evId; cardId = evId; freshId = null; hideEditor(); }
+    rev++; renderFlow(); renderHead();
+    setTimeout(() => {
+      const r = rangeOf(tl), box = $("tlFlow"), w = box.clientWidth;
+      const span = date.day ? 0.6 : date.month ? 3 : Math.max(8, Math.min(60, (r.end - r.start) / 8));   // tahun tampil di layar
+      const zoom = Math.max(0.05, Math.min(1000, w / (span * scaleOf(r))));
+      const xf = fracToX(r, findMark ? findMark.frac : f), v = api.getViewport();
+      animUntil = performance.now() + 600;
+      api.setViewport({ x: w / 2 - xf * zoom, y: v.y, zoom }, { duration: 450 });
+      setTimeout(() => {   // posisi akhir dipasang persis (interpolasi d3 bisa menggeser tinggi garis), lalu label dihitung ulang
+        animUntil = performance.now() + 60;   // lewati kunci tinggi garis untuk lompatan akhir ini juga
+        api.setViewport({ x: w / 2 - xf * zoom, y: v.y, zoom });
+        rev++; renderFlow();
+      }, 480);
+    }, 0);
+  }
+  function FindMark({ range }) {
+    const [tx, ty, zoom] = RF.useStore((st) => st.transform);
+    if (!findMark) return null;
+    const x = tx + fracToX(range, findMark.frac) * zoom, d = findMark.date;
+    const add = () => { const dd = { year: d.year, month: d.month, day: d.day }; findMark = null; addEventAt(dd); };
+    return h("div", { className: "tl-findmark", style: { left: x, top: ty }, onPointerDown: (e) => e.stopPropagation() },
+      h("span", { className: "tl-findmark-ring" }),
+      h("div", { className: "tl-findmark-tip" },
+        h("b", null, fmtLong(d)),
+        h("button", { type: "button", onClick: add }, ic("plus", 12), "Event di sini"),
+        h("button", { type: "button", className: "is-x", "aria-label": "Tutup penanda", onClick: () => { findMark = null; rev++; renderFlow(); } }, ic("x", 12))));
+  }
+  function bindFind() {
+    const inp = $("tlFind"), pop = $("tlFindPop");
+    let items = [], active = 0;
+    const close = () => { pop.classList.add("hidden"); inp.setAttribute("aria-expanded", "false"); };
+    const choose = (it) => {
+      if (!it) return;
+      close();
+      if (it.kind === "date") jumpTo(it.date); else jumpTo(it.ev, it.ev.id);
+      inp.blur();
+    };
+    const draw = () => {
+      const q = inp.value;
+      items = tl && q.trim() ? findResults(q) : [];
+      active = Math.min(active, Math.max(0, items.length - 1));
+      if (!q.trim()) { close(); return; }
+      pop.innerHTML = items.length ? items.map((it, i) => it.kind === "date"
+        ? `<button type="button" role="option" class="tl-find-row is-date${i === active ? " is-active" : ""}" data-i="${i}"><svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-calendar-event"></use></svg><span><b>${esc(it.label)}</b><small>Lompat ke tanggal ini</small></span><kbd>Enter</kbd></button>`
+        : `<button type="button" role="option" class="tl-find-row${i === active ? " is-active" : ""}" data-i="${i}" style="--ev:${esc(it.ev.color || COLORS[0])}"><i class="tl-find-dot"></i><span><b>${esc(it.label)}</b><small>${esc(it.sub)}</small></span></button>`).join("")
+        : `<p class="tl-find-empty">Tidak ditemukan. Coba tahun (1319), bulan & tahun (Des 1319), tanggal lengkap (21/12/1319), atau judul event.</p>`;
+      pop.classList.remove("hidden"); inp.setAttribute("aria-expanded", "true");
+    };
+    inp.addEventListener("input", () => { active = 0; draw(); });
+    inp.addEventListener("focus", draw);
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); if (items.length) { active = (active + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length; draw(); } }
+      else if (e.key === "Enter") { e.preventDefault(); choose(items[active]); }
+      else if (e.key === "Escape") { if (inp.value) inp.value = ""; close(); inp.blur(); }
+    });
+    inp.addEventListener("blur", () => setTimeout(close, 150));
+    pop.addEventListener("pointerdown", (e) => e.preventDefault());   // klik hasil tidak menutup dulu lewat blur
+    pop.addEventListener("click", (e) => { const b = e.target.closest(".tl-find-row"); if (b) choose(items[+b.dataset.i]); });
+    // "/" = fokus ke pencarian (saat tab Timeline tampil & tidak sedang mengetik)
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (!inp.offsetParent) return;
+      e.preventDefault(); inp.focus(); inp.select();
+    });
+  }
+
   function FlowApp({ tlRev, panMode }) {
     const [nodes, setNodes, onNodesChangeBase] = useNodesState([]);
     const [ghost, setGhost] = React.useState(null);   // penanda + tooltip "klik untuk menambah"
@@ -297,6 +472,7 @@
     // saat zoom, garis tetap di ketinggian layar yang sama (kalau tidak, zoom dalam bisa "melempar" garis keluar layar)
     const onMove = (_e, v) => {
       const prev = lastVp.current;
+      if (performance.now() < animUntil) { lastVp.current = v; return; }
       if (prev && v.zoom !== prev.zoom && v.y !== prev.y) {
         lastVp.current = { x: v.x, y: prev.y, zoom: v.zoom };
         api.setViewport(lastVp.current);
@@ -366,7 +542,7 @@
     const onPaneClick = (e) => {
       const g = hoverAt(e);
       if (g) { addEventAt(g.date); setGhost(null); return; }
-      if (selectedId || cardId) { selectedId = null; cardId = null; hideEditor(); rev++; renderFlow(); }
+      if (selectedId || cardId || findMark) { selectedId = null; cardId = null; findMark = null; hideEditor(); rev++; renderFlow(); }
     };
 
     return h(Flow, {
@@ -380,6 +556,7 @@
     },
       h(AxisLayer, { range: rangeOf(tl) }),
       h(EndButtons, { range: rangeOf(tl) }),
+      h(FindMark, { range: rangeOf(tl) }),
       cardId && findEvent(cardId) ? h(EventCard, { key: cardId, ev: findEvent(cardId), range: rangeOf(tl), fresh: freshId === cardId }) : null,
       h(Controls, { showInteractive: false, showFitView: false, position: "bottom-right", className: "tl-controls" }),
       ghost ? h("div", { className: "tl-ghost", style: { left: ghost.left, top: ghost.top } },
@@ -466,7 +643,8 @@
   }
   function openTimeline(id) {
     tl = timelines().find((t) => t.id === id) || null;
-    selectedId = null; cardId = null; hideEditor();
+    selectedId = null; cardId = null; findMark = null; hideEditor();
+    $("tlFind").value = "";
     rev++;
     renderList(); renderHead(); renderFlow();
     if (tl && ctx.onOpen) ctx.onOpen(tl.id);   // app.js: riwayat sidebar tab
@@ -561,6 +739,7 @@
   function bindOnce() {
     if (bound) return; bound = true;
     $("tlSearch").addEventListener("input", renderList);
+    bindFind();
     $("tlNew").onclick = () => {
       const t = { id: uid("tl"), title: "Timeline Baru", start: 1500, end: 1900, events: [] };
       timelines().push(t); ctx.onChange(); openTimeline(t.id);
