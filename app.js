@@ -596,6 +596,7 @@ function exportProjectToWord(p) {
 // ================= PROJECT VIEW (Write / Organize) =================
 function openProject(id) {
   closeAccountView();
+  closeCloudLibrary(true);
   hideDashCover();
   currentProjectId = id;
   const p = getProject(id);
@@ -3599,85 +3600,199 @@ async function loadProjectsFromDrive(isInitialLogin = false) {
   renderDashboard();
 }
 // ================= CLOUD LIBRARY (manual send/receive, terpisah dari autosave) =================
+// Halaman di dalam dashboard (seperti Pengaturan Akun): rail, background & logo tetap; #dashboardView.is-cloud
+// menyembunyikan rak project. Tiga tab: Kirim ke Cloud (project lokal), Ambil dari Cloud (folder utama Drive), Trash.
+// Daftar Drive di-cache sebentar (CLOUD_CACHE_MS) supaya angka di tab & pindah tab tidak memanggil Drive berulang.
+const CLOUD_CACHE_MS = 30000;
+var cloudCache = { receive: null, trash: null };   // { files, at }
+var cloudViewOpen = false;   // var: dipakai openProject / resetAccountState yang bisa jalan sebelum baris ini
+var cloudTab = "send";
 function formatDateTime(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { day: "2-digit", month: "short", year: "numeric" }) + " " + d.toLocaleTimeString((window.NovelI18n ? NovelI18n.locale : "id-ID"), { hour: "2-digit", minute: "2-digit" });
 }
 function openCloudLibrary() {
-  closeAccountView();   // kembali dari Cloud Library = daftar project
-  el("dashboardView").classList.add("hidden");
+  closeAllDropdowns();
+  closeAccountView();
+  if (typeof hideDashCover === "function") hideDashCover();
   el("editorView").classList.add("hidden");
-  el("cloudLibraryView").classList.remove("hidden");
-  switchCloudTab("send");
-}
-function closeCloudLibrary() {
-  el("cloudLibraryView").classList.add("hidden");
   el("dashboardView").classList.remove("hidden");
-  renderDashboard();
+  el("dashboardView").classList.add("is-cloud");
+  const view = el("cloudLibraryView");
+  view.classList.remove("hidden");
+  setRailPage("cloud");
+  if (!cloudViewOpen) {
+    cloudViewOpen = true;
+    document.addEventListener("keydown", cloudKeyHandler);
+    view.scrollTop = 0;
+    view.focus({ preventScroll: true });
+  }
+  switchCloudTab("send");
+  // angka di tab Ambil & Trash (di latar; hasilnya dipakai lagi saat tab dibuka)
+  ["receive", "trash"].forEach((k) => cloudFiles(k).then(updateCloudCounts, () => {}));
 }
+function closeCloudLibrary(silent) {   // silent: tanpa render ulang dashboard (buka project / logout)
+  if (!cloudViewOpen) return;
+  cloudViewOpen = false;
+  document.removeEventListener("keydown", cloudKeyHandler);
+  el("cloudLibraryView").classList.add("hidden");
+  el("dashboardView").classList.remove("is-cloud");
+  setRailPage("projects");
+  if (silent !== true) renderDashboard();
+}
+function cloudKeyHandler(e) {
+  if (e.key !== "Escape" || e.defaultPrevented) return;
+  if (document.querySelector(".modal:not(.hidden)") || !el("settingsMenu").classList.contains("hidden")) return;
+  closeCloudLibrary();
+  el("btnRailProjects").focus();
+}
+const CLOUD_HINTS = {
+  send: "Simpan salinan project di perangkat ini ke Google Drive sekarang juga.",
+  receive: "Buka project yang tersimpan di Drive — termasuk dari perangkat lain.",
+  trash: "Project yang dihapus menunggu di sini. Pulihkan, atau hapus permanen.",
+};
 function switchCloudTab(tab) {
-  el("tabSendToCloud").classList.toggle("active", tab === "send");
-  el("tabReceiveFromCloud").classList.toggle("active", tab === "receive");
-  el("tabTrash").classList.toggle("active", tab === "trash");
+  cloudTab = tab;
+  [["tabSendToCloud", "send"], ["tabReceiveFromCloud", "receive"], ["tabTrash", "trash"]].forEach(([id, t]) => {
+    el(id).classList.toggle("active", t === tab);
+    el(id).setAttribute("aria-selected", String(t === tab));
+  });
   el("sendToCloudPanel").classList.toggle("hidden", tab !== "send");
   el("receiveFromCloudPanel").classList.toggle("hidden", tab !== "receive");
   el("trashPanel").classList.toggle("hidden", tab !== "trash");
+  el("btnCloudSendAll").classList.toggle("hidden", tab !== "send" || !projects.length);
+  el("cloudHint").textContent = CLOUD_HINTS[tab];
   if (tab === "send") renderSendToCloudList();
   else if (tab === "receive") renderReceiveFromCloudList();
   else renderTrashList();
 }
-function cloudAvatarHtml(title, cover, colorA, colorB) {
-  if (cover) return `<img class="cloud-avatar" src="${cover}" alt="" />`;
-  const bg = colorA ? `background:linear-gradient(135deg, ${colorA}, ${colorB || colorA})` : "";
-  return `<div class="cloud-avatar cloud-avatar-letter" style="${bg}">${escapeHtml((title || "?").charAt(0).toUpperCase())}</div>`;
+function refreshCloudLibrary() {
+  cloudCache.receive = cloudCache.trash = null;
+  const b = el("btnCloudRefresh");
+  b.classList.add("is-busy");
+  setTimeout(() => b.classList.remove("is-busy"), 700);
+  switchCloudTab(cloudTab);
+  ["receive", "trash"].filter((k) => k !== cloudTab).forEach((k) => cloudFiles(k).then(updateCloudCounts, () => {}));
 }
+async function cloudFiles(kind, force = false) {
+  const c = cloudCache[kind];
+  if (!force && c && Date.now() - c.at < CLOUD_CACHE_MS) return c.files;
+  const folderId = kind === "trash" ? await getOrCreateFolder(DRIVE_TRASH_FOLDER_NAME, "trash") : await getOrCreateFolder(DRIVE_FOLDER_NAME, "main");
+  const files = await driveListInFolder(folderId);
+  cloudCache[kind] = { files, at: Date.now() };
+  return files;
+}
+function updateCloudCounts() {
+  const set = (id, n) => { const b = el(id); b.textContent = n == null ? "" : String(n); b.classList.toggle("hidden", n == null); };
+  set("clCountSend", projects.length);
+  set("clCountReceive", cloudCache.receive ? cloudCache.receive.files.length : null);
+  set("clCountTrash", cloudCache.trash ? cloudCache.trash.files.length : null);
+}
+// sampul kecil (potret, seperti kartu buku di rak): foto sampul atau gradasi + huruf pertama
+function cloudCoverHtml(title, cover, colorA, colorB) {
+  if (cover) return `<span class="cl-cover"><img src="${escapeHtml(cover)}" alt="" loading="lazy" /></span>`;
+  const bg = colorA ? ` style="background:linear-gradient(160deg, ${colorA}, ${colorB || colorA})"` : "";
+  return `<span class="cl-cover cl-cover-letter"${bg}><span>${escapeHtml((title || "?").trim().charAt(0).toUpperCase() || "?")}</span></span>`;
+}
+function cloudRowHtml({ cover, title, meta, dot, badge, actions }) {
+  return `${cover}
+    <div class="cl-row-text">
+      <div class="cl-row-title" data-no-i18n>${escapeHtml(title)}</div>
+      <div class="cl-row-meta">${dot ? `<i class="cl-dot cl-dot-${dot}" aria-hidden="true"></i>` : ""}${meta}${badge ? `<span class="cl-badge">${badge}</span>` : ""}</div>
+    </div>
+    <div class="cl-row-actions">${actions}</div>`;
+}
+function cloudBtn(act, icon, label, cls) {
+  return `<button type="button" class="cl-act${cls ? " " + cls : ""}" data-act="${act}" title="${label}" aria-label="${label}">${icon}<span>${label}</span></button>`;
+}
+function cloudSkeleton(panel) {
+  panel.innerHTML = `<div class="cl-card" aria-busy="true">${'<div class="cl-row cl-skel"><span class="cl-cover"></span><div class="cl-row-text"><i></i><i></i></div></div>'.repeat(3)}</div>`;
+}
+function cloudEmpty(panel, icon, title, desc, isError) {
+  panel.innerHTML = `<div class="cl-empty${isError ? " is-error" : ""}"><span class="cl-empty-ic">${tiPx(icon, 24)}</span><div class="cl-empty-title">${title}</div>${desc ? `<div class="cl-empty-desc">${desc}</div>` : ""}</div>`;
+}
+const cloudSentMeta = (p) => p.driveFileId ? `<span>Terkirim</span> <span>${timeAgo(p.updatedAt)}</span>` : "<span>Belum pernah dikirim</span>";
 function renderSendToCloudList() {
   const panel = el("sendToCloudPanel");
-  panel.innerHTML = "";
-  if (projects.length === 0) { panel.innerHTML = '<p class="cloud-empty">Belum ada project lokal untuk dikirim.</p>'; return; }
+  updateCloudCounts();
+  el("btnCloudSendAll").classList.toggle("hidden", cloudTab !== "send" || !projects.length);
+  if (projects.length === 0) { cloudEmpty(panel, tiIcon("folder-open"), "Belum ada project lokal", "Project yang kamu buat di perangkat ini akan muncul di sini."); return; }
+  const card = document.createElement("div");
+  card.className = "cl-card";
   projects.forEach((p) => {
     const row = document.createElement("div");
-    row.className = "cloud-row";
-    row.innerHTML = `
-      ${cloudAvatarHtml(p.title, p.cover, p.colorA, p.colorB)}
-      <div class="cloud-row-title">${escapeHtml(p.title)}</div>
-      <div class="cloud-row-meta">${p.driveFileId ? "Terkirim " + timeAgo(p.updatedAt) : "Belum pernah dikirim"}</div>
-      <button class="cloud-action-btn" title="Kirim ke Cloud" aria-label="Kirim ke Cloud">${tiPx(tiIcon("cloud-upload"), 20)}</button>`;
-    row.querySelector(".cloud-action-btn").onclick = async (e) => {
+    row.className = "cl-row";
+    row.innerHTML = cloudRowHtml({
+      cover: cloudCoverHtml(p.title, p.cover, p.colorA, p.colorB), title: p.title,
+      dot: p.driveFileId ? "ok" : "warn", meta: cloudSentMeta(p),
+      actions: cloudBtn("send", tiPx(tiIcon("cloud-upload"), 17), "Kirim"),
+    });
+    row.querySelector('[data-act="send"]').onclick = async (e) => {
       e.stopPropagation();
-      const btn = e.currentTarget;
-      btn.innerHTML = tiPx(tiIcon("loader-2"), 20);   // berputar (CSS .cloud-action-btn.is-busy)
-      btn.classList.add("is-busy");
-      if (currentProjectId === p.id) flushCurrentEdits();
-      await saveProjectToDriveMain(p);
-      btn.classList.remove("is-busy");
-      btn.innerHTML = tiPx(tiIcon("check"), 20);
-      setTimeout(() => renderSendToCloudList(), 900);
+      if (await sendProjectToCloud(p, e.currentTarget)) afterCloudSend();
     };
-    panel.appendChild(row);
+    card.appendChild(row);
   });
+  panel.replaceChildren(card);
+}
+async function sendProjectToCloud(p, btn) {
+  if (btn.classList.contains("is-busy")) return false;
+  btn.classList.add("is-busy");
+  btn.innerHTML = tiPx(tiIcon("loader-2"), 17) + "<span>Mengirim…</span>";   // ikon berputar (CSS .cl-act.is-busy)
+  if (currentProjectId === p.id) flushCurrentEdits();
+  let ok = true;
+  try { await saveProjectToDriveMain(p); } catch (e) { ok = false; }
+  btn.classList.remove("is-busy");
+  btn.classList.add(ok ? "is-done" : "is-fail");
+  btn.innerHTML = ok ? tiPx(tiIcon("check"), 17) + "<span>Terkirim</span>" : tiPx(tiIcon("alert-triangle"), 17) + "<span>Gagal</span>";
+  return ok;
+}
+// setelah kirim: segarkan angka tab Ambil & kembalikan tombol ke keadaan biasa
+function afterCloudSend() {
+  cloudFiles("receive", true).then(updateCloudCounts, () => {});
+  setTimeout(() => { if (cloudViewOpen && cloudTab === "send") renderSendToCloudList(); }, 900);
+}
+async function sendAllToCloud() {
+  const all = el("btnCloudSendAll");
+  if (all.disabled) return;
+  all.disabled = true;
+  const rows = [...el("sendToCloudPanel").querySelectorAll(".cl-row")];
+  let fail = 0;
+  for (let i = 0; i < projects.length; i++) {
+    const btn = rows[i] && rows[i].querySelector('[data-act="send"]');
+    if (btn) { if (!(await sendProjectToCloud(projects[i], btn))) fail++; }
+  }
+  all.disabled = false;
+  toast(fail ? fail + " project gagal dikirim" : "Semua project terkirim ke Cloud", tiIcon(fail ? "alert-triangle" : "cloud-check"));
+  afterCloudSend();
 }
 async function renderReceiveFromCloudList() {
   const panel = el("receiveFromCloudPanel");
-  panel.innerHTML = '<p class="cloud-empty">Memuat daftar dari Drive...</p>';
+  if (!cloudCache.receive) cloudSkeleton(panel);
   try {
-    const folderId = await getOrCreateFolder(DRIVE_FOLDER_NAME, "main");
-    const files = await driveListInFolder(folderId);
-    if (files.length === 0) { panel.innerHTML = '<p class="cloud-empty">Belum ada file tersimpan di Drive.</p>'; return; }
-    panel.innerHTML = "";
+    const files = await cloudFiles("receive");
+    updateCloudCounts();
+    if (cloudTab !== "receive") return;
+    if (files.length === 0) { cloudEmpty(panel, tiIcon("cloud"), "Drive masih kosong", "Kirim project dari tab Kirim ke Cloud supaya bisa dibuka di perangkat lain."); return; }
+    const card = document.createElement("div");
+    card.className = "cl-card";
     files.forEach((f) => {
       const localMatch = projects.find((p) => p.driveFileId === f.id);
       const row = document.createElement("div");
-      row.className = "cloud-row";
-      row.innerHTML = `
-        ${cloudAvatarHtml(f.name, localMatch?.cover, localMatch?.colorA, localMatch?.colorB)}
-        <div class="cloud-row-title">${escapeHtml(f.name.replace(/\.novj$/, ""))}</div>
-        <div class="cloud-row-meta">${formatDateTime(f.modifiedTime)}</div>
-        <button class="cloud-action-btn" title="Ambil dari Cloud" aria-label="Ambil dari Cloud">${tiPx(tiIcon("cloud-download"), 20)}</button>`;
+      row.className = "cl-row is-click";
+      row.tabIndex = 0;
+      row.innerHTML = cloudRowHtml({
+        cover: cloudCoverHtml(f.name, localMatch?.cover, localMatch?.colorA, localMatch?.colorB), title: f.name.replace(/\.novj$/, ""),
+        meta: `<span>Diubah</span> <span>${formatDateTime(f.modifiedTime)}</span>`,
+        badge: localMatch ? "Ada di perangkat ini" : "",
+        actions: cloudBtn("pull", tiPx(tiIcon("cloud-download"), 17), "Ambil"),
+      });
       row.onclick = () => pullFromCloud(f);
-      panel.appendChild(row);
+      row.onkeydown = (e) => { if (e.key === "Enter" && e.target === row) pullFromCloud(f); };
+      card.appendChild(row);
     });
-  } catch (e) { panel.innerHTML = '<p class="cloud-empty">Gagal memuat daftar: ' + escapeHtml(e.message) + "</p>"; }
+    panel.replaceChildren(card);
+  } catch (e) { cloudEmpty(panel, tiIcon("cloud-x"), "Gagal memuat daftar", escapeHtml(e.message), true); }
 }
 async function pullFromCloud(f) {
   try {
@@ -3693,7 +3808,6 @@ async function pullFromCloud(f) {
       projects.unshift(p);
     }
     toast('Project "' + p.title + '" diambil dari Cloud', tiIcon("cloud-download"));
-    el("cloudLibraryView").classList.add("hidden");
     openProject(p.id);
   } catch (e) { alert("Gagal mengambil dari Drive: " + e.message); }
 }
@@ -3701,28 +3815,28 @@ async function pullFromCloud(f) {
 // ---- TRASH: project yang dihapus dipindah ke sini dulu, bukan langsung hilang permanen ----
 async function renderTrashList() {
   const panel = el("trashPanel");
-  panel.innerHTML = '<p class="cloud-empty">Memuat Trash dari Drive...</p>';
+  if (!cloudCache.trash) cloudSkeleton(panel);
   try {
-    const trashFolderId = await getOrCreateFolder(DRIVE_TRASH_FOLDER_NAME, "trash");
-    const files = await driveListInFolder(trashFolderId);
-    if (files.length === 0) { panel.innerHTML = '<p class="cloud-empty">Trash kosong. Project yang dihapus akan muncul di sini.</p>'; return; }
-    panel.innerHTML = "";
+    const files = await cloudFiles("trash");
+    updateCloudCounts();
+    if (cloudTab !== "trash") return;
+    if (files.length === 0) { cloudEmpty(panel, tiIcon("trash"), "Trash kosong", "Project yang dihapus akan muncul di sini."); return; }
+    const card = document.createElement("div");
+    card.className = "cl-card";
     files.forEach((f) => {
       const row = document.createElement("div");
-      row.className = "cloud-row";
-      row.innerHTML = `
-        ${cloudAvatarHtml(f.name, null, null, null)}
-        <div class="cloud-row-title">${escapeHtml(f.name.replace(/\.novj$/, ""))}</div>
-        <div class="cloud-row-meta">Dihapus ${timeAgo(f.modifiedTime)}</div>
-        <div class="cloud-row-actions">
-          <button class="cloud-action-btn" data-act="restore" title="Pulihkan project" aria-label="Pulihkan project">${tiPx(tiIcon("restore"), 20)}</button>
-          <button class="cloud-action-btn cloud-action-danger" data-act="wipe" title="Hapus permanen" aria-label="Hapus permanen">${tiPx(tiIcon("trash-x"), 20)}</button>
-        </div>`;
+      row.className = "cl-row";
+      row.innerHTML = cloudRowHtml({
+        cover: cloudCoverHtml(f.name, null, null, null), title: f.name.replace(/\.novj$/, ""),
+        meta: `<span>Dihapus</span> <span>${timeAgo(f.modifiedTime)}</span>`,
+        actions: cloudBtn("restore", tiPx(tiIcon("restore"), 17), "Pulihkan") + cloudBtn("wipe", tiPx(tiIcon("trash-x"), 17), "Hapus permanen", "cl-act-icon cl-act-danger"),
+      });
       row.querySelector('[data-act="restore"]').onclick = (e) => { e.stopPropagation(); restoreFromTrash(f); };
       row.querySelector('[data-act="wipe"]').onclick = (e) => { e.stopPropagation(); permanentlyDeleteFromTrash(f); };
-      panel.appendChild(row);
+      card.appendChild(row);
     });
-  } catch (e) { panel.innerHTML = '<p class="cloud-empty">Gagal memuat Trash: ' + escapeHtml(e.message) + "</p>"; }
+    panel.replaceChildren(card);
+  } catch (e) { cloudEmpty(panel, tiIcon("cloud-x"), "Gagal memuat Trash", escapeHtml(e.message), true); }
 }
 async function restoreFromTrash(f) {
   try {
@@ -3736,6 +3850,7 @@ async function restoreFromTrash(f) {
     const p = { id: "proj-" + f.id, title: data.title || f.name.replace(/\.novj$/, ""), description: "", template: "standard", cover: data.cover || null, colorA: colorPair[0], colorB: colorPair[1], driveFileId: f.id, updatedAt: new Date().toISOString(), data };
     if (!projects.some((x) => x.driveFileId === f.id)) projects.unshift(p);
     toast('Project "' + p.title + '" dipulihkan', tiIcon("restore"));
+    cloudCache.receive = cloudCache.trash = null;
     renderTrashList();
   } catch (e) { toast("Gagal memulihkan: " + e.message, tiIcon("alert-triangle")); }
 }
@@ -3744,6 +3859,7 @@ async function permanentlyDeleteFromTrash(f) {
   try {
     await driveDelete(f.id);
     toast("Dihapus permanen dari Trash", tiIcon("trash-x"));
+    cloudCache.trash = null;
     renderTrashList();
   } catch (e) { toast("Gagal menghapus permanen: " + e.message, tiIcon("alert-triangle")); }
 }
@@ -3817,6 +3933,8 @@ function resetAccountState() {
   accountGen++;
   accountInfo = null; accountStatus = "idle"; accountFetchPromise = null;
   closeAccountView();
+  closeCloudLibrary(true);
+  cloudCache.receive = cloudCache.trash = null;
   renderAccountRail();
 }
 
@@ -3988,7 +4106,7 @@ function syncAccountThemeSeg() {
 
 // ---- buka / tutup halaman akun ----
 function setRailPage(page) {
-  [["btnRailProjects", "projects"], ["btnRailAccount", "account"]].forEach(([id, p]) => {
+  [["btnRailProjects", "projects"], ["btnRailAccount", "account"], ["btnQuickCloud", "cloud"]].forEach(([id, p]) => {
     const b = el(id);
     b.classList.toggle("is-active", p === page);
     if (p === page) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
@@ -4157,8 +4275,8 @@ function initAccount() {
   syncAccountThemeSeg();
   renderAccountRail();
 
-  el("btnRailProjects").onclick = () => closeAccountView();
-  el("btnRailAccount").onclick = () => openAccountView();
+  el("btnRailProjects").onclick = () => { closeAccountView(); closeCloudLibrary(); };
+  el("btnRailAccount").onclick = () => { closeCloudLibrary(); openAccountView(); };
   el("menuAccountSettings").onclick = () => openAccountView();
   el("menuHelp").onclick = () => el("supportModal").classList.remove("hidden");
   el("btnSideAccount").onclick = () => { backToLibrary(); openAccountView(); };
@@ -5313,20 +5431,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // ---- Cloud Library (manual send/receive, terpisah dari autosave) ----
   el("btnCloudBack").onclick = closeCloudLibrary;
-  el("btnCloudMenu").onclick = (e) => {
-    e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const menu = el("cloudMenu");
-    menu.style.top = rect.bottom + 6 + "px"; menu.style.right = (window.innerWidth - rect.right) + "px"; menu.style.left = "auto";
-    menu.classList.remove("hidden");
-  };
-  el("menuCloudRefresh").onclick = () => {
-    closeAllDropdowns();
-    let activeTab = "send";
-    if (el("tabReceiveFromCloud").classList.contains("active")) activeTab = "receive";
-    else if (el("tabTrash").classList.contains("active")) activeTab = "trash";
-    switchCloudTab(activeTab);
-  };
+  el("btnCloudRefresh").onclick = refreshCloudLibrary;
+  el("btnCloudSendAll").onclick = sendAllToCloud;
   el("tabSendToCloud").onclick = () => switchCloudTab("send");
   el("tabReceiveFromCloud").onclick = () => switchCloudTab("receive");
   el("tabTrash").onclick = () => switchCloudTab("trash");
