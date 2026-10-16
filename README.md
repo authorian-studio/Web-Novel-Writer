@@ -1,6 +1,18 @@
-# Novelist Web — v0.13.0
+# Novelist Web — v0.13.1
 
-## Riwayat perubahan terbaru (v0.13.0) — paling baru di atas
+## Riwayat perubahan terbaru (v0.13.1) — paling baru di atas
+
+**Kursor kustom** (`cursor.js`, CSS "KURSOR KUSTOM" di `style.css`).
+- **Kursor khas Novelist (bawaan):** mata pena kecil warna krem bergaris gelap dengan titik emas; di atas tombol,
+  tautan, menu & kartu yang bisa diklik berubah jadi pena emas. Lingkar tipis terang membuatnya tetap terlihat di tema
+  gelap maupun terang. Kolom ketik & editor tetap memakai kursor teks (I-beam); seret/geser/ubah ukuran tetap kursor
+  sistem. Hanya untuk mouse/trackpad — layar sentuh tidak terpengaruh. Murni CSS (tanpa JS yang mengikuti mouse),
+  jadi tidak ada jeda.
+- **Pengaturan Akun → Kursor:** *Novelist* · *Sistem* (kursor bawaan OS) · *Kustom* — unggah atau seret gambar sendiri
+  (PNG transparan paling bagus, maks. 5 MB), pilih ukuran 24/32/48 px dan titik tunjuk (ujung kiri atas / tengah).
+  Disimpan di perangkat (`localStorage "novelist_cursor"`) dan dipasang sebelum halaman tampil.
+
+### v0.13.0
 
 **English is now the default interface language; Bahasa Indonesia stays available** (`i18n.js`, `i18n-en.js`).
 - Pilih bahasa di **Pengaturan Akun → Language / Bahasa** (English · Indonesia) atau di menu bahasa halaman login;
