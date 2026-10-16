@@ -868,6 +868,7 @@
     isKind: (k) => !!K[k],
     kindName: (k) => (K[k] ? K[k].name : ""),
     render, renderList, renderDetail, sync, refresh, newEntry, find, findAny,
+    entries: (kind) => entries(kind), colorOf,   // dipakai kartu event Timeline ("Tautkan kartu")
     // HTML ringkas satu entri untuk ekspor Word
     exportHtml(item, kind) {
       const k = K[kind];

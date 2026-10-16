@@ -1724,6 +1724,7 @@ async function openTimelineTab() {
     onChange: markDirtyAndSchedule,
     getScenes: () => flattenScenes(getProject(currentProjectId).data.scenes),
     openScene: (id) => openSceneInWrite(id),
+    openDoc: (kind, id) => openProjectDoc(kind, id),   // kartu Kodeks yang ditautkan ke event
     onOpen: (id) => {   // TAB PROJECT: riwayat
       const t = (getProject(currentProjectId).data.timelines || []).find((x) => x && x.id === id);
       noteTabDoc("timeline", { doc: id, kind: "timeline", title: t ? t.title : "" });
@@ -1754,6 +1755,7 @@ async function openMapTab() {
     onChange: markDirtyAndSchedule,
     getScenes: () => flattenScenes(getProject(currentProjectId).data.scenes),
     openScene: (id) => openSceneInWrite(id),
+    openDoc: (kind, id) => openProjectDoc(kind, id),   // kartu Kodeks yang ditautkan ke event
     onOpen: (id) => {   // TAB PROJECT: riwayat
       const m = (getProject(currentProjectId).data.maps || []).find((x) => x && x.id === id);
       noteTabDoc("map", { doc: id, kind: "map", title: m ? m.title : "" });

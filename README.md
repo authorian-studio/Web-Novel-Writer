@@ -1,6 +1,22 @@
-# Novelist Web — v0.13.8
+# Novelist Web — v0.13.9
 
-## Riwayat perubahan terbaru (v0.13.8) — paling baru di atas
+## Riwayat perubahan terbaru (v0.13.9) — paling baru di atas
+
+**Timeline: kartu event muncul tepat di atas titiknya (ala vvd).** Klik garis waktu: event baru langsung dibuat dan
+kartu kecil muncul di atas titiknya, dengan garis penunjuk ke titik di garis dan judul yang sudah terpilih untuk
+langsung diketik. Klik event yang sudah ada membuka kartu yang sama.
+
+Semua isian bisa disunting langsung di kartu:
+- **Gambar** (klik atau seret file).
+- **Judul**.
+- **Tanggal**: klik tanggal untuk membuka isian tanggal, bulan, dan tahun.
+- **Deskripsi**.
+- **Tag** yang bisa dilipat: Enter untuk menambah, × untuk menghapus.
+- **Tautkan kartu**: cari dan pilih entri Kodeks (karakter, lokasi, dll.). Kartu yang tertaut tampil sebagai chip
+  berwarna; klik chip untuk membuka entrinya. Data disimpan di `event.cards`.
+
+Tombol 👁 membuka panel detail lengkap (scene terkait, warna), dan tombol tong sampah menghapus event. Kartu mengikuti
+geser/zoom kanvas, pindah ke bawah garis bila ruang di atas sempit, dan bisa digulir bila isinya panjang.
 
 **Ingat saya di halaman login.** Ada kotak centang **Ingat saya** di bawah tombol Google, tercentang secara bawaan.
 Bila dicentang, sesi Google (token akses ±1 jam yang otomatis diperpanjang, dan email akun) disimpan di perangkat ini:
