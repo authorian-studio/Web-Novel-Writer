@@ -244,3 +244,68 @@ body.light .kx { --kx-soft: rgba(0,0,0,.03); --kx-hover: rgba(0,0,0,.045); --kx-
   .kx-gallery { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 9px; }
   .kx-row-del { opacity: 1; }
 }
+
+/* ---------- lembar karakter (kodeks-sheet.js): bagian opsional di detail Karakter ---------- */
+.kx-sheet { display: flex; flex-direction: column; }
+.kx-sh h3 { justify-content: space-between; }
+.kx-sh-toggle { display: inline-flex; align-items: center; gap: 7px; padding: 0; border: none; background: none; cursor: pointer; color: var(--text-dim) !important; font: inherit; letter-spacing: inherit; text-transform: inherit; }
+.kx-sh-toggle:hover { color: var(--text) !important; }
+.kx-sh-toggle > .ti:first-child { color: var(--kc); }
+.kx-sh-toggle > .ti:last-child { transition: transform .2s ease; }
+.kx-sh.is-closed .kx-sh-toggle > .ti:last-child { transform: rotate(-90deg); }
+.kx-sh.is-closed .kx-sh-body { display: none; }
+.kx-sh-hide { opacity: 0; transition: opacity .15s; }
+.kx-sh h3:hover .kx-sh-hide, .kx-sh-hide:focus-visible { opacity: 1; }
+.kx-sh-sub { margin: 12px 0 8px; font-size: calc(12px * var(--fs-scale, 1)); font-weight: 650; color: var(--text); }
+.kx-sh-body > .kx-fields + .kx-fields:not(.is-areas) { margin-top: 8px; }
+.kx-sh .kx-fields.is-areas { margin-top: 8px; }
+.kx-field select { width: 100%; height: 38px; border-radius: 9px; border: 1px solid var(--glass-border); background: var(--kx-soft); color: var(--text); padding: 0 10px; font-size: calc(13.5px * var(--fs-scale, 1)); outline: none; }
+.kx-field select:focus { border-color: var(--kc); }
+.kx-sh select option { background: var(--bg-panel); color: var(--text); }
+/* kotak HP / stres / kemahiran / emas */
+.kx-pips-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: 10px 0; }
+.kx-pips-label { min-width: 84px; font-size: calc(12.5px * var(--fs-scale, 1)); font-weight: 650; color: var(--text); }
+.kx-pips { display: inline-flex; flex-wrap: wrap; gap: 5px; }
+.kx-pip { width: 22px; height: 16px; padding: 0; border-radius: 4px; border: 1.5px solid color-mix(in srgb, var(--text-dim) 70%, transparent); background: none; cursor: pointer; transition: background .12s, border-color .12s, transform .12s; }
+.kx-pip.is-round { width: 16px; border-radius: 50%; }
+.kx-pip.is-sm { width: 13px; height: 13px; }
+.kx-pip:hover { border-color: var(--kc); transform: scale(1.08); }
+.kx-pip.is-on { background: var(--kc); border-color: var(--kc); }
+.kx-pips-n { font-size: calc(12px * var(--fs-scale, 1)); font-variant-numeric: tabular-nums; color: var(--text-dim); }
+.kx-pip-max { display: inline-flex; gap: 2px; }
+.kx-pip-max .kx-icon-btn { width: 24px; height: 24px; background: var(--kx-soft); font-size: calc(14px * var(--fs-scale, 1)); font-weight: 700; }
+.kx-check { display: inline-flex; align-items: center; gap: 8px; margin: 6px 0 10px; font-size: calc(13px * var(--fs-scale, 1)); color: var(--text); cursor: pointer; }
+.kx-check input { width: 16px; height: 16px; accent-color: var(--kc); }
+/* meter emosi */
+.kx-meters { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 6px 22px; margin: 12px 0 4px; }
+.kx-meter { display: grid; grid-template-columns: minmax(110px, 1fr) 1.3fr 30px; align-items: center; gap: 10px; }
+.kx-meter-label { font-size: calc(12px * var(--fs-scale, 1)); color: var(--text-dim); font-weight: 600; }
+.kx-meter-v { font-size: calc(12px * var(--fs-scale, 1)); text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+.kx-meter input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 999px; outline: none; cursor: pointer;
+  background: linear-gradient(90deg, var(--kc) var(--v, 0%), var(--kx-on) var(--v, 0%)); }
+.kx-meter input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 2px solid var(--kc); box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+.kx-meter input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 2px solid var(--kc); }
+.kx-meter input[type="range"]:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--kc) 45%, transparent); }
+/* daftar berulang (pengalaman, inventaris, skill, hubungan, …) */
+.kx-sl { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 6px; }
+.kx-sl-row { display: grid; grid-template-columns: var(--cols); gap: 8px; align-items: center; }
+.kx-sl-row.is-head span { font-size: calc(11.5px * var(--fs-scale, 1)); font-weight: 600; color: var(--text-dim); }
+.kx-sl-row input, .kx-sl-row select { width: 100%; min-width: 0; height: 34px; border-radius: 8px; border: 1px solid var(--glass-border); background: var(--kx-soft); color: var(--text); padding: 0 9px; font-size: calc(13px * var(--fs-scale, 1)); outline: none; }
+.kx-sl-row input:focus, .kx-sl-row select:focus { border-color: var(--kc); }
+.kx-rate { display: inline-flex; gap: 4px; }
+.kx-sl-del:hover { color: var(--danger) !important; }
+.kx-sl-add { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 8px; border: 1px dashed var(--glass-border); background: none; color: var(--text-dim) !important; font-size: calc(12.5px * var(--fs-scale, 1)); font-weight: 600; cursor: pointer; }
+.kx-sl-add:hover { border-color: var(--kc); color: var(--text) !important; }
+/* chip "Tambah bagian" */
+.kx-sh-add { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 16px; padding: 12px; border-radius: 12px; border: 1px dashed var(--glass-border); }
+.kx-sh-add-label { display: inline-flex; align-items: center; gap: 6px; margin-right: 4px; font-size: calc(12px * var(--fs-scale, 1)); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+.kx-sh-add-label .ti { color: var(--kc); }
+.kx-sh-chip { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--glass-border); background: var(--kx-soft); color: var(--text) !important; font-size: calc(12px * var(--fs-scale, 1)); font-weight: 500; cursor: pointer; transition: border-color .15s, background .15s; }
+.kx-sh-chip .ti { color: var(--kc); }
+.kx-sh-chip:hover { border-color: var(--kc); background: color-mix(in srgb, var(--kc) 12%, transparent); }
+.kx-sh-chip.is-all { border-style: dashed; }
+@media (max-width: 700px) {
+  .kx-sl-row { grid-template-columns: 1fr 1fr 28px; }
+  .kx-sl-row.is-head { display: none; }
+  .kx-meter { grid-template-columns: 100px 1fr 28px; }
+}

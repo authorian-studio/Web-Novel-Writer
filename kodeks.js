@@ -234,7 +234,7 @@
   function matchesQ(kind, it, q) {
     if (!q) return true;
     const f = fieldsOf(it);
-    const hay = [it.title, it.aliases, folderOf(it), tagsOf(it).join(" "), Object.keys(f).map((k) => f[k]).join(" "), plainOf(it, "content")].map(norm).join(" \u0001 ");
+    const hay = [it.title, it.aliases, folderOf(it), tagsOf(it).join(" "), Object.keys(f).map((k) => f[k]).join(" "), plainOf(it, "content"), kind === "characters" && window.KodeksSheet ? window.KodeksSheet.text(it) : ""].map(norm).join(" \u0001 ");
     return q.split(" ").every((w) => hay.includes(w));
   }
   function visible(kind) {
@@ -723,6 +723,7 @@
         <div class="kx-fields">${k.f.filter((d) => d[2] === "t").map(fieldHtml).join("")}</div>
         <div class="kx-fields is-areas">${k.f.filter((d) => d[2] === "a").map(fieldHtml).join("")}</div>
       </section>
+      ${kind === "characters" && window.KodeksSheet ? window.KodeksSheet.html(it) : ""}
       <section class="kx-d-sec">
         <h3>${ic("file-text", 15)}${kind === "notes" ? "Isi catatan" : "Deskripsi & catatan"}</h3>
         <div class="kx-editor organize-editor" contenteditable="true" spellcheck="false" data-placeholder="Tulis bebas di sini…">${it.content || ""}</div>
@@ -737,6 +738,7 @@
     KINDS.forEach((kk) => entries(kk.id).forEach((x) => tagsOf(x).forEach((t) => allTags.add(t))));
     box.querySelector("#kxTagList").innerHTML = Array.from(allTags).filter((t) => !tagsOf(it).includes(t)).map((t) => `<option value="${esc(t)}">`).join("");
     bindDetail(box, kind, it);
+    if (kind === "characters" && window.KodeksSheet) window.KodeksSheet.bind(box, it, () => { markDirtyAndSchedule(); softList(); });   // lembar karakter (kodeks-sheet.js)
     renderMentions(p, it);
     box.querySelectorAll("textarea").forEach(autoGrow);
     if (typeof noteTabDoc === "function") noteTabDoc("organize", { doc: it.id, kind, title: it.title });   // TAB PROJECT: riwayat
@@ -846,7 +848,7 @@
       if (!k || !isObj(item)) return "";
       const f = fieldsOf(item), rowsH = k.f.filter((d) => String(f[d[0]] || "").trim()).map((d) => `<p style="margin:2px 0;"><b>${esc(d[1])}:</b> ${esc(f[d[0]]).replace(/\n/g, "<br>")}</p>`).join("");
       const meta = [item.aliases ? "Nama lain: " + esc(item.aliases) : "", folderOf(item) ? "Folder: " + esc(folderOf(item)) : "", tagsOf(item).length ? "Tag: " + tagsOf(item).map(esc).join(", ") : ""].filter(Boolean).join(" · ");
-      return (meta ? `<p style="color:#666;font-size:12px;">${meta}</p>` : "") + rowsH;
+      return (meta ? `<p style="color:#666;font-size:12px;">${meta}</p>` : "") + rowsH + (kind === "characters" && window.KodeksSheet ? window.KodeksSheet.exportHtml(item) : "");
     },
   };
 })();
