@@ -650,11 +650,12 @@ body.light .proj-side-project.is-current { background: rgba(0,0,0,.07); }
 .proj-clock { font-size: calc(12.5px * var(--fs-scale, 1)); font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; padding: 0 6px; text-shadow: 0 1px 8px rgba(0,0,0,.5); }
 body.light .proj-clock { text-shadow: none; }
 
-.proj-float-tools { position: absolute; z-index: 4; right: 14px; top: 64px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px; border-radius: 14px; background: var(--glass); border: 1px solid var(--glass-border); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-.proj-float-btn { width: 36px; height: 36px; border: none; border-radius: 10px; background: transparent; color: var(--text-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .2s ease, color .2s ease; }
+/* preview manuskrip & ganti tema: pil kecil di bar atas, tepat di kiri jam (tidak lagi melayang di tepi kanan isi tab) */
+.proj-float-tools { display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 11px; background: var(--glass); border: 1px solid var(--glass-border); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.proj-float-btn { width: 30px; height: 30px; border: none; border-radius: 9px; background: transparent; color: var(--text-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .2s ease, color .2s ease; }
 .proj-float-btn:hover { background: rgba(255,255,255,.09); color: var(--text); }
 body.light .proj-float-btn:hover { background: rgba(0,0,0,.06); }
-.proj-float-sep { width: 20px; height: 1px; background: var(--glass-border); }
+.proj-float-sep { width: 1px; height: 16px; background: var(--glass-border); }
 /* status simpan: teks kecil di pojok kanan bawah (seperti "Charting your world..." di vvd) */
 .save-status { position: absolute; z-index: 4; right: 18px; bottom: 12px; font-size: calc(11.5px * var(--fs-scale, 1)); color: var(--text-dim); white-space: nowrap; pointer-events: none; }
 /* status yang perlu tindakan ("Perlu login ulang", "Gagal sinkron — coba lagi"): pil merah yang bisa diklik, di atas kanvas */
@@ -680,8 +681,7 @@ body.light .save-status.is-action { box-shadow: 0 6px 18px rgba(0,0,0,.1); }
 #editorView[data-tab="home"] #projectTopbar > * { pointer-events: auto; }
 #editorView[data-tab="home"] .tab-sidebar { position: absolute; top: 52px; bottom: 0; left: 0; pointer-events: none; }
 #editorView[data-tab="home"] .tsb-panel { pointer-events: auto; }
-#editorView[data-tab="home"] .proj-float-tools { display: none; }
-#editorView[data-tab="timeline"] .proj-float-tools { display: none; }   /* Timeline: kanvas memakai seluruh lebar (tema di Pengaturan / menu project) */   /* preview di tepi kanan kanvas, tema di menu "…" kanvas */
+#editorView[data-tab="home"] .proj-float-tools { display: none; }   /* Beranda: bilah kanvas sendiri (menu "…" berisi preview & tema) menempati sisi kiri jam */
 #homeCanvas > .home-loading { inset: 0; border: none; border-radius: 0; }
 @media (max-width: 700px) { #editorView[data-tab="home"] .tab-sidebar { bottom: 58px; } }
 .home-loading .ti { animation: homeSpin 1s linear infinite; }
@@ -942,7 +942,7 @@ body.light .tl-ghost-tip { background: #fff; }
 .tl-date input:disabled { opacity: .4; }
 
 /* --- Map (world-building ala vvd): sidebar daftar peta + kanvas 2D/3D, layer, skala, toolbar alat & popover bioma --- */
-#tabMap { padding: 4px 70px 16px 12px; gap: 12px; }
+#tabMap { padding: 4px 12px 16px 12px; gap: 12px; }
 .mp-side { width: 236px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; padding: 10px; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 16px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); overflow: hidden; }
 .mp-side-top { display: flex; align-items: center; gap: 6px; }
 .mp-search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px; border-radius: 9px; background: rgba(255,255,255,.05); border: 1px solid var(--glass-border); color: var(--text-dim); }
@@ -1190,7 +1190,7 @@ body.light .mp-btn:hover:not(:disabled) { background: rgba(0,0,0,.08); }
 }
 
 /* --- Write / Organize: kolom & editor jadi panel kaca di atas background --- */
-#tabWrite, #tabOrganize { padding: 4px 70px 16px 12px; gap: 12px; }
+#tabWrite, #tabOrganize { padding: 4px 12px 16px 12px; gap: 12px; }
 .scenes-col { width: 300px; flex-shrink: 0; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 16px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); display: flex; flex-direction: column; overflow: hidden; }
 .scenes-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 8px; font-size: calc(11.5px * var(--fs-scale, 1)); letter-spacing: .08em; color: var(--text-dim); font-weight: 700; }
 .scenes-header-actions { display: flex; gap: 4px; }
@@ -2167,11 +2167,8 @@ body.light .acc-range::-moz-range-thumb { box-shadow: 0 0 0 1px rgba(0,0,0,.18),
   .mp-item { width: auto; max-width: 70%; padding: 7px 11px; }
   .mp-empty { margin: 4px 6px; }
   .mp-head { padding: 4px 6px 4px 12px; }
-  #editorView[data-tab="map"] .proj-float-tools { display: none; }   /* tombol mengambang menutupi toolbar peta */
   .scenes-col { width: 100%; height: 42%; flex-shrink: 0; }
-  .proj-float-tools { top: auto; bottom: 70px; right: 10px; flex-direction: row; }
-  .proj-float-sep { width: 1px; height: 20px; }
-  .save-status { top: 18px; bottom: auto; right: 64px; }
+  .save-status { top: 18px; bottom: auto; }
   .proj-clock { display: none; }
   /* dashboard: rail pindah jadi bar bawah */
   .dash-rail { top: auto; width: 100%; height: 56px; flex-direction: row; padding: 0 18px; background: rgba(10,10,12,.88); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid var(--border); }
@@ -2264,9 +2261,9 @@ body.perf-boost .login-art-drop { background: #111; }
 /* --- tata letak yang harus tetap muat saat teks diperbesar (sampai 120%) / font disleksia yang lebih lebar --- */
 @media (max-width: 700px) {
   /* bar atas project: chip judul tidak boleh menabrak status simpan di kanan (judul panjang menggulir di dalam input) */
-  .proj-chip { min-width: 0; max-width: calc(100vw - 122px - 34vw); }   /* 122 px = logo + tombol sidebar tab + jarak */
+  .proj-chip { min-width: 0; max-width: calc(100vw - 122px - 80px - 26vw); }   /* 122 px = logo + tombol sidebar tab + jarak; 80 px = pil preview & tema */
   #projectTitle { min-width: 0; flex: 0 1 auto; }
-  .save-status { right: 14px; max-width: 34vw; overflow: hidden; }
+  .save-status { right: 92px; max-width: 26vw; overflow: hidden; }
 }
 /* judul project: lebar input dihitung app.js dalam satuan ch (cocok untuk Inter); OpenDyslexic lebih lebar -> ikuti isi */
 @supports (field-sizing: content) {
