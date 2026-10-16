@@ -1,6 +1,13 @@
-# Novelist Web — v0.14.0
+# Novelist Web — v0.14.1
 
-## Riwayat perubahan terbaru (v0.14.0) — paling baru di atas
+## Riwayat perubahan terbaru (v0.14.1) — paling baru di atas
+
+**Tombol preview & tema pindah ke bar atas.** Tombol 👁 (Preview manuskrip) dan 🌙 (ganti tema) tidak lagi melayang di
+tepi kanan isi tab. Sekarang keduanya menjadi pil kecil di bar atas, tepat di kiri jam, di semua tab project kecuali
+Beranda (yang punya menu "…" sendiri). Timeline pun kini punya kedua tombol ini.
+
+Ruang kosong ±58 px yang dulu disisakan untuk tombol mengambang dikembalikan, sehingga Tulis, Kodeks, dan Peta memakai
+lebar penuh. Di HP, status simpan bergeser ke kiri pil supaya tidak bertumpuk.
 
 **Timeline: warna event bebas dengan pemilih warna modern, dan pencarian tanggal/tahun.**
 

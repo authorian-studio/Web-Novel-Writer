@@ -48,10 +48,7 @@ body.light .jj-panel {
 .jj-panel input, .jj-panel textarea { -webkit-user-select: text; user-select: text; }
 .jj-panel button:focus-visible, .jj-panel input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-/* tombol mengambang project (preview & tema) di tepi kanan, di bawah kepala; status simpan di pojok kanan bawah */
-#editorView[data-tab="jejaring"] .proj-float-tools { top: 104px; right: 22px; gap: 2px; padding: 4px; border-radius: 12px; }
-#editorView[data-tab="jejaring"] .proj-float-btn { width: 30px; height: 30px; border-radius: 8px; }
-#editorView[data-tab="jejaring"] .proj-float-sep { width: 16px; }
+/* status simpan di pojok kanan bawah (tombol preview & tema ada di bar atas, di kiri jam) */
 #editorView[data-tab="jejaring"].jj-maxed .proj-float-tools { display: none; }
 @media (min-width: 701px) { #editorView[data-tab="jejaring"] .save-status { right: 28px; bottom: 22px; } }
 
