@@ -1,6 +1,30 @@
-# Novelist Web — v0.12.3
+# Novelist Web — v0.12.4
 
-## Riwayat perubahan terbaru (v0.12.3) — paling baru di atas
+## Riwayat perubahan terbaru (v0.12.4) — paling baru di atas
+
+**Kodeks › Karakter: lembar karakter lengkap** (`kodeks-sheet.js`, gaya di `kodeks.css`). Tampilan Kodeks tetap; di bawah
+"Templat Karakter" kini ada bagian tambahan yang bisa dipilih lewat chip **Tambah bagian** (atau **Tampilkan semua**).
+Tiap bagian bisa dilipat atau disembunyikan (isinya tetap tersimpan & muncul lagi saat ditambahkan).
+- **Profil & identitas** — kata ganti, keturunan & komunitas, tanggal lahir, zodiak, kebangsaan, bahasa, kepercayaan,
+  status (hidup/meninggal/hilang…), lokasi sekarang, muncul pertama, face claim.
+- **Fisik detail** — tinggi, berat, postur, rambut, mata, kulit, tanda khusus, gaya pakaian, suara, gerak-gerik.
+- **Kerusakan & kesehatan** — ambang luka ringan/berat/parah, kotak **HP** & **Stres** yang bisa diklik (jumlah kotak
+  1–12), kondisi/luka saat ini, riwayat kesehatan.
+- **Senjata aktif** — kemahiran (6 titik), senjata utama & cadangan (nama, atribut & jangkauan, dadu & jenis kerusakan,
+  fitur). **Armor aktif** — nama, ambang dasar, skor dasar, fitur.
+- **Pengalaman** (daftar + bonus), **Emas & kekayaan** (genggam, kantong, peti, aset lain), **Fitur & kemampuan**
+  (fitur kelas/bawaan + daftar kemampuan), **Inventaris** (barang + senjata di inventaris dengan slot utama/cadangan).
+- **Skill & keahlian** (daftar skill dengan tingkat 1–5), **Emosi & kondisi mental** (emosi dominan & tersembunyi,
+  11 meter 0–100: kebahagiaan, kesedihan, amarah, ketakutan, kecemasan, kepercayaan, percaya diri, empati, kestabilan
+  mental, semangat, tekanan batin; pemicu emosi, cara menenangkan diri, trauma, cara menunjukkan perasaan).
+- **Kepribadian mendalam** (MBTI, Enneagram, alignment, temperamen, sifat positif/negatif, ketakutan, keinginan,
+  rahasia, kebohongan yang dipercaya, kebiasaan, hobi, suka/tidak suka, prinsip, kutipan khas), **Hubungan** (tokoh,
+  hubungan, sikap, catatan), **Arc karakter** (want/need, awal, titik balik, akhir, tema), **Riwayat hidup**.
+- Isi lembar ikut **dicari** di Kodeks dan ikut **ekspor Word**. Data: `item.sheet = { on: [bagian…], <bagian>: {…} }`
+  — entri lama tanpa `sheet` tetap seperti biasa.
+- Tidak ditambahkan (sesuai permintaan): kelas & subkelas, level, evasion/armor + enam atribut, dan Hope.
+
+### v0.12.3
 
 **Perbaikan Tree Relations (garis & label):**
 - Dua kartu yang hampir segaris (selisih beberapa px) kini disambung garis **lurus**, bukan belokan mini bersudut bulat
