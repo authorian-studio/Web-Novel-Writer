@@ -1,6 +1,12 @@
-# Novelist Web — v0.13.4
+# Novelist Web — v0.13.5
 
-## Riwayat perubahan terbaru (v0.13.4) — paling baru di atas
+## Riwayat perubahan terbaru (v0.13.5) — paling baru di atas
+
+**Tree Relations: seret "+" ke kartu lain kini selalu tersambung.** Sebelumnya, kalau garis dilepas di dekat tepi
+kartu atau di atas label nama, menu relasi terbuka lalu langsung tertutup lagi. Penyebabnya klik kanvas yang
+menyusul `mouseup`, jadi garis tidak pernah dibuat. Hal yang sama juga membuat "lepas di area kosong → kartu baru"
+gagal. Sekarang klik susulan itu diabaikan. Selain itu, melepas di atas label nama atau dalam ±26 px dari tepi kartu
+otomatis tersambung ke kartu tersebut.
 
 **Cloud Library tampil baru.** Sekarang jadi halaman di dalam dashboard seperti Pengaturan Akun: background foto,
 dot-grid, rail & logo tetap, dan tombol Cloud di rail menyala selama terbuka. Isinya:
