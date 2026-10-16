@@ -1,6 +1,17 @@
-# Novelist Web — v0.13.6
+# Novelist Web — v0.13.7
 
-## Riwayat perubahan terbaru (v0.13.6) — paling baru di atas
+## Riwayat perubahan terbaru (v0.13.7) — paling baru di atas
+
+**Pohon peta jadi gambar ilustrasi 2D, dan di 3D selalu menghadap kamera.** Semua pohon kini digambar langsung sebagai
+ilustrasi datar: isi rata dengan bayang & sorot sederhana, plus garis tinta tegas, seperti vvd. Jenisnya pinus, pinus
+muda, pinus bersalju, pohon rindang, pohon rindang muda, palem, dan rumpun alang-alang, masing-masing 4 varian bentuk.
+Gambarnya berasal dari satu sumber, `map-trees.js`:
+- **2D** memakai gambar itu sebagai sprite per ukuran zoom. Sebelumnya sprite dirender dari model 3D kecil.
+- **3D** memasang gambar yang sama pada papan (billboard) dari satu atlas tekstur. Shader memutar tiap papan
+  supaya selalu menghadap kamera, jadi dari arah mana pun pohon terlihat utuh sambil kamera diputar. Dari atas,
+  papan sedikit condong ke kamera.
+- Bayangan pohon di 3D adalah siluet gambarnya.
+- Model pohon 3D dan garis tepi cangkangnya dihapus, sehingga geometri jauh lebih ringan: 4 titik per pohon.
 
 **Peta (Map) tampil ala ilustrasi seperti vvd, dan 3D jauh lebih ringan.**
 - **Gunung** tidak lagi berupa puluhan puncak kerucut berduri. Sekarang menjadi bukit batu abu-abu yang membulat:

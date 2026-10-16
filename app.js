@@ -1640,12 +1640,12 @@ async function openTimelineTab() {
   consumeTabPendingDoc("timeline");   // dibuka dari riwayat
 }
 
-// ---- MAP: map-core.js (data) + map2d.js (editor 2D) + map-ui.js (shell) baru dimuat saat tab ini pertama kali dibuka.
+// ---- MAP: map-core.js (data) + map-trees.js (gambar pohon 2D) + map2d.js (editor 2D) + map-ui.js (shell) baru dimuat saat tab ini pertama kali dibuka.
 // map3d.js + three.js (vendor/) di-import oleh map-ui.js hanya saat pengguna beralih ke tampilan 3D.
 let mapLibPromise = null;
 function ensureMapLib() {
   if (!mapLibPromise) {
-    mapLibPromise = ["map-core.js", "map2d.js", "map-ui.js"]
+    mapLibPromise = ["map-core.js", "map-trees.js", "map2d.js", "map-ui.js"]
       .reduce((chain, src) => chain.then(() => loadScriptOnce(src)), Promise.resolve());
     mapLibPromise.catch(() => { mapLibPromise = null; });   // boleh dicoba lagi
   }

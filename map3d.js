@@ -2,8 +2,8 @@
 // Di-import dinamis oleh map-ui.js (import('./map3d.js')) saat pengguna pertama kali beralih ke tampilan 3D.
 // Membangun "slab" peta dari data NovelMapCore: permukaan medan (grid 2 vertex/sel + tekstur 8 px/sel bergaya 2D,
 // dipertajam & diberi detail halus di shader saat dekat; tebing batu berlapis menurut tinggi), dinding sisi berlapis tanah,
-// air transparan (garis tinta pantai, buih putih, cincin air dangkal), pohon bergaya ilustrasi (InstancedMesh toon + garis
-// tepi cangkang terbalik; gunung = bukit batu membulat dari medan, tanpa puncak kerucut), sungai/jalan/wilayah yang menempel medan, label peta (decal menempel medan) & pin
+// air transparan (garis tinta pantai, buih putih, cincin air dangkal), pohon = papan bergambar ilustrasi 2D (map-trees.js,
+// InstancedMesh; shader memutar tiap papan menghadap kamera), gunung = bukit batu membulat dari medan, sungai/jalan/wilayah yang menempel medan, label peta (decal menempel medan) & pin
 // tempat (Sprite; nama dirapikan agar tidak bertumpuk). Render hanya saat perlu: setelah ±2.5 dtk tanpa interaksi tidak ada
 // frame sama sekali (air berhenti beriak) supaya tidak membebani GPU; devicePixelRatio dibatasi MAX_PR.
 // Garis pantai & pola bioma memakai rumus yang sama dengan map2d.js supaya tampilan 2D dan 3D cocok.
@@ -42,7 +42,6 @@ const FIT_Y = 0.8;            // porsi tinggi layar (NDC) maksimum yang diisi sl
 const IDLE_MS = 66;           // sesaat setelah interaksi, air tetap beriak ±15 fps…
 const IDLE_STOP = 2500;       // …lalu berhenti total (tidak ada render saat diam -> GPU/baterai hemat, tidak lag)
 const MAX_PR = 1.5;           // batas devicePixelRatio kanvas 3D (layar 2x/3x tetap tajam, beban piksel jauh lebih ringan)
-const INK_W = 0.06, INK_PX = 1.1;   // tebal garis tepi pohon: unit dunia (dekat) / px layar (jauh)
 const CREAM = "#f7f1e1", INK = "#2b2118", ACCENT = "#d7a86e";
 const SERIF = 'Georgia, "Times New Roman", serif';
 const SANS = 'Inter, -apple-system, "Segoe UI", sans-serif';
@@ -859,6 +858,7 @@ export function createMap3D(container, opts) {
       kind, mix: b.tree === "broad" && pale, z: dense ? (b.tree === "broad" ? 1.6 : 1.3) : b.tree === "reed" ? 1 : 1.55 };   // z = pengali ukuran pohon (jarang = pohon besar)
   });
   // skala pohon [dasar, variasi] (tinggi pinus skala 1 ±1.7 sel)
+  const TREE_VARS = window.NovelMapTrees ? window.NovelMapTrees.VARIANTS : 4;
   const TREE_SIZE = { pine: [1.06, 0.4], pineLight: [0.95, 0.32], snowPine: [1, 0.32], broad: [1.02, 0.34], broadLight: [0.95, 0.3], palm: [1.04, 0.32], reed: [0.95, 0.55] };
   function buildTrees(t) {
     clearGroup(G.trees);
@@ -885,7 +885,7 @@ export function createMap3D(container, opts) {
     for (let i = 0; i < n * n; i++) used[bio[i]] = 1;
     const spacings = [];
     treeCfg.forEach((c, i) => { if (c && used[i] && !spacings.includes(c.s)) spacings.push(c.s); });
-    const CN = Math.ceil(n / TREE_CHUNK), buckets = new Map();   // "jenis|potongan" -> [x, y, z, skala, sudut, skalaY, r, g, b, ...]
+    const CN = Math.ceil(n / TREE_CHUNK), buckets = new Map();   // "jenis|potongan" -> [x, y, z, skala, -, skalaY, r, g, b, varian, ...]
     spacings.forEach((sp) => {
       const GN = Math.ceil(n / sp), sd = seed + 911 + Math.round(sp * 100) * 7919;   // per jarak grid (stabil saat bioma lain ditambah)
       for (let gy = 0; gy < GN; gy++) for (let gx = 0; gx < GN; gx++) {
@@ -903,32 +903,38 @@ export function createMap3D(container, opts) {
         const key = kind + "|" + (((y / TREE_CHUNK) | 0) * CN + ((x / TREE_CHUNK) | 0));
         let arr = buckets.get(key);
         if (!arr) buckets.set(key, (arr = []));
-        const sz = TREE_SIZE[kind], k = 0.86 + r2 * 0.24, tint = (r3 - 0.5) * 0.16;
-        arr.push(x - half, h - 0.06, y - half, (sz[0] + sz[1] * r1) * cfg.z, r2 * TAU * 3.1, 0.9 + r3 * 0.24, k * (1 + tint), k, k * (1 - tint * 1.3));
+        const sz = TREE_SIZE[kind], k = 0.86 + r2 * 0.24, tint = (r3 - 0.5) * 0.16, vr = (((r2 * 3.1) % 1) * TREE_VARS) | 0;   // varian = 2D
+        arr.push(x - half, h - 0.06, y - half, (sz[0] + sz[1] * r1) * cfg.z, 0, 0.9 + r3 * 0.24, k * (1 + tint), k, k * (1 - tint * 1.3), vr);
       }
     });
     buckets.forEach((arr, key) => {
-      const tk = shared.trees[key.slice(0, key.indexOf("|"))], count = arr.length / 9;
-      const mesh = new THREE.InstancedMesh(tk.body, shared.treeMat, count), M = mesh.instanceMatrix.array;
-      const col = new Float32Array(count * 3);
+      const count = arr.length / 10, mesh = treeMesh(key.slice(0, key.indexOf("|")), count), M = mesh.instanceMatrix.array;
+      const col = new Float32Array(count * 3), cell = mesh.geometry.getAttribute("aCell").array, row = mesh.userData.row;
       for (let j = 0; j < count; j++) {
-        const o = j * 9, sc = arr[o + 3], a = arr[o + 4], c = Math.cos(a) * sc, sn = Math.sin(a) * sc, m = j * 16;
-        // putar sumbu Y + skala (tajuk sedikit lebih tinggi/pendek), langsung ke matriks kolom
-        M[m] = c; M[m + 1] = 0; M[m + 2] = -sn; M[m + 3] = 0;
+        const o = j * 10, sc = arr[o + 3], m = j * 16;
+        // papan menghadap kamera dihitung di shader; matriks instance hanya posisi kaki + skala (lebar, tinggi)
+        M[m] = sc; M[m + 1] = 0; M[m + 2] = 0; M[m + 3] = 0;
         M[m + 4] = 0; M[m + 5] = sc * arr[o + 5]; M[m + 6] = 0; M[m + 7] = 0;
-        M[m + 8] = sn; M[m + 9] = 0; M[m + 10] = c; M[m + 11] = 0;
+        M[m + 8] = 0; M[m + 9] = 0; M[m + 10] = sc; M[m + 11] = 0;
         M[m + 12] = arr[o]; M[m + 13] = arr[o + 1]; M[m + 14] = arr[o + 2]; M[m + 15] = 1;
         col[j * 3] = arr[o + 6]; col[j * 3 + 1] = arr[o + 7]; col[j * 3 + 2] = arr[o + 8];
+        cell[j * 2] = arr[o + 9]; cell[j * 2 + 1] = row;
       }
       mesh.instanceColor = new THREE.InstancedBufferAttribute(col, 3);
-      mesh.castShadow = true;   // bayangan jatuh ke tanah; tajuk tidak menerima bayangan (warna rata seperti ilustrasi)
+      mesh.computeBoundingSphere();
       G.trees.add(mesh);
-      if (tk.ink) {   // garis tepi: matriks instance dipakai bersama
-        const ink = new THREE.InstancedMesh(tk.ink, shared.inkMat, 0);
-        ink.instanceMatrix = mesh.instanceMatrix; ink.count = count;
-        G.trees.add(ink);
-      }
     });
+  }
+  // InstancedMesh papan pohon jenis `kind` (geometri sendiri: atribut sel atlas per instance)
+  function treeMesh(kind, count) {
+    const T = shared.trees[kind], geo = T.geo.clone();
+    geo.setAttribute("aCell", new THREE.InstancedBufferAttribute(new Float32Array(count * 2), 2));
+    const mesh = new THREE.InstancedMesh(geo, shared.treeMat, count);
+    mesh.customDepthMaterial = shared.treeDepthMat;   // bayangan = siluet gambar pohon
+    mesh.castShadow = true;
+    mesh.userData.row = T.row;
+    mesh.userData.ownGeo = true;
+    return mesh;
   }
 
   // ---------- pita yang menempel medan (sungai, jalan, batas wilayah) ----------
@@ -1091,7 +1097,6 @@ export function createMap3D(container, opts) {
   function updatePinScale() {
     if (!height) return;
     const px = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / height, k = px * pinK();
-    shared.inkUniform.value.set(INK_W, px * INK_PX);   // garis tepi pohon minimal ±1 px saat jauh
     G.places.children.forEach((sp) => sp.scale.set(sp.userData.pw * k, sp.userData.ph * k, 1));
     layoutDirty = true;
   }
@@ -1348,13 +1353,12 @@ export function createMap3D(container, opts) {
       warm = 1; warmT = now;
       warmG = new THREE.Group();
       const m4 = new THREE.Matrix4().makeScale(1e-4, 1e-4, 1e-4).setPosition(0, BASE_Y - 4, 0);   // di bawah slab
-      [[shared.trees.pine.body, shared.treeMat], [shared.trees.pine.ink, shared.inkMat], [shared.peaks.rock.ink, shared.inkRockMat]].forEach(([geo, mat], i) => {
-        const im = new THREE.InstancedMesh(geo, mat, 1);
-        im.setMatrixAt(0, m4);
-        if (!i) { im.setColorAt(0, new THREE.Color(1, 1, 1)); im.castShadow = true; }
+      {   // papan pohon (+ materi bayangannya) dikompilasi lebih dulu
+        const im = treeMesh("pine", 1);
+        im.setMatrixAt(0, m4); im.setColorAt(0, new THREE.Color(1, 1, 1));
         im.frustumCulled = false;
         warmG.add(im);
-      });
+      }
       scene.add(warmG);
       const done = () => { if (warm === 1) { warm = 2; needsRender = true; renderer.shadowMap.needsUpdate = true; } };
       try { renderer.compileAsync(scene, camera).then(done, done); } catch (e) { done(); }
@@ -1390,7 +1394,7 @@ export function createMap3D(container, opts) {
     renderer.render(scene, camera);
     lastRender = now; needsRender = false;
     if (warmCur) cursorG.visible = false;
-    if (warmG) { scene.remove(warmG); warmG.children.forEach((o) => o.dispose()); warmG = null; }   // bayangan sudah digambar
+    if (warmG) { scene.remove(warmG); warmG.children.forEach((o) => { o.dispose(); o.geometry.dispose(); }); warmG = null; }   // bayangan sudah digambar
   }
   function setActive(on) {
     if (disposed) return;
@@ -1754,7 +1758,7 @@ export function createMap3D(container, opts) {
     for (let i = g.children.length - 1; i >= 0; i--) {
       const o = g.children[i];
       g.remove(o);
-      if (o.isInstancedMesh) o.dispose();                        // geometri/material pohon & gunung dipakai bersama
+      if (o.isInstancedMesh) { o.dispose(); if (o.userData.ownGeo) o.geometry.dispose(); }   // material pohon dipakai bersama
       else if (o.isSprite) { if (o.material) o.material.dispose(); }   // tekstur ada di spriteCache
       else {
         if (o.geometry) o.geometry.dispose();
@@ -1976,28 +1980,43 @@ function makeShared(maxAniso, hash2) {
   const skirtMat = keep(new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(FLOOR_DEEP[0] * 0.78, FLOOR_DEEP[1] * 0.82, FLOOR_DEEP[2] * 0.85), side: THREE.BackSide }));
   const bottomMat = keep(new THREE.MeshStandardMaterial({ color: 0x46321f, roughness: 1, metalness: 0 }));
   const dropMat = keep(new THREE.MeshBasicMaterial({ map: drop, transparent: true, depthWrite: false }));
-  // pohon: toon 4 tingkat (gaya ilustrasi) + garis tepi tinta (cangkang terbalik). Tebal garis = maks(tebal dunia, ±1 px)
-  const toonRamp = keep(new THREE.DataTexture(new Uint8Array([96, 96, 104, 136, 212, 255, 255, 255]), 8, 1, THREE.RedFormat));
-  toonRamp.minFilter = toonRamp.magFilter = THREE.NearestFilter; toonRamp.generateMipmaps = false; toonRamp.needsUpdate = true;
-  const treeMat = keep(new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonRamp }));
-  const inkUniform = { value: new THREE.Vector2(0.04, 0.002) };
-  const inkMat = keep(new THREE.MeshBasicMaterial({ color: 0x1f3520, side: THREE.BackSide }));
-  inkMat.onBeforeCompile = (sh) => {
-    sh.uniforms.uInk = inkUniform;
-    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nuniform vec2 uInk;")
-      .replace("#include <project_vertex>", [
-        "#include <project_vertex>",
-        "\t{",
-        "\t\tvec3 hn = normal;",
-        "\t\t#ifdef USE_INSTANCING",
-        "\t\t\thn = mat3(instanceMatrix) * hn;",
-        "\t\t#endif",
-        "\t\thn = normalize(mat3(modelViewMatrix) * hn);",
-        "\t\tmvPosition.xyz += hn * max(uInk.x, uInk.y * -mvPosition.z);",
-        "\t\tgl_Position = projectionMatrix * mvPosition;",
-        "\t}",
-      ].join("\n"));
+  // pohon: papan (billboard) bergambar ilustrasi 2D (map-trees.js, atlas: baris = jenis, kolom = varian) yang selalu
+  // menghadap kamera — berputar mengikuti arah pandang & sedikit condong ke kamera saat dilihat dari atas. Tanpa cahaya
+  // (warna gambar apa adanya, seperti 2D); bayangan = siluet gambar yang menghadap matahari (materi kedalaman sendiri).
+  const TR = window.NovelMapTrees, AT = TR.atlas(96);
+  const atlasTex = keep(new THREE.CanvasTexture(AT.canvas));
+  atlasTex.colorSpace = THREE.SRGBColorSpace; atlasTex.anisotropy = maxAniso;
+  const cellU = { value: new THREE.Vector2(1 / AT.cols, 1 / AT.rows) };
+  const BB = [
+    "vec4 bbC = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);",
+    "float bbS = length(instanceMatrix[0].xyz), bbSY = length(instanceMatrix[1].xyz);",
+    "vec3 bbF = normalize(cameraPosition - bbC.xyz);",
+    "vec3 bbR = cross(vec3(0.0, 1.0, 0.0), bbF);",
+    "bbR = dot(bbR, bbR) > 1e-6 ? normalize(bbR) : vec3(1.0, 0.0, 0.0);",
+    "vec3 bbU = normalize(mix(vec3(0.0, 1.0, 0.0), cross(bbF, bbR), 0.35));",   // tegak, condong 35% ke kamera
+    "vec4 mvPosition = viewMatrix * vec4(bbC.xyz + bbR * (transformed.x * bbS) + bbU * (transformed.y * bbSY), 1.0);",
+    "gl_Position = projectionMatrix * mvPosition;",
+  ].join("\n\t");
+  const billboard = (sh) => {
+    sh.uniforms.uCell = cellU;
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute vec2 aCell;\nuniform vec2 uCell;")
+      .replace("#include <uv_vertex>", "#include <uv_vertex>\n#ifdef USE_MAP\n\tvMapUv = (aCell + uv) * uCell;\n#endif")
+      .replace("#include <project_vertex>", "\t" + BB);
   };
+  const treeMat = keep(new THREE.MeshBasicMaterial({ map: atlasTex, alphaTest: 0.5, side: THREE.DoubleSide }));
+  treeMat.onBeforeCompile = billboard;
+  const treeDepthMat = keep(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: atlasTex, alphaTest: 0.5, side: THREE.DoubleSide }));
+  treeDepthMat.onBeforeCompile = billboard;
+  // geometri papan per jenis: kaki di y = 0, uv = bagian sel atlas yang berisi gambar (sel ditambah offset per instance)
+  const trees = {};
+  TR.KINDS.forEach((k) => {
+    const I = AT.info[k], geo = new THREE.PlaneGeometry(I.w, I.h);
+    geo.translate(0, I.h / 2 - I.y0, 0);
+    const uv = geo.getAttribute("uv");
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, I.u0 + uv.getX(i) * (I.u1 - I.u0), I.v0 + uv.getY(i) * (I.v1 - I.v0));
+    keep(geo);
+    trees[k] = { geo, row: AT.rows - 1 - I.row };   // tekstur flipY: baris dihitung dari bawah
+  });
   const ribbon = (extra) => keep(new THREE.MeshStandardMaterial(Object.assign({ vertexColors: true, metalness: 0,
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }, extra)));
   const riverMat = ribbon({ roughness: 0.3, emissive: 0x15324a, emissiveIntensity: 0.6 });
@@ -2008,24 +2027,9 @@ function makeShared(maxAniso, hash2) {
       "#include <emissivemap_fragment>\n\ttotalEmissiveRadiance += diffuseColor.rgb * 0.35;");
   };
 
-  // jenis pohon: { body, ink }. Warna [bawah, atas(, pucuk)]
-  const trees = {
-    pine: pineKit(["#2a4f34", "#4d885a", "#5e9a68"], 1),
-    pineLight: pineKit(["#3f6b33", "#76a653", "#86b660"], 0.82),
-    snowPine: pineKit(["#2c5136", "#4a8055"], 0.9, true),
-    broad: broadKit(["#4d7a33", "#9ac65e"], 1),
-    broadLight: broadKit(["#5e8a3a", "#a9d06a"], 0.78),
-    palm: palmKit(["#2a6e29", "#4f9d3a", "#82c957"], 1),
-    reed: reedKit(),
-  };
-  Object.values(trees).forEach((t) => { keep(t.body); if (t.ink) keep(t.ink); });
-  const peaks = { rock: peakKit(false), snow: peakKit(true) };
-  Object.values(peaks).forEach((t) => { keep(t.body); keep(t.ink); });
-  const inkRockMat = keep(new THREE.MeshBasicMaterial({ color: 0x3b2f26, side: THREE.BackSide }));
-  inkRockMat.onBeforeCompile = inkMat.onBeforeCompile;
   return {
-    terrainMat, terrainUniforms, plainMat, wallMat, waterMat, waterWallMat, skirtMat, bottomMat, dropMat, treeMat, inkMat, inkRockMat,
-    inkUniform, riverMat, pathMat, zoneMat, trees, peaks, waterTex, waterNormal, waterUniforms,
+    terrainMat, terrainUniforms, plainMat, wallMat, waterMat, waterWallMat, skirtMat, bottomMat, dropMat, treeMat, treeDepthMat,
+    riverMat, pathMat, zoneMat, trees, waterTex, waterNormal, waterUniforms,
     dispose() { disposables.forEach((o) => o.dispose()); },
   };
 }
@@ -2130,189 +2134,6 @@ function dropShadowCanvas() {
   g.fillRect(S / 2 - r - S, S / 2 - r, r * 2, r * 2);
   return cv;
 }
-
-// ---------- pohon bergaya ilustrasi: badan (toon, warna vertex bergradasi) + cangkang garis tepi ----------
-// Cangkang = salinan bagian tajuk dengan atribut normal = arah dari pusat bagian; shader garis tepi (inkMaterial)
-// mendorong vertex ke arah itu, jadi vertex kembar di sudut bergeser sama (garis tanpa celah). Alas pohon y = 0.
-const TRUNK = ["#4a3220", "#71512f"];
-// g: geometri sumber (berpusat di origin); c: [warna bawah, warna atas]; p: posisi; s: skala;
-// o.nc: [cx, cy, cz, rx, ry, rz] normal elipsoid terhadap pusat & jari-jari itu (seluruh tajuk diarsir sebagai satu bentuk
-// bulat; gerombol bola hanya memberi tepi bergerigi), o.rot: [miring z, putar y], o.radial: gradasi dari sumbu ke luar,
-// o.grad: [y bawah, y atas] rentang gradasi warna, o.ink: false = tanpa garis tepi, atau geometri cangkang khusus
-function xform(g, p, s, o) {
-  const geo = g.index ? g.toNonIndexed() : g;
-  if (geo !== g) g.dispose();
-  geo.scale(s[0], s[1], s[2]);
-  if (o.rot) { geo.rotateZ(o.rot[0]); geo.rotateY(o.rot[1]); }
-  geo.translate(p[0], p[1], p[2]);
-  if (o.nc) {
-    const P = geo.getAttribute("position").array, N = geo.getAttribute("normal").array, q = o.nc;
-    for (let i = 0; i < P.length; i += 3) {
-      const x = (P[i] - q[0]) / (q[3] * q[3]), y = (P[i + 1] - q[1]) / (q[4] * q[4]), z = (P[i + 2] - q[2]) / (q[5] * q[5]), l = Math.hypot(x, y, z) || 1;
-      N[i] = x / l; N[i + 1] = y / l; N[i + 2] = z / l;
-    }
-  }
-  return geo;
-}
-function tp(g, c, p, s, o) {
-  o = o || {};
-  s = typeof s === "number" ? [s, s, s] : s || [1, 1, 1];
-  const inkSrc = o.ink === false ? null : o.ink && o.ink.isBufferGeometry ? o.ink : g.clone();
-  const geo = xform(g, p, s, o), P = geo.getAttribute("position").array, n = P.length / 3, col = new Float32Array(n * 3);
-  const c0 = new THREE.Color(c[0]), c1 = new THREE.Color(c[1]);
-  let lo = Infinity, hi = -Infinity;
-  const key = (i) => (o.radial ? Math.hypot(P[i * 3] - p[0], P[i * 3 + 2] - p[2]) : P[i * 3 + 1]);
-  if (o.grad) { lo = o.grad[0]; hi = o.grad[1]; }
-  else for (let i = 0; i < n; i++) { const v = key(i); if (v < lo) lo = v; if (v > hi) hi = v; }
-  for (let i = 0; i < n; i++) {
-    const t = hi > lo ? clamp01((key(i) - lo) / (hi - lo)) : 1;
-    col[i * 3] = c0.r + (c1.r - c0.r) * t; col[i * 3 + 1] = c0.g + (c1.g - c0.g) * t; col[i * 3 + 2] = c0.b + (c1.b - c0.b) * t;
-  }
-  geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
-  let ink = null;
-  if (inkSrc && o.inkN) ink = xform(inkSrc, p, s, Object.assign({}, o, { nc: null }));   // arah cangkang sudah di atribut normal
-  else if (inkSrc) {
-    ink = xform(inkSrc, p, s, o);
-    const Q = ink.getAttribute("position").array, N = ink.getAttribute("normal").array, cy = p[1] + (o.inkY || 0);
-    for (let i = 0; i < Q.length; i += 3) {
-      const x = Q[i] - p[0], y = Q[i + 1] - cy, z = Q[i + 2] - p[2], l = Math.hypot(x, y, z);
-      if (l < 1e-5) { N[i] = 0; N[i + 1] = 1; N[i + 2] = 0; } else { N[i] = x / l; N[i + 1] = y / l; N[i + 2] = z / l; }
-    }
-  }
-  return { b: geo, i: ink };
-}
-function mergeAttrs(parts, names) {
-  const total = parts.reduce((s, g) => s + g.getAttribute("position").count, 0), arr = names.map(() => new Float32Array(total * 3));
-  let o = 0;
-  parts.forEach((g) => {
-    names.forEach((nm, k) => arr[k].set(g.getAttribute(nm).array, o * 3));
-    o += g.getAttribute("position").count; g.dispose();
-  });
-  const geo = new THREE.BufferGeometry();
-  names.forEach((nm, k) => geo.setAttribute(nm, new THREE.BufferAttribute(arr[k], 3)));
-  geo.computeBoundingSphere();
-  return geo;
-}
-// satu jenis pohon: { body, ink } (ink = null bila tanpa garis tepi)
-function kit(parts) {
-  const body = mergeAttrs(parts.map((q) => q.b), ["position", "normal", "color"]);
-  const inks = parts.filter((q) => q.i).map((q) => q.i);
-  return { body, ink: inks.length ? mergeAttrs(inks, ["position", "normal"]) : null };
-}
-const trunk = (r, h) => tp(new THREE.CylinderGeometry(r * 0.65, r, h, 5, 1, true), TRUNK, [0, h / 2, 0], 1, { ink: false });
-// bola tajuk; o = opsi tp (nc/grad untuk tajuk gerombol), bawaan: normal bola sendiri
-const lobe = (r, c, x, y, z, sy, o) => {
-  const ry = r * (sy || 0.86);
-  return tp(new THREE.IcosahedronGeometry(1, 0), c, [x, y, z], [r, ry, r], Object.assign({ nc: [x, y, z, r, ry, r] }, o));
-};
-// pinus: tumpukan kerucut ramping, tiap tingkat gelap di bawah & terang di pucuk (kesan berlapis); snow = pucuk bersalju
-function pineKit(c, k, snow) {
-  const parts = [trunk(0.065 * k, 0.4 * k)];
-  [[0.37, 0.7, 0.22], [0.29, 0.62, 0.6], [0.21, 0.55, 0.97], [0.12, 0.38, 1.3]].forEach(([r, h, b], t) => {
-    r *= k; h *= k; b *= k;
-    const cc = [c[0], t === 3 ? c[2] || c[1] : c[1]], seg = t === 3 ? 6 : 8;
-    if (!snow || t === 3) {
-      parts.push(tp(new THREE.ConeGeometry(r, h, seg, 1, true), snow ? ["#dfe7ea", "#ffffff"] : cc, [0, b + h / 2, 0], 1,
-        { ink: new THREE.ConeGeometry(r, h, seg, 1, false) }));
-      return;
-    }
-    // tingkat bersalju: badan hijau terpancung + topi salju
-    const hs = h * 0.5;
-    parts.push(tp(new THREE.CylinderGeometry(r * 0.5, r, hs, seg, 1, true), cc, [0, b + hs / 2, 0], 1,
-      { ink: new THREE.ConeGeometry(r, h, seg, 1, false).translate(0, (h - hs) / 2, 0), inkY: (h - hs) / 2 }));
-    parts.push(tp(new THREE.ConeGeometry(r * 0.53, h - hs + 0.02 * k, seg, 1, true), ["#e3eaec", "#ffffff"], [0, b + hs + (h - hs) / 2 - 0.01 * k, 0], 1, { ink: false }));
-  });
-  return kit(parts);
-}
-// pohon rindang: tajuk lonceng (bulat-meruncing, lebih tinggi dari lebar) dari gerombol bola + batang terlihat
-function broadKit(c, k) {
-  const o = { nc: [0, 0.82 * k, 0, 0.44 * k, 0.62 * k, 0.44 * k], grad: [0.36 * k, 1.42 * k] };
-  return kit([
-    trunk(0.075 * k, 0.55 * k),
-    lobe(0.42 * k, c, 0, 0.74 * k, 0, 0.92, o),
-    lobe(0.32 * k, c, 0.03 * k, 1.04 * k, -0.02 * k, 0.95, o),
-    lobe(0.18 * k, c, -0.01 * k, 1.3 * k, 0.01 * k, 1, o),
-  ]);
-}
-// daun palem: dari pangkal ke ujung yang merunduk, tulang daun menonjol; sisi atas + bawah.
-// ink = cangkang lembaran: didorong terutama ke bawah (+ sedikit ke tepi daun) agar selalu di belakang daun dilihat dari atas
-function frondGeo(len, wid, droop, ink) {
-  const m = len * 0.45, ym = -droop * 0.35 - 0.04, B = [0, 0, 0], L = [m, ym, wid], T = [len, -droop, 0], R = [m, ym, -wid];
-  const tri = [B, L, T, B, T, R, B, T, L, B, R, T];
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(tri.flat(), 3));
-  if (!ink) { geo.computeVertexNormals(); return geo; }
-  const d = (x, z) => { const l = Math.hypot(x, 1, z); return [x / l, -1 / l, z / l]; };
-  const DN = { B: d(0, 0), L: d(0.1, 0.45), T: d(0.5, 0), R: d(0.1, -0.45) }, names = ["B", "L", "T", "B", "T", "R", "B", "T", "L", "B", "R", "T"];
-  geo.setAttribute("normal", new THREE.Float32BufferAttribute(names.flatMap((k) => DN[k]), 3));
-  return geo;
-}
-// rimba: payung daun palem lebar menjuntai di atas batang (normal daun menghadap ke atas -> tajuk terang seperti kubah)
-function palmKit(c, k) {
-  const parts = [trunk(0.075 * k, 0.8 * k), lobe(0.2 * k, [c[1], c[2]], 0, 0.84 * k, 0, 0.75)];
-  const N = 8, top = 0.86 * k;
-  for (let i = 0; i < N; i++) {
-    const a = (i / N) * TAU + (i % 2) * 0.18, len = (0.66 + (i % 3) * 0.07) * k;
-    parts.push(tp(frondGeo(len, 0.2 * k, 0.34 * k), [c[0], c[2]], [0, top, 0], 1,
-      { rot: [0.1 + (i % 2) * 0.12, a], radial: true, nc: [0, top - 0.5 * k, 0, 1, 1, 1], ink: frondGeo(len, 0.2 * k, 0.34 * k, true), inkN: true }));   // normal kubah
-  }
-  return kit(parts);
-}
-// rumpun rawa: helai-helai tipis menyebar
-function reedKit() {
-  const parts = [];
-  [[0, 0.5, 0], [0.42, 0.42, 1.3], [0.38, 0.38, 2.6], [0.45, 0.46, 3.9], [0.36, 0.34, 5.1]].forEach(([tilt, h, a], i) => {
-    const r = i ? 0.09 : 0;
-    parts.push(tp(new THREE.ConeGeometry(0.04, h, 3, 1, true), ["#3f4d27", i % 2 ? "#7d8a45" : "#6a783b"],
-      [Math.cos(a) * r, h / 2, Math.sin(a) * r], 1, { rot: [tilt * (i % 2 ? 1 : -1), a], ink: false }));
-  });
-  return kit(parts);
-}
-// puncak batu: kerucut 6 sisi bercincin acak (bergerigi, faset tegas dengan toon), alas y=0, puncak y=1;
-// snow = faset di atas cincin ketiga bersalju (garis salju bergerigi). Cangkang garis tepi = arah dari pusat bawah.
-function peakKit(snow) {
-  let sd = 7;
-  const rnd = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
-  const SIDES = 6, RINGS = [[0, 1], [0.36, 0.68], [0.6, 0.42]], ring = RINGS.map(([y, r], k) => {
-    const pts = [];
-    for (let j = 0; j < SIDES; j++) {
-      const a = ((j + (k ? (rnd() - 0.5) * 0.35 : 0)) / SIDES) * TAU, rr = r * (k ? 0.85 + rnd() * 0.3 : 1), yy = y + (k === 2 ? (rnd() - 0.5) * 0.1 : 0);
-      pts.push([Math.cos(a) * rr, yy, Math.sin(a) * rr]);
-    }
-    return pts;
-  });
-  const apex = [0.04, 1, -0.03], pos = [], col = [];
-  const C0 = new THREE.Color("#76695b"), C1 = new THREE.Color("#b9ad9c"), CS = new THREE.Color("#f4f6f7"), CS2 = new THREE.Color("#d9e2e6");
-  const tri = (a, b, c, top) => {
-    pos.push(...a, ...b, ...c);
-    [a, b, c].forEach((v) => {
-      const cc = snow && top ? CS2.clone().lerp(CS, v[1]) : C0.clone().lerp(C1, v[1]);
-      col.push(cc.r, cc.g, cc.b);
-    });
-  };
-  for (let k = 0; k < RINGS.length; k++) for (let j = 0; j < SIDES; j++) {
-    const a = ring[k][j], b = ring[k][(j + 1) % SIDES];
-    if (k === RINGS.length - 1) { tri(a, apex, b, true); continue; }
-    const c = ring[k + 1][j], d = ring[k + 1][(j + 1) % SIDES];
-    tri(a, c, b, false); tri(b, c, d, false);
-  }
-  const body = new THREE.BufferGeometry();
-  body.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  body.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-  body.computeVertexNormals();   // tanpa indeks -> normal per faset
-  body.computeBoundingSphere();
-  const ink = new THREE.BufferGeometry(), dir = [];
-  for (let i = 0; i < pos.length; i += 3) {
-    const x = pos[i], y = pos[i + 1] - 0.3, z = pos[i + 2], l = Math.hypot(x, y, z) || 1;
-    dir.push(x / l, y / l, z / l);
-  }
-  ink.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  ink.setAttribute("normal", new THREE.Float32BufferAttribute(dir, 3));
-  ink.computeBoundingSphere();
-  return { body, ink };
-}
-
-// ---------- sprite tempat & label ----------
 function canvasTexture(cv, mip) {
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
