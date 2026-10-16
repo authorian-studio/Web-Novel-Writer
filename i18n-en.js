@@ -720,7 +720,7 @@ window.NOVELIST_EN = {"exact":{"Cari tanggal, tahun, atau event…":"Search a da
 "Kembali ke pustaka":"Back to library",
 "Kembalikan bawaan":"Restore default",
 "Kembalikan gambar bawaan":"Restore default image",
-"Efek reveal kursor":"Cursor reveal effect",
+"Tampilkan ilustrasi":"Show illustration",
 "Kepercayaan":"Beliefs",
 "Kepercayaan diri":"Self-confidence",
 "Kepercayaan pada orang lain":"Trust in others",

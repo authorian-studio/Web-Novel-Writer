@@ -279,7 +279,7 @@ const LOGIN_I18N = {
     artChanged: "Gambar login diganti — tersimpan di perangkat ini.",
     artChangedTemp: "Gambar diganti, tapi browser menolak menyimpannya — akan kembali ke gambar bawaan saat halaman dimuat ulang.",
     artRestored: "Gambar bawaan dikembalikan.",
-    artFx: "Efek reveal kursor", artFxOn: "Efek reveal dinyalakan.", artFxOff: "Efek reveal dimatikan — tersimpan di perangkat ini.",
+    artShow: "Tampilkan ilustrasi", artShown: "Ilustrasi ditampilkan lagi.", artHidden: "Ilustrasi disembunyikan — tersimpan di perangkat ini.",
     bgUpload: "Ganti background…", bgReset: "Hapus background", bgChanged: "Background halaman login diganti — tersimpan di perangkat ini.",
     bgRestored: "Background dihapus.", bgFailed: "Background tidak bisa dipasang. Coba gambar lain (JPG, PNG, atau WebP).",
     termsTitle: "Ketentuan Penggunaan",
@@ -313,7 +313,7 @@ const LOGIN_I18N = {
     artChanged: "Login image changed — saved on this device.",
     artChangedTemp: "Image changed, but your browser blocked saving it — it will go back to the default when the page reloads.",
     artRestored: "Default image restored.",
-    artFx: "Cursor reveal effect", artFxOn: "Reveal effect turned on.", artFxOff: "Reveal effect turned off — saved on this device.",
+    artShow: "Show illustration", artShown: "Illustration shown again.", artHidden: "Illustration hidden — saved on this device.",
     bgUpload: "Change background…", bgReset: "Remove background", bgChanged: "Login page background changed — saved on this device.",
     bgRestored: "Background removed.", bgFailed: "Couldn't set that background. Try another image (JPG, PNG, or WebP).",
     termsTitle: "Terms of Use",
@@ -4999,16 +4999,16 @@ let loginArtCustom = null;    // { src, alpha, w, h, at } gambar pilihan penggun
 let loginArtTouched = false;  // pengguna sudah ganti/reset sebelum gambar tersimpan selesai dibaca -> abaikan hasil bacaan
 let loginArtBusy = false;
 
-// Efek reveal kursor (sorotan mengikuti kursor, ledakan saat klik, intro) bisa dimatikan dari menu kiri-bawah.
-// Saat mati, dot halftone tetap digambar tapi tidak bereaksi pada kursor. Disimpan di localStorage perangkat ini.
-const LOGIN_ART_FX_KEY = "novelist_login_art_fx";   // "off" = efek reveal dimatikan
-const LOGIN_ART_FX_OFF = { revealRadius: 0, clickBurst: false, wander: false, intro: false };
-let loginArtFxOn = true;
-try { loginArtFxOn = localStorage.getItem(LOGIN_ART_FX_KEY) !== "off"; } catch (e) { loginArtFxOn = true; }
+// Ilustrasi HalftoneReveal bisa dimatikan dari menu kiri-bawah: kolom kiri disembunyikan, konteks WebGL dilepas,
+// form login pindah ke tengah. Disimpan di localStorage perangkat ini.
+const LOGIN_ART_SHOW_KEY = "novelist_login_art_show";   // "off" = ilustrasi disembunyikan
+let loginArtShown = true;
+try { loginArtShown = localStorage.getItem(LOGIN_ART_SHOW_KEY) !== "off"; } catch (e) { loginArtShown = true; }
+let loginArtSync = null;      // sync() dari initLoginArt: buat/hapus HalftoneReveal sesuai lebar layar + saklar
 
 function loginArtOptions() {
-  const base = loginArtCustom ? Object.assign({}, LOGIN_ART_OPTIONS, LOGIN_ART_CUSTOM_TONE, { src: loginArtCustom.src }) : LOGIN_ART_OPTIONS;
-  return loginArtFxOn ? base : Object.assign({}, base, LOGIN_ART_FX_OFF);
+  if (!loginArtCustom) return LOGIN_ART_OPTIONS;
+  return Object.assign({}, LOGIN_ART_OPTIONS, LOGIN_ART_CUSTOM_TONE, { src: loginArtCustom.src });
 }
 // Browser tanpa WebGL2 (atau hardware acceleration mati): gambarnya ditampilkan apa adanya supaya kolom kiri tidak kosong.
 function loginArtFallbackBg(src) { return 'center / contain no-repeat url("' + src + '")'; }
@@ -5117,22 +5117,21 @@ async function prepareLoginArtImage(file) {
 function syncLoginArtMenu() {
   const reset = el("btnLoginArtReset");
   if (reset) reset.classList.toggle("hidden", !loginArtCustom);
-  const fx = el("btnLoginArtFx");
-  if (fx) fx.setAttribute("aria-checked", String(loginArtFxOn));
-  const host = el("loginArt");
-  if (host) host.classList.toggle("fx-off", !loginArtFxOn);
+  const show = el("btnLoginArtShow");
+  if (show) show.setAttribute("aria-checked", String(loginArtShown));
+  const view = el("loginView");
+  if (view) view.classList.toggle("art-off", !loginArtShown);
 }
 
-function toggleLoginArtFx() {
-  loginArtFxOn = !loginArtFxOn;
+function setLoginArtShown(on, notice) {
+  loginArtShown = on;
   try {
-    if (loginArtFxOn) localStorage.removeItem(LOGIN_ART_FX_KEY);
-    else localStorage.setItem(LOGIN_ART_FX_KEY, "off");
+    if (on) localStorage.removeItem(LOGIN_ART_SHOW_KEY);
+    else localStorage.setItem(LOGIN_ART_SHOW_KEY, "off");
   } catch (e) { /* diblokir: berlaku sampai halaman dimuat ulang */ }
-  // nilai default dikembalikan eksplisit karena update() menggabungkan opsi (kunci yang dihapus tidak kembali sendiri)
-  if (loginArt && loginArt.supported) loginArt.update(loginArtFxOn ? { revealRadius: LOGIN_ART_OPTIONS.revealRadius, clickBurst: true, wander: false, intro: true } : LOGIN_ART_FX_OFF);
   syncLoginArtMenu();
-  showLoginNotice(lt(loginArtFxOn ? "artFxOn" : "artFxOff"));
+  if (loginArtSync) loginArtSync();
+  if (notice) showLoginNotice(lt(on ? "artShown" : "artHidden"));
 }
 
 // Ganti gambar halftone dengan file pilihan pengguna (dari tombol unggah atau seret-lepas).
@@ -5151,6 +5150,7 @@ async function changeLoginArt(file) {
     if (!rec || !isLoginArtRecord(rec) || !(await loginArtDecodes(rec.src))) { showLoginNotice(lt("artFailed")); return; }
     loginArtTouched = true;
     loginArtCustom = rec;
+    if (!loginArtShown) setLoginArtShown(true, false);   // baru saja pilih gambar -> tentu ingin melihatnya
     applyLoginArt();
     syncLoginArtMenu();
     showLoginNotice(lt((await saveLoginArtCustom(rec)) ? "artChanged" : "artChangedTemp"));
@@ -5187,7 +5187,7 @@ function initLoginArtPicker() {
   el("btnLoginBgReset").onclick = () => { setOpen(false); btn.focus(); resetLoginBg(); };
   bgIn.onchange = () => { const f = bgIn.files && bgIn.files[0]; bgIn.value = ""; if (f) changeLoginBg(f); };
   el("btnLoginArtReset").onclick = () => { setOpen(false); btn.focus(); resetLoginArt(); };
-  el("btnLoginArtFx").onclick = () => toggleLoginArtFx();   // menu tetap terbuka supaya saklarnya terlihat berubah
+  el("btnLoginArtShow").onclick = () => setLoginArtShown(!loginArtShown, true);   // menu tetap terbuka supaya saklarnya terlihat berubah
   input.onchange = () => { const f = input.files && input.files[0]; input.value = ""; if (f) changeLoginArt(f); };
   document.addEventListener("pointerdown", (e) => { if (!ctl.contains(e.target)) setOpen(false); });
   ctl.addEventListener("keydown", (e) => {
@@ -5286,14 +5286,16 @@ async function initLoginArt() {
   // Hanya jalan saat kolom kiri terlihat (>900px) — di HP kolomnya disembunyikan, jadi WebGL tidak dibuat sama sekali.
   const wide = window.matchMedia("(min-width: 901px)");
   const sync = () => {
-    if (wide.matches && !loginArt) {
+    const want = wide.matches && loginArtShown;
+    if (want && !loginArt) {
       const opts = loginArtOptions();
       loginArt = window.HalftoneReveal.create(host, opts);
       if (!loginArt.supported) host.style.background = loginArtFallbackBg(opts.src);
-    } else if (!wide.matches && loginArt) {
+    } else if (!want && loginArt) {
       loginArt.destroy(); loginArt = null; host.style.background = "";
     }
   };
+  loginArtSync = sync;
   sync();
   wide.addEventListener("change", sync);
 }

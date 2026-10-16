@@ -2,10 +2,10 @@
 
 ## Riwayat perubahan terbaru (v0.14.2) — paling baru di atas
 
-**Halaman login: efek reveal halftone bisa dimatikan.** Menu tombol kiri-bawah (tempat "Unggah gambar…") kini punya
-saklar **Efek reveal kursor**. Bila dimatikan, ilustrasi tetap tampil sebagai dot halftone, tapi tidak lagi bereaksi
-pada kursor: tidak ada sorotan gambar asli, tidak ada ledakan saat klik, dan tidak ada animasi intro. Kursor kembali
-normal (bukan crosshair). Pilihan ini tersimpan di perangkat ini dan tetap berlaku untuk gambar pilihan sendiri.
+**Halaman login: ilustrasi halftone reveal bisa dimatikan.** Menu tombol kiri-bawah (tempat "Unggah gambar…") kini
+punya saklar **Tampilkan ilustrasi**. Bila dimatikan, gambar halftone reveal di kolom kiri disembunyikan dan konteks
+WebGL-nya dilepas, sehingga lebih ringan. Form login pun pindah ke tengah layar. Pilihan ini tersimpan di perangkat ini.
+Bila kamu mengunggah gambar baru saat ilustrasi mati, ilustrasi otomatis dinyalakan lagi.
 
 **Tombol preview & tema pindah ke bar atas.** Tombol 👁 (Preview manuskrip) dan 🌙 (ganti tema) tidak lagi melayang di
 tepi kanan isi tab. Sekarang keduanya menjadi pil kecil di bar atas, tepat di kiri jam, di semua tab project kecuali
