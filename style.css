@@ -611,35 +611,59 @@ body.light .proj-bg-photo::after { display: none; }
 body.light .proj-logo-btn img { mix-blend-mode: multiply; filter: invert(1); }
 body.light .proj-logo-btn:hover { background: rgba(0,0,0,.06); }
 
-/* sidebar project: geser masuk dari kiri, tertutup = tersembunyi di luar layar */
-.proj-sidebar-scrim { position: absolute; inset: 0; z-index: 30; background: rgba(0,0,0,.35); opacity: 0; pointer-events: none; transition: opacity .3s ease; }
-.proj-sidebar-scrim.is-open { opacity: 1; pointer-events: auto; }
+/* sidebar project: rail ramping yang tertanam di kiri (bukan laci overlay). #editorView.prail-open menggeser bar atas &
+   isi project selebar rail (margin-left juga berlaku untuk #editorBody yang absolute di Beranda). */
+#editorView { --prail-w: 0px; }
+#editorView.prail-open { --prail-w: 60px; }
+#projectTopbar, #editorBody { margin-left: var(--prail-w); transition: margin-left .34s cubic-bezier(.32,.72,0,1); }
+#editorView.prail-no-anim #projectTopbar, #editorView.prail-no-anim #editorBody,
+#editorView.prail-no-anim .proj-sidebar, #editorView.prail-no-anim .proj-logo-btn { transition: none; }
+/* logo di bar atas "pindah" ke puncak rail saat rail terbuka */
+.proj-logo-btn { transition: width .34s cubic-bezier(.32,.72,0,1), margin .34s cubic-bezier(.32,.72,0,1), opacity .2s ease; }
+#editorView.prail-open .proj-logo-btn { width: 0; margin-right: -8px; opacity: 0; pointer-events: none; overflow: hidden; }
 .proj-sidebar {
-  position: absolute; z-index: 31; top: 8px; bottom: 8px; left: 8px; width: 264px; display: flex; flex-direction: column; gap: 4px; padding: 10px;
-  border-radius: 16px; background: var(--glass); border: 1px solid var(--glass-border); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-  box-shadow: 0 20px 50px rgba(0,0,0,.45); transform: translateX(calc(-100% - 16px)); visibility: hidden;
-  transition: transform .38s cubic-bezier(.32,.72,0,1), visibility 0s linear .38s;
+  position: absolute; z-index: 4; top: 0; bottom: 0; left: 0; width: 60px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 9px 0 12px; box-sizing: border-box; background: rgba(10,10,13,.5); border-right: 1px solid var(--glass-border);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  transform: translateX(-100%); visibility: hidden;
+  transition: transform .34s cubic-bezier(.32,.72,0,1), visibility 0s linear .34s;
 }
-.proj-sidebar.is-open { transform: none; visibility: visible; transition: transform .38s cubic-bezier(.32,.72,0,1), visibility 0s; }
-body:not(.light) .proj-sidebar { background: rgba(14,15,19,.82); }
-.proj-sidebar-head { display: flex; align-items: center; gap: 10px; padding: 2px 2px 12px; margin-bottom: 4px; border-bottom: 1px solid var(--glass-border); }
-.proj-sidebar-logo { width: 28px; height: 28px; border-radius: 7px; mix-blend-mode: screen; }
-body.light .proj-sidebar-logo { mix-blend-mode: multiply; filter: invert(1); }
-.proj-sidebar-brand { flex: 1; font-weight: 800; font-size: calc(15px * var(--fs-scale, 1)); }
-.proj-sidebar-close { width: 30px; height: 30px; border: none; border-radius: 8px; background: transparent; color: var(--text-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.proj-sidebar-close:hover { background: rgba(255,255,255,.08); color: var(--text); }
-.proj-side-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: none; border-radius: 10px; background: transparent; color: var(--text); font-size: calc(13.5px * var(--fs-scale, 1)); font-weight: 500; cursor: pointer; text-align: left; transition: background .15s ease; }
-.proj-side-item svg { color: var(--text-dim); flex-shrink: 0; }
-.proj-side-item:hover, .proj-side-project:hover { background: rgba(255,255,255,.07); }
-body.light .proj-side-item:hover, body.light .proj-side-project:hover { background: rgba(0,0,0,.05); }
-.proj-side-label { margin: 12px 10px 4px; font-size: calc(11px * var(--fs-scale, 1)); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
-.proj-side-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
-.proj-side-project { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; border: none; border-radius: 10px; background: transparent; color: var(--text-dim); font-size: calc(13px * var(--fs-scale, 1)); cursor: pointer; text-align: left; }
-.proj-side-project.is-current { background: rgba(255,255,255,.1); color: var(--text); font-weight: 600; }
-body.light .proj-side-project.is-current { background: rgba(0,0,0,.07); }
-.proj-side-thumb { width: 24px; height: 32px; flex-shrink: 0; border-radius: 5px; background: center / cover no-repeat; display: flex; align-items: center; justify-content: center; font-family: "Dancing Script", cursive; font-size: calc(14px * var(--fs-scale, 1)); color: #fff; }
-.proj-side-title { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.proj-side-bottom { border-top: 1px solid var(--glass-border); padding-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+#editorView.prail-open .proj-sidebar { transform: none; visibility: visible; transition: transform .34s cubic-bezier(.32,.72,0,1), visibility 0s; }
+body.light .proj-sidebar { background: rgba(255,255,255,.6); }
+.prail-btn {
+  position: relative; flex-shrink: 0; width: 40px; height: 40px; padding: 0; border: none; border-radius: 11px; background: transparent;
+  color: var(--text-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s ease, color .15s ease;
+}
+.prail-btn:hover, .prail-btn:focus-visible { background: rgba(255,255,255,.08); color: var(--text); outline: none; }
+body.light .prail-btn:hover, body.light .prail-btn:focus-visible { background: rgba(0,0,0,.06); }
+.prail-btn:focus-visible { box-shadow: 0 0 0 2px rgba(255,255,255,.35); }
+.prail-logo { margin-bottom: 6px; }
+.prail-logo img { width: 26px; height: 26px; border-radius: 6px; mix-blend-mode: screen; transition: opacity .2s ease, transform .2s ease; }
+body.light .prail-logo img { mix-blend-mode: multiply; filter: invert(1); }
+.prail-logo-close { position: absolute; opacity: 0; transform: translateX(-3px); transition: opacity .2s ease, transform .2s ease; }
+.prail-logo:hover img, .prail-logo:focus-visible img { opacity: 0; transform: scale(.8); }
+.prail-logo:hover .prail-logo-close, .prail-logo:focus-visible .prail-logo-close { opacity: 1; transform: none; }
+.prail-sep { width: 26px; height: 1px; margin: 6px 0; background: var(--glass-border); flex-shrink: 0; }
+.proj-side-list { flex: 1; min-height: 0; width: 100%; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 2px 0; }
+.proj-side-list::-webkit-scrollbar { display: none; }
+.proj-side-project { width: 44px; height: 44px; }
+.proj-side-thumb {
+  width: 34px; height: 34px; border-radius: 10px; background: center / cover no-repeat; display: flex; align-items: center; justify-content: center;
+  font-family: "Dancing Script", cursive; font-size: calc(16px * var(--fs-scale, 1)); color: #fff; opacity: .78; transition: opacity .15s ease, transform .15s ease;
+}
+.proj-side-project:hover .proj-side-thumb { opacity: 1; transform: scale(1.04); }
+.proj-side-project.is-current .proj-side-thumb { opacity: 1; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px rgba(255,255,255,.55); }
+body.light .proj-side-project.is-current .proj-side-thumb { box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.4); }
+/* penanda project aktif di tepi kiri rail */
+.proj-side-project.is-current::before { content: ""; position: absolute; left: -8px; top: 12px; bottom: 12px; width: 3px; border-radius: 0 3px 3px 0; background: var(--text); }
+.proj-side-bottom { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 8px; border-top: 1px solid var(--glass-border); }
+/* HP: layar terlalu sempit untuk didorong -> rail menimpa konten (dengan bayangan), bar atas & isi tidak bergeser */
+@media (max-width: 700px) {
+  #editorView.prail-open { --prail-w: 0px; }
+  #editorView.prail-open .proj-logo-btn { width: 34px; margin-right: 0; opacity: 1; pointer-events: auto; }
+  .proj-sidebar { z-index: 13; background: rgba(12,12,16,.92); box-shadow: 8px 0 30px rgba(0,0,0,.45); }
+  body.light .proj-sidebar { background: rgba(255,255,255,.94); box-shadow: 8px 0 30px rgba(0,0,0,.12); }
+}
 
 .proj-chip { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 4px 0 5px; border-radius: 10px; background: var(--glass); border: 1px solid var(--glass-border); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 .proj-chip-cover { width: 24px; height: 24px; flex-shrink: 0; border-radius: 7px; background: center / cover no-repeat; display: flex; align-items: center; justify-content: center; font-family: "Dancing Script", cursive; font-size: calc(15px * var(--fs-scale, 1)); color: #fff; }

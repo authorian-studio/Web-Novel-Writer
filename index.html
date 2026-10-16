@@ -485,35 +485,28 @@
       <div class="galaxy-dots"></div>
     </div>
 
-    <!-- sidebar project: dibuka lewat logo di kiri atas; berisi keluar ke dashboard, pindah project, tema & simpan -->
-    <div id="projSidebarScrim" class="proj-sidebar-scrim"></div>
+    <!-- sidebar project: rail ramping yang tertanam di kiri (dibuka lewat logo kiri atas). Konten project bergeser sedikit ke
+         kanan, tidak ditutupi. Isi: logo (tutup), keluar ke dashboard, daftar project (sampul kecil), simpan / tema / akun. -->
     <aside id="projSidebar" class="proj-sidebar" aria-hidden="true" aria-label="Sidebar project">
-      <div class="proj-sidebar-head">
-        <img src="icon-192.png" alt="" draggable="false" class="proj-sidebar-logo" />
-        <span class="proj-sidebar-brand">Novelist</span>
-        <button id="btnProjSidebarClose" class="proj-sidebar-close" title="Tutup sidebar" aria-label="Tutup sidebar">
-          <svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-layout-sidebar-left-collapse"></use></svg>
-        </button>
-      </div>
-      <button id="btnBack" class="proj-side-item">
-        <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-layout-dashboard"></use></svg>
-        <span>Keluar ke Dashboard</span>
+      <button id="btnProjSidebarClose" class="prail-btn prail-logo" data-tip="Tutup sidebar" data-tip-pos="right" aria-label="Tutup sidebar">
+        <img src="icon-192.png" alt="" draggable="false" />
+        <svg class="ti prail-logo-close" width="18" height="18" aria-hidden="true"><use href="#ti-layout-sidebar-left-collapse"></use></svg>
       </button>
-      <div class="proj-side-label">Project</div>
-      <div id="projSidebarList" class="proj-side-list"></div>
+      <button id="btnBack" class="prail-btn" data-tip="Keluar ke Dashboard" data-tip-pos="right" aria-label="Keluar ke Dashboard">
+        <svg class="ti" width="19" height="19" aria-hidden="true"><use href="#ti-layout-dashboard"></use></svg>
+      </button>
+      <div class="prail-sep" role="separator"></div>
+      <div id="projSidebarList" class="proj-side-list" role="list" aria-label="Project"></div>
       <div class="proj-side-bottom">
-        <button id="btnSideSave" class="proj-side-item">
-          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-cloud-upload"></use></svg>
-          <span>Simpan ke Drive</span>
+        <button id="btnSideSave" class="prail-btn" data-tip="Simpan ke Drive" data-tip-pos="right" aria-label="Simpan ke Drive">
+          <svg class="ti" width="19" height="19" aria-hidden="true"><use href="#ti-cloud-upload"></use></svg>
         </button>
-        <button id="btnSideTheme" class="proj-side-item">
-          <svg class="ti ic-dark-only" width="17" height="17" aria-hidden="true"><use href="#ti-moon"></use></svg>
-          <svg class="ti ic-light-only" width="17" height="17" aria-hidden="true"><use href="#ti-sun"></use></svg>
-          <span>Ganti Tema</span>
+        <button id="btnSideTheme" class="prail-btn" data-tip="Ganti Tema" data-tip-pos="right" aria-label="Ganti Tema">
+          <svg class="ti ic-dark-only" width="19" height="19" aria-hidden="true"><use href="#ti-moon"></use></svg>
+          <svg class="ti ic-light-only" width="19" height="19" aria-hidden="true"><use href="#ti-sun"></use></svg>
         </button>
-        <button id="btnSideAccount" class="proj-side-item">
-          <svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-user-circle"></use></svg>
-          <span>Pengaturan Akun</span>
+        <button id="btnSideAccount" class="prail-btn" data-tip="Pengaturan Akun" data-tip-pos="right" aria-label="Pengaturan Akun">
+          <svg class="ti" width="19" height="19" aria-hidden="true"><use href="#ti-user-circle"></use></svg>
         </button>
       </div>
     </aside>

@@ -709,39 +709,53 @@ function openProject(id) {
   if (window.NovelKodeks) window.NovelKodeks.render();
   markSaved();
   restoreProjectTabs(p);   // TAB PROJECT: tab terbuka + tab aktif project ini (bawaan: Beranda)
+  restoreProjSidebar();
   el("dashboardView").classList.add("hidden");
   el("editorView").classList.remove("hidden");
   startProjClock();
 }
-// ---- SIDEBAR PROJECT (dibuka dari logo kiri atas) ----
+// ---- SIDEBAR PROJECT: rail ramping tertanam di kiri (dibuka dari logo kiri atas) ----
+// Bukan laci overlay: #editorView.prail-open menggeser bar atas & isi project selebar rail. Status buka/tutup diingat.
+const PROJ_RAIL_KEY = "novelist_proj_rail";
+function isProjSidebarOpen() { return el("editorView").classList.contains("prail-open"); }
 function renderProjSidebarList() {
   const list = el("projSidebarList");
   list.innerHTML = "";
   projects.forEach((p) => {
     const b = document.createElement("button");
-    b.className = "proj-side-project" + (p.id === currentProjectId ? " is-current" : "");
-    const thumb = p.cover ? `<span class="proj-side-thumb" style="background-image:url('${p.cover}')"></span>`
-      : `<span class="proj-side-thumb" style="background-image:linear-gradient(135deg, ${p.colorA}, ${p.colorB})">${escapeHtml((p.title || "?").charAt(0).toUpperCase())}</span>`;
-    b.innerHTML = `${thumb}<span class="proj-side-title">${escapeHtml(p.id === currentProjectId ? el("projectTitle").value : p.title)}</span>`;
-    b.onclick = () => { closeProjSidebar(); if (p.id !== currentProjectId) switchToProject(p.id); };
+    const current = p.id === currentProjectId;
+    const title = (current ? el("projectTitle").value : p.title) || "?";
+    b.className = "prail-btn proj-side-project" + (current ? " is-current" : "");
+    b.setAttribute("role", "listitem");
+    b.dataset.tip = title; b.dataset.tipPos = "right";
+    b.setAttribute("aria-label", title);
+    if (current) b.setAttribute("aria-current", "true");
+    b.innerHTML = p.cover ? `<span class="proj-side-thumb" style="background-image:url('${p.cover}')"></span>`
+      : `<span class="proj-side-thumb" style="background-image:linear-gradient(135deg, ${p.colorA}, ${p.colorB})">${escapeHtml(title.charAt(0).toUpperCase())}</span>`;
+    b.onclick = () => { if (p.id !== currentProjectId) switchToProject(p.id); };
     list.appendChild(b);
   });
 }
-function projSidebarKeyHandler(e) { if (e.key === "Escape") closeProjSidebar(); }
-function openProjSidebar() {
-  renderProjSidebarList();
-  el("projSidebar").classList.add("is-open");
-  el("projSidebarScrim").classList.add("is-open");
-  el("projSidebar").setAttribute("aria-hidden", "false");
-  el("btnProjSidebar").setAttribute("aria-expanded", "true");
-  document.addEventListener("keydown", projSidebarKeyHandler);
+function setProjSidebar(open, remember = true) {
+  const v = el("editorView");
+  if (open) renderProjSidebarList();
+  hideTabTip();
+  v.classList.toggle("prail-open", open);
+  el("projSidebar").setAttribute("aria-hidden", String(!open));
+  el("btnProjSidebar").setAttribute("aria-expanded", String(open));
+  if (remember) try { localStorage.setItem(PROJ_RAIL_KEY, open ? "1" : "0"); } catch (e) { /* diblokir */ }
 }
-function closeProjSidebar() {
-  el("projSidebar").classList.remove("is-open");
-  el("projSidebarScrim").classList.remove("is-open");
-  el("projSidebar").setAttribute("aria-hidden", "true");
-  el("btnProjSidebar").setAttribute("aria-expanded", "false");
-  document.removeEventListener("keydown", projSidebarKeyHandler);
+function openProjSidebar() { setProjSidebar(true); }
+function closeProjSidebar() { setProjSidebar(false); }
+// dipanggil saat project dibuka: kembalikan status rail terakhir tanpa animasi geser
+function restoreProjSidebar() {
+  let open = false;
+  try { open = localStorage.getItem(PROJ_RAIL_KEY) === "1"; } catch (e) { open = false; }
+  const v = el("editorView");
+  v.classList.add("prail-no-anim");
+  setProjSidebar(open, false);
+  void v.offsetWidth;
+  requestAnimationFrame(() => v.classList.remove("prail-no-anim"));
 }
 // simpan project yang sedang dibuka (judul + isi) lalu kirim ke Drive
 function saveCurrentProject() {
@@ -765,7 +779,6 @@ function hideProjectModules() {
   if (window.NovelJejaring) window.NovelJejaring.hide();
 }
 function backToLibrary() {
-  closeProjSidebar();
   flushCurrentEdits();
   hideProjectModules();
   muteTimelineKeys(true);
@@ -1076,6 +1089,12 @@ function showTabTip(t) {
   tabTipEl.textContent = t.dataset.tip;
   const r = t.getBoundingClientRect(), vr = v.getBoundingClientRect();
   const w = tabTipEl.offsetWidth, h = tabTipEl.offsetHeight;
+  if (t.dataset.tipPos === "right") {   // rail sidebar project: tooltip di kanan tombol
+    const top = Math.max(6, Math.min(vr.height - h - 6, r.top - vr.top + r.height / 2 - h / 2));
+    tabTipEl.style.transform = `translate(${Math.round(r.right - vr.left + 10)}px, ${Math.round(top)}px)`;
+    tabTipEl.classList.add("is-on");
+    return;
+  }
   const up = t.dataset.tipPos === "top" || r.bottom + h + 12 > vr.bottom;
   const top = up ? r.top - vr.top - h - 8 : r.bottom - vr.top + 8;
   const left = Math.max(6, Math.min(vr.width - w - 6, r.left - vr.left + r.width / 2 - w / 2));
@@ -5569,12 +5588,15 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // ---- project view ----
   el("btnBack").onclick = backToLibrary;
-  el("btnProjSidebar").onclick = () => (el("projSidebar").classList.contains("is-open") ? closeProjSidebar() : openProjSidebar());
-  el("btnProjSidebarClose").onclick = closeProjSidebar;
-  el("projSidebarScrim").onclick = closeProjSidebar;
+  el("btnProjSidebar").onclick = () => (isProjSidebarOpen() ? closeProjSidebar() : openProjSidebar());
+  el("btnProjSidebarClose").onclick = () => { closeProjSidebar(); el("btnProjSidebar").focus(); };
   el("btnSideTheme").onclick = () => document.body.classList.toggle("light");
-  el("btnSideSave").onclick = async () => { closeProjSidebar(); await saveCurrentProject(); toast("Tersimpan ke Drive", tiIcon("cloud-check")); };
-  el("projectTitle").addEventListener("input", () => { fitProjectTitle(); markDirtyAndSchedule(); });
+  el("btnSideSave").onclick = async () => { await saveCurrentProject(); toast("Tersimpan ke Drive", tiIcon("cloud-check")); };
+  el("projectTitle").addEventListener("input", () => {
+    fitProjectTitle(); markDirtyAndSchedule();
+    const cur = isProjSidebarOpen() && el("projSidebarList").querySelector(".is-current");   // nama di tooltip rail ikut berubah
+    if (cur) { const t = el("projectTitle").value || "?"; cur.dataset.tip = t; cur.setAttribute("aria-label", t); }
+  });
   el("btnPreview").onclick = openPreview;
   el("btnClosePreview").onclick = () => el("previewModal").classList.add("hidden");
 

@@ -1,6 +1,17 @@
-# Novelist Web — v0.14.2
+# Novelist Web — v0.14.3
 
-## Riwayat perubahan terbaru (v0.14.2) — paling baru di atas
+## Riwayat perubahan terbaru (v0.14.3) — paling baru di atas
+
+**Sidebar logo jadi rail ramping yang tertanam.** Klik logo Novelist di kiri atas project tidak lagi memunculkan panel
+besar yang menutupi layar. Sekarang muncul rail ikon selebar 60 px yang menempel di kiri, dan seluruh isi project
+(bar atas + tab) bergeser sedikit ke kanan. Isinya, dari atas ke bawah:
+- logo (klik untuk menutup rail);
+- Keluar ke Dashboard;
+- daftar project sebagai sampul kecil; project aktif diberi cincin dan penanda di tepi kiri;
+- Simpan ke Drive, Ganti Tema, Pengaturan Akun.
+
+Nama tiap tombol muncul sebagai tooltip di kanan saat disorot. Klik project lain langsung pindah tanpa menutup rail.
+Status buka/tutup rail diingat di perangkat ini. Di HP (≤700 px), rail menimpa konten supaya layar tidak sesak.
 
 **Halaman login: halftone reveal bisa dimatikan.** Menu tombol kiri-bawah (tempat "Unggah gambar…") kini punya
 tombol **Matikan halftone reveal**. Bila diklik, gambar halftone reveal di kolom kiri hilang dan konteks WebGL-nya
