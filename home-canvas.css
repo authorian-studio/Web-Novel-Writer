@@ -477,3 +477,18 @@ body.perf-boost .react-flow__edge-trail.is-new .hc-thread { stroke-dasharray: no
   .hc-pop, .hc-tip-card, .hc-trail.is-new, .hc-trail-dot::after { animation: none !important; }
   .hc-rf .react-flow__edge-trail.is-new .hc-thread { animation: none; stroke-dasharray: none; stroke-dashoffset: 0; }
 }
+
+/* ---------- DUA JENIS PAPAN: Beranda (graf jejak) vs Brainstorm ---------- */
+/* Beranda: hanya Pilih / Geser + tombol ke papan Brainstorm */
+.hc-panel.is-home .hc-tools > * { display: none; }
+.hc-panel.is-home .hc-tools > [data-tool="select"], .hc-panel.is-home .hc-tools > [data-tool="hand"],
+.hc-panel.is-home .hc-tools > .hc-tsep:first-of-type, .hc-panel.is-home .hc-tools > .hc-home-only { display: flex; }
+.hc-panel.is-brain .hc-home-only { display: none; }
+.hc-t-cta { gap: 7px; padding: 0 14px 0 11px; color: var(--text); font-size: calc(13px * var(--fs-scale, 1)); font-weight: 650; }
+.hc-t-cta .ti { color: var(--accent); }
+.hc-t-quick { gap: 6px; padding: 0 11px 0 9px; font-size: calc(12.5px * var(--fs-scale, 1)); font-weight: 600; }
+.hc-t-quick .ti { color: var(--accent); }
+/* benang tipis buatan pengguna (Brainstorm) */
+.hc-rf .react-flow__edge-link.is-thread .react-flow__edge-path { stroke-width: 1.1; stroke-linecap: round; opacity: .8; }
+.hc-rf .react-flow__edge-link.is-thread.selected .react-flow__edge-path { stroke-width: 1.8; opacity: 1; }
+@media (max-width: 700px) { .hc-t-quick span, .hc-t-cta span { display: none; } .hc-t-quick, .hc-t-cta { padding: 0 9px; } }

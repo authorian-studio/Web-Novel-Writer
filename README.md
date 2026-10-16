@@ -1,6 +1,22 @@
-# Novelist Web — v0.12.4
+# Novelist Web — v0.12.5
 
-## Riwayat perubahan terbaru (v0.12.4) — paling baru di atas
+## Riwayat perubahan terbaru (v0.12.5) — paling baru di atas
+
+**Beranda dipisah jadi dua jenis papan** (`home-canvas.js`, `home-canvas.css`).
+- **Beranda (utama) = graf dokumen saja:** titik semua yang sudah kamu buat (scene, bab, karakter, lokasi, timeline,
+  peta, cerita, tree relasi, papan) dan benang urutannya. Bilah bawah hanya **Pilih**, **Geser** dan tombol
+  **Brainstorm**; alat tambah objek, tempel/seret gambar & pintasan alat lain tidak aktif di sini. Filter jejak, zoom,
+  peta mini, klik titik = buka dokumen tetap seperti sebelumnya.
+- **Brainstorm = papan bebas untuk mengembangkan ide** (dulu "Papan"): menu papan kini dikelompokkan **Beranda** &
+  **Brainstorm** ("Brainstorm baru"). Bilah bawah punya tombol cepat **Karakter** dan **Tempat** — pilih yang sudah ada
+  (bisa dicari) atau ketik nama lalu "Buat … baru" (langsung masuk Kodeks) dan klik di kanvas untuk menaruh kartunya —
+  plus kartu dokumen lain, catatan, bentuk, gambar, teks, frame.
+- **Benang tipis:** alat **Benang / penghubung** (C) di papan Brainstorm membuat garis tipis melengkung tanpa panah
+  (`edge.style = "thread"`); klik kanan garis → "Jadikan panah" / "Jadikan benang tipis", label bisa diedit.
+- **Migrasi otomatis:** catatan/bentuk/gambar/kartu yang dulu ditaruh di Beranda dipindah sekali ke papan
+  "Brainstorm" baru; penghubungnya ke titik jejak menjadi penghubung ke kartu dokumen yang sama di papan itu.
+
+### v0.12.4
 
 **Kodeks › Karakter: lembar karakter lengkap** (`kodeks-sheet.js`, gaya di `kodeks.css`). Tampilan Kodeks tetap; di bawah
 "Templat Karakter" kini ada bagian tambahan yang bisa dipilih lewat chip **Tambah bagian** (atau **Tampilkan semua**).
