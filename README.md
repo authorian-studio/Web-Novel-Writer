@@ -1,6 +1,11 @@
-# Novelist Web — v0.14.1
+# Novelist Web — v0.14.2
 
-## Riwayat perubahan terbaru (v0.14.1) — paling baru di atas
+## Riwayat perubahan terbaru (v0.14.2) — paling baru di atas
+
+**Halaman login: efek reveal halftone bisa dimatikan.** Menu tombol kiri-bawah (tempat "Unggah gambar…") kini punya
+saklar **Efek reveal kursor**. Bila dimatikan, ilustrasi tetap tampil sebagai dot halftone, tapi tidak lagi bereaksi
+pada kursor: tidak ada sorotan gambar asli, tidak ada ledakan saat klik, dan tidak ada animasi intro. Kursor kembali
+normal (bukan crosshair). Pilihan ini tersimpan di perangkat ini dan tetap berlaku untuk gambar pilihan sendiri.
 
 **Tombol preview & tema pindah ke bar atas.** Tombol 👁 (Preview manuskrip) dan 🌙 (ganti tema) tidak lagi melayang di
 tepi kanan isi tab. Sekarang keduanya menjadi pil kecil di bar atas, tepat di kiri jam, di semua tab project kecuali
