@@ -18,16 +18,16 @@
   // Bioma (index = nilai di layer biome). "land: false" = air. Warna dipakai 2D & 3D.
   const BIOMES = [
     { key: "sea",        name: "Laut & danau",  color: "#3f7396", alt: "#5d90b2", land: false },
-    { key: "grassland",  name: "Padang rumput", color: "#b8c676", alt: "#cad78e", land: true, tree: "broad", treeDensity: 0.04 },
+    { key: "grassland",  name: "Padang rumput", color: "#b8c676", alt: "#cad78e", land: true, tree: "broad", treeDensity: 0.016 },
     { key: "farmland",   name: "Ladang",        color: "#cdbb6c", alt: "#a3b75c", land: true, pattern: "fields" },
     { key: "forest",     name: "Hutan",         color: "#5f8b46", alt: "#4e7a3a", land: true, tree: "broad", treeDensity: 0.55 },
     { key: "pine",       name: "Hutan pinus",   color: "#46694a", alt: "#38593d", land: true, tree: "pine", treeDensity: 0.6 },
     { key: "jungle",     name: "Rimba",         color: "#3d7a33", alt: "#2e6828", land: true, tree: "palm", treeDensity: 0.7 },
     { key: "marsh",      name: "Rawa",          color: "#8b9b62", alt: "#6e8a6c", land: true, tree: "reed", treeDensity: 0.25 },
     { key: "desert",     name: "Gurun",         color: "#e4ca91", alt: "#d5b678", land: true },
-    { key: "tundra",     name: "Tundra",        color: "#d6dad6", alt: "#c2c8c5", land: true, tree: "pine", treeDensity: 0.04 },
+    { key: "tundra",     name: "Tundra",        color: "#d6dad6", alt: "#c2c8c5", land: true, tree: "pine", treeDensity: 0.02 },
     { key: "cracklands", name: "Tanah retak",   color: "#d69b63", alt: "#ba824f", land: true, pattern: "cracks" },
-    { key: "mountains",  name: "Pegunungan",    color: "#8e897f", alt: "#c9c5bd", land: true, mountain: true },
+    { key: "mountains",  name: "Pegunungan",    color: "#77736e", alt: "#a9a49c", land: true, mountain: true },
   ];
   const SEA = 0;
 
@@ -192,13 +192,14 @@
     const land = new Float32Array(len), mount = new Float32Array(len);
     for (let i = 0; i < len; i++) { const b = BIOMES[map.biome[i]] || BIOMES[0]; land[i] = b.land ? 1 : 0; mount[i] = b.mountain ? 1 : 0; }
     const shore = boxBlur(boxBlur(land, n, 3), n, 2);
-    const mountS = boxBlur(boxBlur(mount, n, 2), n, 1);
+    // gunung = bukit batu besar yang membulat (bukan punggung bergerigi): topeng diperhalus lebar -> kubah
+    const mountS = boxBlur(boxBlur(boxBlur(mount, n, 3), n, 3), n, 2);
     const h = new Float32Array(len), river = new Uint8Array(len);
     for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
       const i = y * n + x, s = shore[i], e = map.height[i] / 255, nz = fbm(x / 14, y / 14, seed, 4);
       if (land[i]) {
-        const ridge = 1 - Math.abs(fbm(x / 9, y / 9, seed + 7, 4) * 2 - 1);   // punggung gunung
-        h[i] = 0.035 + s * 0.06 + e * 0.9 + mountS[i] * (0.3 + ridge * 0.55) + (nz - 0.5) * 0.04;
+        const ms = mountS[i], dome = ms * ms * (3 - 2 * ms), lump = fbm(x / 10, y / 10, seed + 7, 3);   // kubah + benjolan lembut
+        h[i] = 0.035 + s * 0.06 + e * 0.9 + dome * (0.32 + lump * 0.9) + (nz - 0.5) * 0.04;
         if (h[i] < 0.015) h[i] = 0.015;
       } else {
         h[i] = Math.min(-0.012, -0.03 - (1 - s) * 0.24 + e * 0.25 + (nz - 0.5) * 0.02);
