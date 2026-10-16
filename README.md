@@ -1,6 +1,20 @@
-# Novelist Web — v0.12.1
+# Novelist Web — v0.12.2
 
-## Riwayat perubahan terbaru (v0.12.1) — paling baru di atas
+## Riwayat perubahan terbaru (v0.12.2) — paling baru di atas
+
+**Jejaring Tokoh berganti nama jadi Tree Relations** (`jejaring.js`, `jejaring.css`; id tab & data `data.jejaring`
+tetap sama, jadi tree lama langsung terbaca).
+- **Satu kartu → banyak kartu:** pilih kartu lalu tombol **Hubungkan** di bilah kartu (atau "+" → "Hubungkan ke kartu
+  lain…"), centang satu atau beberapa kartu di lembar itu (bisa dicari; yang sudah terhubung ditandai), lalu pilih jenis
+  relasinya (atau buat kustom / tanpa label). Semua garis dibuat sekaligus dan bisa diurungkan dengan sekali Ctrl+Z.
+- **Garis siku yang tidak saling tumpuk (ala vvd):** semua garis kini dirutekan bersama —
+  - garis yang keluar/masuk di sisi kartu yang sama mendapat titik sambung sendiri-sendiri, diurutkan menurut letak
+    kartu di ujung lainnya;
+  - ruas tengah yang sejajar di lorong yang sama diberi jalur berbeda (berjarak 9 px), dengan urutan yang dipilih
+    supaya persilangan sesedikit mungkin;
+  - sudut membulat, label relasi di tengah ruas tengah. Berlaku juga di pratinjau wizard.
+
+### v0.12.1
 
 **Timeline dirombak** (`timeline.js`, gaya di `style.css` bagian Timeline).
 - **Latar bintik samar** di kanvas (tema gelap & terang).
@@ -25,7 +39,7 @@
 - **Templat isian per jenis** (mis. Karakter: peran, usia, gender, ras, pekerjaan, asal, penampilan, kepribadian,
   motivasi, kekuatan & kelemahan, latar belakang; Sistem Sihir: sumber, pengguna, aturan, batasan & harga, tingkatan),
   ditambah kolom bebas **Deskripsi & catatan** (isi Organize lama tetap di sini).
-- **Foto** (klik / seret gambar; diperkecil otomatis). Karakter tanpa foto memakai foto kartunya di Jejaring Tokoh.
+- **Foto** (klik / seret gambar; diperkecil otomatis). Karakter tanpa foto memakai foto kartunya di Tree Relations (dulu Jejaring Tokoh).
 - **Nama lain / panggilan**, **tag** (saran dari tag yang sudah ada, filter tag), **folder** per jenis (buat, ganti
   nama, hapus — entri tidak ikut terhapus; seret entri ke folder atau untuk mengurutkan).
 - **Pencarian** di nama, nama lain, isian templat, tag, folder & deskripsi.

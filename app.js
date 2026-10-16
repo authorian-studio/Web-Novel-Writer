@@ -701,7 +701,7 @@ const TAB_DEFS = [
   { id: "write", panel: "write", name: "Tulis", icon: tiIcon("pencil"), desc: "Editor scene: bab & adegan bertingkat" },
   { id: "quill", panel: "write", name: "Quill", icon: tiIcon("feather"), desc: "Tulis cerita bergaya buku, lalu terbitkan" },
   { id: "organize", panel: "organize", name: "Kodeks", icon: tiIcon("books"), desc: "Wiki dunia: karakter, lokasi, faksi, sihir, sejarah & lainnya" },
-  { id: "jejaring", panel: "jejaring", name: "Jejaring Tokoh", icon: tiIcon("affiliate"), desc: "Pohon relasi tokoh: keluarga, kantor, militer, istana" },
+  { id: "jejaring", panel: "jejaring", name: "Tree Relations", icon: tiIcon("affiliate"), desc: "Pohon relasi tokoh: keluarga, kantor, militer, istana" },
   { id: "timeline", panel: "timeline", name: "Timeline", icon: tiIcon("timeline"), desc: "Garis waktu peristiwa, terhubung ke scene" },
   { id: "map", panel: "map", name: "Map", icon: tiIcon("map"), desc: "Lukis peta dunia & lihat sebagai diorama 3D" },
   { id: "plot", panel: "plot", name: "Plot", icon: tiIcon("git-branch"), desc: "Susun alur & konflik cerita (segera hadir)" },
@@ -1738,9 +1738,9 @@ function ensureJejaringLib() {
 }
 async function renderJejaringTab() {
   const box = el("jejaringCanvas");
-  if (!window.NovelJejaring) box.innerHTML = `<div class="home-loading">${tiPx(tiIcon("loader-2"), 18)}<span>Memuat Jejaring Tokoh…</span></div>`;
+  if (!window.NovelJejaring) box.innerHTML = `<div class="home-loading">${tiPx(tiIcon("loader-2"), 18)}<span>Memuat Tree Relations…</span></div>`;
   try { await ensureJejaringLib(); }
-  catch (e) { box.innerHTML = '<div class="home-loading">Jejaring Tokoh gagal dimuat. Periksa koneksi lalu buka tab ini lagi.</div>'; return; }
+  catch (e) { box.innerHTML = '<div class="home-loading">Tree Relations gagal dimuat. Periksa koneksi lalu buka tab ini lagi.</div>'; return; }
   if (el("tabJejaring").classList.contains("hidden") || el("editorView").classList.contains("hidden") || !currentProjectId) return;   // pengguna sudah pindah
   const p = getProject(currentProjectId);
   window.NovelJejaring.show({

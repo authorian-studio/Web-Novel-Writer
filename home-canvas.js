@@ -69,7 +69,7 @@
     map: { name: "Peta", icon: "#ti-map", c: "#3fb8c9", cl: "#1b8494" },
     story: { name: "Cerita", icon: "#ti-book-2", c: "#b58cff", cl: "#7d55d0" },
     chapter: { name: "Chapter", icon: "#ti-bookmark", c: "#d3c2ff", cl: "#8f78c9" },
-    jejaring: { name: "Jejaring", icon: "#ti-affiliate", c: "#f5a66b", cl: "#c86c2c" },
+    jejaring: { name: "Tree Relations", icon: "#ti-affiliate", c: "#f5a66b", cl: "#c86c2c" },
     board: { name: "Papan", icon: "#ti-layout-board", c: "#a3a8b4", cl: "#6c717c" },
   };
   const ORG = ["characters", "locations", "factions", "items", "creatures", "cultures", "magic", "history", "notes"];   // entri Kodeks
@@ -77,11 +77,11 @@
   // ubin alat "Dokumen" (urutan seperti referensi: Kartu, Peta, Kanvas, Pohon relasi, ...)
   const TILES = [
     { id: "card", kind: "characters", name: "Kartu" }, { id: "map", kind: "map", name: "Peta" }, { id: "board", kind: "board", name: "Kanvas" },
-    { id: "jejaring", kind: "jejaring", name: "Jejaring" }, { id: "timeline", kind: "timeline", name: "Timeline" },
+    { id: "jejaring", kind: "jejaring", name: "Tree" }, { id: "timeline", kind: "timeline", name: "Timeline" },
     { id: "scene", kind: "scene", name: "Scene" }, { id: "story", kind: "story", name: "Cerita" },
   ];
-  const LIST_NAMES = { characters: "Kartu", locations: "Kartu", notes: "Kartu", factions: "Kartu", items: "Kartu", creatures: "Kartu", cultures: "Kartu", magic: "Kartu", history: "Kartu", map: "Peta", board: "Kanvas (papan)", jejaring: "Jejaring Tokoh", timeline: "Timeline", scene: "Scene", story: "Cerita Quill" };
-  const NEW_NAMES = { characters: "karakter", locations: "lokasi", notes: "catatan", map: "peta", board: "papan", jejaring: "jejaring", timeline: "timeline", scene: "scene", story: "cerita" };
+  const LIST_NAMES = { characters: "Kartu", locations: "Kartu", notes: "Kartu", factions: "Kartu", items: "Kartu", creatures: "Kartu", cultures: "Kartu", magic: "Kartu", history: "Kartu", map: "Peta", board: "Kanvas (papan)", jejaring: "Tree Relations", timeline: "Timeline", scene: "Scene", story: "Cerita Quill" };
+  const NEW_NAMES = { characters: "karakter", locations: "lokasi", notes: "catatan", map: "peta", board: "papan", jejaring: "tree", timeline: "timeline", scene: "scene", story: "cerita" };
   // sampul Quill (salinan warna preset quill.js, untuk pratinjau kartu cerita)
   const COVERS = { midnight: ["#1c1f3b"], ink: ["#141418"], wine: ["#4b1627"], forest: ["#173a2b"], ocean: ["#123552"], clay: ["#7a3b26"], sand: ["#d8c49c"],
     cream: ["#efe6d1"], dusk: ["#3b1f4a", "#b04a5a"], aurora: ["#0e2a3b", "#1f6f6a", "#93cfa2"], ember: ["#2a0e0a", "#b8472a"], nebula: ["#140f30", "#3d2b7c", "#c2709c"],
@@ -364,7 +364,7 @@
       }
       case "jejaring": {
         const ppl = jjPeople(o);
-        return { path: "Jejaring Tokoh", snip: ppl.slice(0, 6).map((n) => personName(n, ix)).join(" · "), meta: ppl.length + " tokoh · " + (Array.isArray(o.sheets) ? o.sheets.length : 0) + " lembar" };
+        return { path: "Tree Relations", snip: ppl.slice(0, 6).map((n) => personName(n, ix)).join(" · "), meta: ppl.length + " tokoh · " + (Array.isArray(o.sheets) ? o.sheets.length : 0) + " lembar" };
       }
       case "board": return { path: "Papan kanvas", snip: "", meta: (Array.isArray(o.nodes) ? o.nodes.length : 0) + " objek" };
     }
@@ -1981,7 +1981,7 @@
       dom.empty.innerHTML = home
         ? (T.length
           ? `<span class="hc-empty-ic">${icS("#ti-adjustments-horizontal", 22)}</span><p>Semua jejak disembunyikan</p><small>Buka filter jejak di tepi kanan untuk menampilkan jenis dokumen lagi.</small>`
-          : `<span class="hc-empty-ic">${icS("#ti-route", 22)}</span><p>Belum ada jejak</p><small>Setiap scene, bab, karakter, peta, timeline, cerita & jejaring yang kamu buat muncul di sini sebagai titik yang tersambung benang — klik titiknya untuk kembali ke dokumen itu.</small>`)
+          : `<span class="hc-empty-ic">${icS("#ti-route", 22)}</span><p>Belum ada jejak</p><small>Setiap scene, bab, karakter, peta, timeline, cerita & tree relasi yang kamu buat muncul di sini sebagai titik yang tersambung benang — klik titiknya untuk kembali ke dokumen itu.</small>`)
         : `<span class="hc-empty-ic">${icS("#ti-layout-board", 22)}</span><p>Papan ini masih kosong</p><small>Pilih alat di bawah — dokumen, catatan, bentuk, gambar, teks atau frame. Seret latar untuk menggeser, roda mouse untuk zoom.</small>`;
     }
   }
@@ -2012,7 +2012,7 @@
     const viaTab = kind === "jejaring";
     const newLabel = `Buat ${NEW_NAMES[kind]} baru${dm.q.trim() && !viaTab ? ` “${dm.q.trim()}”` : ""}${viaTab ? "…" : ""}`;
     return rows + none + '<div class="hc-mi-sep" role="separator"></div>' +
-      `<button type="button" class="hc-mi hc-dl-new" role="menuitem" data-act="docnew"${viaTab ? ' title="Dibuat lewat wizard di tab Jejaring Tokoh"' : ""}><span class="hc-mi-ic">${icS("#ti-plus", 15)}</span><span class="hc-mi-label">${esc(newLabel)}${viaTab ? "<small>Lewat wizard di tab Jejaring Tokoh — kartunya ditaruh di sini setelah dibuat</small>" : ""}</span></button>`;
+      `<button type="button" class="hc-mi hc-dl-new" role="menuitem" data-act="docnew"${viaTab ? ' title="Dibuat lewat wizard di tab Tree Relations"' : ""}><span class="hc-mi-ic">${icS("#ti-plus", 15)}</span><span class="hc-mi-label">${esc(newLabel)}${viaTab ? "<small>Lewat wizard di tab Tree Relations — kartunya ditaruh di sini setelah dibuat</small>" : ""}</span></button>`;
   }
   function menuHtml(kind, o) {
     const home = board.id === HOME_ID, x = H();
