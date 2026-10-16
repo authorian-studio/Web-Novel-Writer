@@ -6,6 +6,7 @@ let currentOrgCat = "characters";
 let currentOrgItemId = null;
 let accessToken = null;
 let tokenClient = null;
+let tokenExpiresAt = 0;        // kapan access token Google habis (ms); 0 = tidak diketahui (mis. token dari Android)
 let activeCardMenuProjectId = null;
 let editingProjectId = null;
 let saveDebounceTimer = null;
@@ -144,22 +145,84 @@ function toast(msg, icon) {
 }
 
 // ================= LOGIN GATE =================
+// Access token Google (GIS token model) habis setelah ±1 jam. Token baru diminta diam-diam (prompt "") sebelum habis
+// dan saat Drive menjawab 401; kalau itu gagal (mis. popup diblokir browser), tulisan tetap aman di perangkat dan status
+// simpan berubah jadi "Perlu login ulang" yang bisa diklik.
+let tokenWaiters = [];          // permintaan token yang menunggu jawaban GIS
+let tokenRefreshing = null;     // satu refresh diam-diam pada satu waktu
+let tokenRefreshTimer = 0;
+const TOKEN_REFRESH_EARLY_MS = 5 * 60000;   // perpanjang 5 menit sebelum habis
+const TOKEN_SILENT_TIMEOUT_MS = 20000;      // GIS tidak menjawab (popup tertutup diam-diam) -> anggap gagal
 function ensureTokenClient() {
   if (tokenClient) return tokenClient;
-  tokenClient = google.accounts.oauth2.initTokenClient({ client_id: GOOGLE_CLIENT_ID, scope: GOOGLE_SCOPES, callback: () => {} });
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID, scope: GOOGLE_SCOPES, callback: onTokenResponse,
+    error_callback: onTokenError,   // popup ditutup / diblokir -> janji login tidak menggantung selamanya
+  });
   return tokenClient;
 }
-function driveSignIn(interactive = true) {
+function settleTokenWaiters(resp) {
+  const list = tokenWaiters;
+  tokenWaiters = [];
+  list.forEach((w) => { clearTimeout(w.t); if (!resp || resp.error) w.reject(resp || { error: "unknown" }); else w.resolve(accessToken); });
+}
+function onTokenResponse(resp) {
+  if (resp && !resp.error && resp.access_token) {
+    accessToken = resp.access_token;
+    tokenExpiresAt = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
+    tokenSilentFailAt = 0;
+    scheduleTokenRefresh();
+  }
+  settleTokenWaiters(resp && resp.access_token ? resp : { error: (resp && resp.error) || "no_token" });
+}
+function onTokenError(err) { settleTokenWaiters({ error: (err && (err.type || err.message)) || "popup_error" }); }
+// prompt: "consent" (login pertama) | "" (tanpa layar izin bila sudah pernah setuju). timeoutMs 0 = tunggu terus.
+function requestGoogleToken(prompt, timeoutMs) {
   return new Promise((resolve, reject) => {
     if (GOOGLE_CLIENT_ID.startsWith("ISI_CLIENT_ID")) { reject({ error: "Client ID Google belum diisi di config.js" }); return; }
+    if (!window.google || !google.accounts || !google.accounts.oauth2) { reject({ error: "Layanan login Google belum dimuat" }); return; }
     const client = ensureTokenClient();
-    client.callback = (resp) => { if (resp.error) { reject(resp); return; } accessToken = resp.access_token; resolve(accessToken); };
-    client.requestAccessToken({ prompt: interactive ? "consent" : "" });
+    const w = { resolve, reject, t: 0 };
+    if (timeoutMs) w.t = setTimeout(() => { tokenWaiters = tokenWaiters.filter((x) => x !== w); reject({ error: "timeout" }); }, timeoutMs);
+    tokenWaiters.push(w);
+    client.callback = onTokenResponse;
+    client.error_callback = onTokenError;
+    const opts = { prompt };
+    const email = typeof accountInfo !== "undefined" && accountInfo && accountInfo.user && accountInfo.user.emailAddress;
+    if (prompt === "" && email) opts.login_hint = email;   // akun yang sama, tanpa memilih akun lagi
+    try { client.requestAccessToken(opts); } catch (e) { settleTokenWaiters({ error: (e && e.message) || "request_failed" }); }
   });
 }
+function driveSignIn(interactive = true) { return requestGoogleToken(interactive ? "consent" : "", 0); }
+// token baru tanpa interaksi -> Promise<boolean>. Satu permintaan bersamaan saja; baru saja gagal (mis. popup diblokir)
+// -> tidak dicoba terus-menerus tiap simpan (menunggu 2 menit atau login lewat klik status).
+let tokenSilentFailAt = 0;
+function driveRefreshToken() {
+  if (tokenRefreshing) return tokenRefreshing;
+  if (Date.now() - tokenSilentFailAt < 120000) return Promise.resolve(false);
+  tokenRefreshing = requestGoogleToken("", TOKEN_SILENT_TIMEOUT_MS)
+    .then(() => true, () => { tokenSilentFailAt = Date.now(); return false; })
+    .finally(() => { tokenRefreshing = null; });
+  return tokenRefreshing;
+}
+// dipakai driveFetch: Android memasang NovelistSync.hooks.refreshToken (Google Play services), web memakai GIS
+function refreshAccessToken(force) {
+  const hook = window.NovelistSync && window.NovelistSync.hooks && window.NovelistSync.hooks.refreshToken;
+  if (hook) return Promise.resolve().then(() => hook(!!force)).then((ok) => !!ok && !!accessToken, () => false);
+  return driveRefreshToken();
+}
+function scheduleTokenRefresh() {
+  clearTimeout(tokenRefreshTimer);
+  if (!tokenExpiresAt) return;
+  const wait = Math.max(30000, tokenExpiresAt - Date.now() - TOKEN_REFRESH_EARLY_MS);
+  tokenRefreshTimer = setTimeout(() => { if (accessToken) refreshAccessToken(false); }, wait);
+}
+const tokenExpiringSoon = () => !!tokenExpiresAt && Date.now() > tokenExpiresAt - 60000;
 function driveSignOut() {
-  if (accessToken && google.accounts?.oauth2?.revoke) google.accounts.oauth2.revoke(accessToken, () => {});
+  if (accessToken && window.google && google.accounts?.oauth2?.revoke) google.accounts.oauth2.revoke(accessToken, () => {});
   accessToken = null;
+  tokenExpiresAt = 0;
+  clearTimeout(tokenRefreshTimer);
   projects = [];
   // ID folder Drive milik akun ini — dibuang supaya login dengan akun Google lain tidak memakai folder akun sebelumnya
   mainFolderIdCache = backupFolderIdCache = trashFolderIdCache = null;
@@ -595,13 +658,17 @@ function switchToProject(id) {
   openProject(id);
 }
 
-function backToLibrary() {
-  closeProjSidebar();
-  flushCurrentEdits();
+// modul yang memegang tampilan/isi project sendiri: simpan teks yang sedang diedit lalu lepas
+function hideProjectModules() {
   if (window.NovelMap) window.NovelMap.hide();
   if (window.NovelQuill) window.NovelQuill.hide();
   if (window.NovelHome) window.NovelHome.hide();
   if (window.NovelJejaring) window.NovelJejaring.hide();
+}
+function backToLibrary() {
+  closeProjSidebar();
+  flushCurrentEdits();
+  hideProjectModules();
   muteTimelineKeys(true);
   const p = getProject(currentProjectId);
   if (p) { p.title = el("projectTitle").value; p.data.title = p.title; p.updatedAt = new Date().toISOString(); }
@@ -2764,10 +2831,15 @@ function twMirrorSave() {
   const box = el("twSave"), src = el("saveStatus");
   if (!box || !src) return;
   const t = src.textContent.replace(/\s+/g, " ").trim();
-  const st = /menyimpan|menyinkron/i.test(t) ? "saving" : /gagal|error|offline|tidak/i.test(t) ? "error" : "saved";
+  // data-state dari setSaveStatus; teks lama tanpa data-state ditebak dari isinya
+  const ds = src.dataset.state;
+  const st = ds === "saving" ? "saving" : ds === "local" || ds === "offline" ? "local"
+    : ds === "login" || ds === "error" || ds === "conflict" || ds === "readonly" ? "error" : ds ? "saved"
+    : /menyimpan|menyinkron/i.test(t) ? "saving" : /gagal|error|offline|tidak|login/i.test(t) ? "error" : "saved";
   box.dataset.state = st;
+  box.classList.toggle("is-action", src.classList.contains("is-action"));
   box.querySelector(".tw-save-text").textContent = st === "saving" ? "Menyimpan…" : (t || "Tersimpan");
-  box.title = st === "saving" ? "Menyimpan ke Google Drive…" : (t || "Tersimpan");
+  box.title = src.title || (st === "saving" ? "Menyimpan…" : (t || "Tersimpan"));
 }
 
 // ---- pasang event tab Tulis (sekali, saat halaman dimuat) ----
@@ -3278,11 +3350,56 @@ function openPreview() {
 }
 
 // ================= SAVE STATUS =================
-function markDirty() { hasUnsyncedChanges = true; dirtySinceLastBackup = true; if (!firstDirtyAt) firstDirtyAt = Date.now(); el("saveStatus").textContent = "Menyimpan..."; }
-// icon (opsional) = markup ikon Tabler di depan label status, mis. markSaved("Gagal sinkron", tiIcon("alert-triangle"))
+// #saveStatus (kanan bawah editor; disalin ke bar bawah Tulis). data-state: saving | local | synced | offline | login |
+// error | conflict | readonly. "login" & "error" bisa diklik: login ulang / coba sinkron lagi.
+// markSaved HANYA untuk simpan yang benar-benar berhasil — status lain lewat setSaveStatus (tanda "belum tersimpan" tetap).
+const SAVE_ACTION_STATES = ["login", "error"];
+function setSaveStatus(label, icon, state) {
+  const s = el("saveStatus");
+  if (!s) return;
+  const st = state || "synced", text = label || "Tersimpan";
+  if (s.dataset.state === st && s.dataset.label === text) return;   // tiap ketukan tombol: tidak perlu menulis ulang DOM
+  s.dataset.state = st; s.dataset.label = text;
+  s.innerHTML = (icon ? tiPx(icon, 13) : "") + escapeHtml(text);
+  const action = SAVE_ACTION_STATES.includes(st);
+  s.classList.toggle("is-action", action);
+  if (action) {
+    s.setAttribute("role", "button"); s.tabIndex = 0;
+    s.title = st === "login" ? "Klik untuk login ulang ke Google — tulisanmu tetap aman" : "Klik untuk mencoba sinkron lagi";
+  } else { s.removeAttribute("role"); s.removeAttribute("tabindex"); s.title = ""; }
+}
+function markDirty() {
+  hasUnsyncedChanges = true; dirtySinceLastBackup = true;
+  if (!firstDirtyAt) firstDirtyAt = Date.now();
+  const p = getProject(currentProjectId);
+  if (p) p._editSeq = (p._editSeq || 0) + 1;   // nomor suntingan: simpan yang selesai setelah ada ketikan baru tidak dianggap "tersimpan"
+  setSaveStatus("Menyimpan…", null, "saving");
+}
+// icon (opsional) = markup ikon Tabler di depan label status, mis. markSaved("Tersimpan", tiIcon("cloud-check"))
 function markSaved(label, icon) {
   hasUnsyncedChanges = false; firstDirtyAt = null;
-  el("saveStatus").innerHTML = (icon ? tiPx(icon, 13) : "") + escapeHtml(label || "Tersimpan");
+  setSaveStatus(label || "Tersimpan", icon, "synced");
+}
+const hhmm = () => new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+// masih ada yang belum sampai ke Drive? (dipakai peringatan "tinggalkan halaman")
+function hasPendingSave() {
+  const ns = window.NovelistSync;
+  if (ns && typeof ns.hasPending === "function") return ns.hasPending();
+  return hasUnsyncedChanges;
+}
+// Tab ditutup / disembunyikan / dimuat ulang: ketikan yang belum masuk data (kolom edit Jejaring/Beranda, editor) masuk
+// sekarang, lalu salinan darurat ditulis SINKRON (novelist-sync -> localStorage), karena simpan async bisa tidak sempat selesai.
+function flushBeforeLeave() {
+  try {
+    const p = getProject(currentProjectId);
+    if (p && !el("editorView").classList.contains("hidden")) {
+      flushCurrentEdits();
+      const t = el("projectTitle").value;
+      if (t && p.title !== t) { p.title = t; p.data.title = t; }
+    }
+  } catch (e) { console.error(e); }
+  try { if (window.NovelistSync && typeof window.NovelistSync.emergencySave === "function") window.NovelistSync.emergencySave(); }
+  catch (e) { console.error(e); }
 }
 async function doAutosaveFlush() {
   clearTimeout(saveDebounceTimer);
@@ -3310,10 +3427,19 @@ let mainFolderIdCache = null;
 let backupFolderIdCache = null;
 let trashFolderIdCache = null;
 
+// Error yang butuh login ulang ditandai code "auth" (dikenali novelist-sync & status simpan)
+function driveAuthError(msg) { const e = new Error(msg); e.code = "auth"; return e; }
+const isDriveAuthError = (e) => !!e && (e.code === "auth" || /Sesi Google berakhir|Belum login/i.test(e.message || ""));
+const withAuth = (options) => ({ ...options, headers: { ...(options.headers || {}), Authorization: `Bearer ${accessToken}` } });
+// Token yang hampir/sudah habis diperpanjang diam-diam dulu; jawaban 401 -> perpanjang lalu ulangi SEKALI.
+// Baru kalau itu gagal, token dibuang & error "auth" dilempar (penyimpanan menunggu login ulang, data tidak dibuang).
 async function driveFetch(url, options = {}) {
-  const res = await fetch(url, { ...options, headers: { ...(options.headers || {}), Authorization: `Bearer ${accessToken}` } });
-  if (res.status === 401) { accessToken = null; throw new Error("Sesi Google berakhir, silakan login ulang."); }
-  if (!res.ok) throw new Error(`Drive API error ${res.status}: ${await res.text()}`);
+  if (!accessToken || tokenExpiringSoon()) await refreshAccessToken(false);
+  if (!accessToken) throw driveAuthError("Belum login ke Google");
+  let res = await fetch(url, withAuth(options));
+  if (res.status === 401 && (await refreshAccessToken(true))) res = await fetch(url, withAuth(options));
+  if (res.status === 401) { accessToken = null; tokenExpiresAt = 0; throw driveAuthError("Sesi Google berakhir, silakan login ulang."); }
+  if (!res.ok) { const e = new Error(`Drive API error ${res.status}: ${await res.text()}`); e.status = res.status; throw e; }
   return res;
 }
 async function getOrCreateFolder(name, cacheKey) {
@@ -3339,12 +3465,30 @@ async function driveListInFolder(folderId, extraQuery = "") {
   const res = await driveFetch(`${DRIVE_API}/files?q=${q}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc&pageSize=100`);
   return (await res.json()).files;
 }
+// Upload multipart Drive dibatasi 5 MB; project yang lebih besar (banyak gambar) diunggah lewat sesi resumable
+const DRIVE_MULTIPART_MAX = 4 * 1024 * 1024;
 async function driveUpload(fileName, jsonContent, fileId, folderId) {
   const metadata = fileId ? {} : { name: fileName, parents: [folderId] };
+  const n = jsonContent.length;
+  if (n > DRIVE_MULTIPART_MAX || (n * 3 > DRIVE_MULTIPART_MAX && new Blob([jsonContent]).size > DRIVE_MULTIPART_MAX)) {
+    return driveUploadResumable(metadata, jsonContent, fileId);
+  }
   const boundary = "novelist_boundary_" + Date.now();
   const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${jsonContent}\r\n--${boundary}--`;
   const url = fileId ? `${DRIVE_UPLOAD_API}/files/${fileId}?uploadType=multipart&fields=id,name,modifiedTime` : `${DRIVE_UPLOAD_API}/files?uploadType=multipart&fields=id,name,modifiedTime`;
   const res = await driveFetch(url, { method: fileId ? "PATCH" : "POST", headers: { "Content-Type": `multipart/related; boundary=${boundary}` }, body });
+  return await res.json();
+}
+async function driveUploadResumable(metadata, jsonContent, fileId) {
+  const q = "?uploadType=resumable&fields=id,name,modifiedTime";
+  const start = await driveFetch(fileId ? `${DRIVE_UPLOAD_API}/files/${fileId}${q}` : `${DRIVE_UPLOAD_API}/files${q}`, {
+    method: fileId ? "PATCH" : "POST",
+    headers: { "Content-Type": "application/json; charset=UTF-8", "X-Upload-Content-Type": "application/json" },
+    body: JSON.stringify(metadata),
+  });
+  const session = start.headers.get("Location");
+  if (!session) throw new Error("Drive API error: sesi upload resumable tidak didapat");
+  const res = await driveFetch(session, { method: "PUT", headers: { "Content-Type": "application/json" }, body: jsonContent });
   return await res.json();
 }
 async function driveGetContent(fileId) { return (await driveFetch(`${DRIVE_API}/files/${fileId}?alt=media`)).text(); }
@@ -3355,12 +3499,30 @@ async function driveMoveFile(fileId, fromFolderId, toFolderId) {
 }
 
 // ---- simpan file utama project ----
-async function saveProjectToDriveMain(p) {
-  if (!p || !accessToken || p._deleted) return;
+// (Versi web & Android memakai novelist-sync.js yang mengganti fungsi ini: simpan di perangkat dulu + deteksi konflik.
+// Ini jalur cadangan bila novelist-sync.js tidak termuat — tetap aman: satu upload per project, gagal = tetap ditandai
+// belum tersimpan + dicoba lagi otomatis.)
+// Satu upload per project pada satu waktu; permintaan selama upload berjalan digabung menjadi SATU upload berikutnya
+// berisi data terbaru (urutan tidak bisa tertukar, project baru tidak dibuat dua kali).
+const driveSaveJobs = new Map();   // p.id -> { promise, again }
+const driveRetry = { timer: 0, delay: 0 };
+function saveProjectToDriveMain(p) {
+  if (!p || p._deleted) return Promise.resolve();
+  const running = driveSaveJobs.get(p.id);
+  if (running) { running.again = true; return running.promise; }
+  const job = { again: false, promise: null };
+  job.promise = (async () => {
+    try { do { job.again = false; await uploadProjectOnce(p, job); } while (job.again && !p._deleted); }
+    finally { driveSaveJobs.delete(p.id); }
+  })();
+  driveSaveJobs.set(p.id, job);
+  return job.promise;
+}
+async function uploadProjectOnce(p, job) {
+  const seq = p._editSeq || 0;
   try {
     const folderId = await getOrCreateFolder(DRIVE_FOLDER_NAME, "main");
-    const payload = { ...p.data, cover: p.cover || null };
-    const json = JSON.stringify(payload);
+    const json = JSON.stringify({ ...p.data, cover: p.cover || null });
     const result = await driveUpload(p.title + ".novj", json, p.driveFileId, folderId);
     if (p._deleted) {
       // Project dihapus SAAT save ini masih berjalan (race condition) — jangan biarkan
@@ -3373,14 +3535,41 @@ async function saveProjectToDriveMain(p) {
     }
     p.driveFileId = result.id;
     p.updatedAt = new Date().toISOString();
-    markSaved("Tersimpan " + new Date().toLocaleTimeString());
+    driveRetry.delay = 0;
+    // ada ketikan baru selama upload -> belum "tersimpan" (upload berikutnya sudah dijadwalkan autosave)
+    if (p.id === currentProjectId && (p._editSeq || 0) === seq && !job.again) markSaved("Tersinkron ke Drive · " + hhmm(), tiIcon("cloud-check"));
     updateSyncIndicator(true);
     if (!el("dashboardView").classList.contains("hidden")) renderDashboard();
   } catch (e) {
-    markSaved("Gagal sinkron", tiIcon("alert-triangle"));
-    updateSyncIndicator(false);
     console.error(e);
+    hasUnsyncedChanges = true;   // JANGAN dianggap tersimpan: peringatan saat menutup tab tetap muncul
+    const auth = isDriveAuthError(e), offline = navigator.onLine === false;
+    if (p.id === currentProjectId) {
+      if (auth) setSaveStatus("Perlu login ulang", tiIcon("alert-triangle"), "login");
+      else if (offline) setSaveStatus("Offline — belum tersinkron", tiIcon("cloud-x"), "offline");
+      else setSaveStatus("Gagal sinkron — coba lagi", tiIcon("alert-triangle"), "error");
+    }
+    updateSyncIndicator(false);
+    if (!auth) scheduleDriveRetry(p);
   }
+}
+// coba lagi otomatis: 2 dtk, 4, 8, … maks. 1 menit (offline: menunggu event "online")
+function scheduleDriveRetry(p) {
+  clearTimeout(driveRetry.timer);
+  driveRetry.delay = Math.min(60000, Math.max(2000, driveRetry.delay * 2));
+  driveRetry.timer = setTimeout(() => {
+    if (navigator.onLine === false || window.NovelistSync) return;
+    if (projects.includes(p) && !p._deleted) saveProjectToDriveMain(p);
+  }, driveRetry.delay);
+}
+// klik status "Perlu login ulang" / "Gagal sinkron" (jalur cadangan; novelist-sync memasang penanganannya sendiri)
+async function retrySaveFromStatus() {
+  if (window.NovelistSync) return;
+  const p = getProject(currentProjectId);
+  if (!accessToken) {
+    try { await driveSignIn(false); } catch (e) { toast("Login gagal: " + ((e && (e.error || e.message)) || e), tiIcon("alert-triangle")); return; }
+  }
+  if (p) { driveRetry.delay = 0; await saveProjectToDriveMain(p); }
 }
 
 // ---- backup bertimestamp ke folder terpisah ----
@@ -3432,10 +3621,12 @@ async function openBackupHistory() {
         if (!confirm("Pulihkan dari backup ini? Perubahan yang belum disimpan di project aktif akan tertimpa.")) return;
         const content = await driveGetContent(f.id);
         const restored = migrateOldData(JSON.parse(content));
+        hideProjectModules();   // modul yang masih memegang data lama dilepas dulu (isinya tidak ikut menimpa)
         p.data = restored;
         p.cover = restored.cover || null;
         el("backupModal").classList.add("hidden");
         openProject(p.id);
+        markDirtyAndSchedule();   // versi hasil pulihan = suntingan baru -> langsung disimpan (tidak kembali ke versi lama saat reload)
         toast("Project dipulihkan dari backup", tiIcon("restore"));
       };
       el("backupList").appendChild(row);
@@ -4952,8 +5143,79 @@ function initRailSidebar() {
   }).observe(el("btnRailLogo"));
 }
 
+// ================= BANNER APLIKASI (versi baru tersedia, project hanya-baca, dll.) =================
+// showAppBanner({ id, text, icon, action, onAction, danger }) — satu banner per id, tombol × menutup.
+function showAppBanner(o) {
+  let b = document.getElementById("appBanner-" + o.id);
+  if (!b) {
+    b = document.createElement("div");
+    b.id = "appBanner-" + o.id;
+    b.className = "app-banner";
+    b.setAttribute("role", "status");
+    document.body.appendChild(b);
+  }
+  b.classList.toggle("is-danger", !!o.danger);
+  b.innerHTML = `${o.icon ? tiPx(o.icon, 16) : ""}<span class="app-banner-text"></span>` +
+    (o.action ? '<button type="button" class="app-banner-btn"></button>' : "") +
+    `<button type="button" class="app-banner-x" aria-label="Tutup">${tiPx(tiIcon("x"), 14)}</button>`;
+  b.querySelector(".app-banner-text").textContent = o.text;
+  if (o.action) { const btn = b.querySelector(".app-banner-btn"); btn.textContent = o.action; btn.onclick = () => o.onAction && o.onAction(btn); }
+  b.querySelector(".app-banner-x").onclick = () => b.remove();
+  return b;
+}
+function hideAppBanner(id) { const b = document.getElementById("appBanner-" + id); if (b) b.remove(); }
+
+// ================= VERSI BARU DI SERVER =================
+// Tab yang dibiarkan terbuka berjam-jam tetap menjalankan kode lama (yang ikut menyimpan project). Tiap 10 menit & saat
+// tab kembali dibuka, app.js + novelist-sync.js di server dicek (ETag / Last-Modified). Berubah -> ajakan muat ulang.
+// Server tanpa penanda versi (mis. aset aplikasi Android) -> pengecekan dimatikan.
+const UPDATE_CHECK_MS = 10 * 60000;
+const updateCheck = { base: null, last: 0, off: false, shown: false };
+async function fetchDeployStamp() {
+  const parts = [];
+  for (const f of ["app.js", "novelist-sync.js"]) {
+    const r = await fetch(f, { method: "HEAD", cache: "no-store" });
+    const v = r.ok ? r.headers.get("etag") || r.headers.get("last-modified") : null;
+    if (!v) return null;
+    parts.push(v);
+  }
+  return parts.join("|");
+}
+async function checkForAppUpdate(force) {
+  if (updateCheck.off || updateCheck.shown || !/^https?:$/.test(location.protocol)) return;
+  if (!force && Date.now() - updateCheck.last < 60000) return;
+  updateCheck.last = Date.now();
+  let stamp = null;
+  try { stamp = await fetchDeployStamp(); } catch (e) { return; }   // offline: coba lagi nanti
+  if (!stamp) { updateCheck.off = true; return; }
+  if (updateCheck.base === null) { updateCheck.base = stamp; return; }
+  if (stamp === updateCheck.base) return;
+  updateCheck.shown = true;
+  showAppBanner({
+    id: "update", icon: tiIcon("refresh"), action: "Muat ulang",
+    text: "Versi baru Novelist tersedia. Muat ulang halaman supaya tulisanmu disimpan dengan versi terbaru.",
+    onAction: async (btn) => {
+      btn.disabled = true; btn.textContent = "Menyimpan…";
+      flushBeforeLeave();
+      try { await Promise.race([doAutosaveFlush(), new Promise((r) => setTimeout(r, 5000))]); } catch (e) { /* tetap ada salinan di perangkat */ }
+      location.reload();
+    },
+  });
+}
+function initUpdateCheck() {
+  checkForAppUpdate(true);
+  setInterval(() => { if (!document.hidden) checkForAppUpdate(); }, UPDATE_CHECK_MS);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) checkForAppUpdate(); });
+}
+
 // ================= EVENT BINDING =================
 window.addEventListener("DOMContentLoaded", () => {
+  initUpdateCheck();
+  // novelist-sync.js (simpan di perangkat + sinkron) gagal dimuat -> jalur cadangan: hanya Drive, beri tahu pengguna
+  if (!window.NovelistSync) {
+    showAppBanner({ id: "nosync", danger: true, icon: tiIcon("alert-triangle"), action: "Muat ulang", onAction: () => location.reload(),
+      text: "Penyimpanan di perangkat tidak aktif (novelist-sync.js gagal dimuat) — tulisan hanya tersimpan ke Google Drive. Muat ulang halaman." });
+  }
   initLoginArt();
   initLoginFooter();
   initRailLogo();
@@ -5099,13 +5361,23 @@ window.addEventListener("DOMContentLoaded", () => {
   // Backup modal
   el("btnCloseBackup").onclick = () => el("backupModal").classList.add("hidden");
 
-  // Cegah kehilangan data kalau tab ditutup sebelum sempat autosave
+  // Cegah kehilangan data kalau tab ditutup sebelum sempat autosave: ketikan yang masih di kolom edit dimasukkan dulu +
+  // salinan darurat ditulis sinkron (flushBeforeLeave), lalu peringatan bila masih ada yang belum sampai ke Drive
   window.addEventListener("beforeunload", (e) => {
-    if (hasUnsyncedChanges) { e.preventDefault(); e.returnValue = ""; }
+    flushBeforeLeave();
+    if (hasPendingSave()) { e.preventDefault(); e.returnValue = ""; }
   });
-  // Simpan langsung (tanpa menunggu debounce) begitu tab disembunyikan / app kehilangan fokus
-  document.addEventListener("visibilitychange", () => { if (document.hidden && hasUnsyncedChanges) doAutosaveFlush(); });
-  window.addEventListener("pagehide", () => { if (hasUnsyncedChanges) doAutosaveFlush(); });
+  // Simpan langsung (tanpa menunggu debounce) begitu tab disembunyikan / app kehilangan fokus / halaman ditutup
+  const saveOnLeave = () => { flushBeforeLeave(); if (hasUnsyncedChanges || hasPendingSave()) doAutosaveFlush(); };
+  document.addEventListener("visibilitychange", () => { if (document.hidden) saveOnLeave(); });
+  window.addEventListener("pagehide", saveOnLeave);
+  // jalur cadangan (tanpa novelist-sync): kembali online -> kirim yang tertunda
+  window.addEventListener("online", () => { if (!window.NovelistSync && hasUnsyncedChanges && currentProjectId) { driveRetry.delay = 0; doAutosaveFlush(); } });
+  // status simpan yang bisa diklik ("Perlu login ulang" / "Gagal sinkron — coba lagi"); salinan di bar Tulis meneruskan klik
+  const statusAct = (e) => { if (e.type === "keydown" && e.key !== "Enter" && e.key !== " ") return; if (!el("saveStatus").classList.contains("is-action")) return; if (e.type === "keydown") e.preventDefault(); retrySaveFromStatus(); };
+  el("saveStatus").addEventListener("click", statusAct);
+  el("saveStatus").addEventListener("keydown", statusAct);
+  el("twSave").addEventListener("click", () => { if (el("saveStatus").classList.contains("is-action")) el("saveStatus").click(); });
 
   window.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "s") {

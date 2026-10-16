@@ -1,6 +1,31 @@
-# Novelist Web — v0.11.1
+# Novelist Web — v0.11.2
 
-## Riwayat perubahan terbaru (v0.11.1) — paling baru di atas
+## Riwayat perubahan terbaru (v0.11.2) — paling baru di atas
+
+**Perbaikan & penguatan sistem simpan Google Drive** (tulisan di Jejaring Tokoh yang tidak tersimpan).
+Penyebab yang ditemukan & diperbaiki:
+- **Sesi Google habis (±1 jam) → simpan berhenti diam-diam.** Sekarang token diperpanjang otomatis tanpa popup
+  (sebelum habis & saat Drive menjawab 401), lalu simpan dicoba lagi. Kalau perpanjangan gagal: data tetap aman di
+  perangkat, status **"Perlu login ulang"** bisa diklik untuk login lalu langsung tersinkron.
+- **Simpan yang gagal dianggap berhasil.** Status "belum tersimpan" tidak lagi dihapus saat upload gagal, jadi dicoba
+  lagi otomatis (2, 4, 8 … maks. 60 dtk) dan browser tetap memperingatkan sebelum tab ditutup.
+- **Jejaring & Beranda hanya menyimpan saat kolom ditinggalkan / Enter; Esc membuang ketikan.** Sekarang ketikan
+  langsung tercatat sambil mengetik, Esc menyimpan teks (Ctrl+Z tetap bisa mengurungkan), dan semua kolom yang
+  sedang disunting disetor dulu sebelum simpan/sinkron/tab disembunyikan.
+- **Dua tab / versi lama menimpa data yang lebih baru**, dan versi Drive yang diambil otomatis membuat editor yang
+  terbuka "lepas" dari data. Sekarang tab yang ketinggalan tidak boleh menimpa (nomor revisi + BroadcastChannel),
+  versi Drive tidak diterapkan saat sedang mengetik, perubahan di dua tempat → dialog konflik (simpan keduanya /
+  pilih salah satu, versi lain masuk backup), dan setelah versi baru diambil semua modul dibuka ulang dengan data baru.
+- **Upload tumpang tindih** (urutan acak, file project baru dobel) → kini satu upload per project, yang terakhir menang.
+- Status **di pojok editor tidak lagi tertutup kanvas Jejaring**: "Menyimpan…", "Tersimpan di perangkat",
+  "Tersinkron ke Drive · JJ.MM", "Offline — tersimpan di perangkat", "Perlu login ulang", "Gagal sinkron — coba lagi".
+- **Simpan di perangkat dulu** (novelist-sync.js, sama dengan aplikasi Android): tiap suntingan masuk IndexedDB ±1 dtk
+  setelah diketik + salinan darurat saat tab ditutup, dipulihkan & dikirim ke Drive saat dibuka lagi; bisa offline.
+- Diuji dengan Drive tiruan: semua modul (Tulis, Organize, Quill, Jejaring nama/catatan/garis/kartu, Beranda
+  catatan/dokumen, Map, Timeline) tersimpan, pulih setelah tab ditutup < 300 ms, token habis, offline, Drive 500,
+  suntingan cepat, versi dari perangkat lain, konflik, dua tab, IndexedDB diblokir, project > 5 MB — semuanya lulus.
+
+### v0.11.1
 
 - **Beranda memenuhi seluruh layar** (seperti halaman dunia di vvd): kanvas tidak lagi di dalam panel berbingkai.
   Topbar, sidebar tab & tombol-tombol melayang di atasnya; judul papan, zoom % & menu "…" jadi chip kecil di atas,
@@ -19,6 +44,21 @@
   (cuplikan scene, potret tokoh, peta mini, strip timeline, avatar jejaring, sampul cerita). Klik dua kali / "Buka" untuk
   membuka dokumennya; kartu bisa diubah ukuran, dipindah, dihubungkan.
 - Tombol **ganti tema** di rail dashboard dihapus (tema diatur di Pengaturan Akun → Tema tampilan).
+- **Simpan di perangkat dulu + sinkron dengan deteksi konflik** (`novelist-sync.js`, dimuat setelah `app.js`; file yang
+  sama dipakai aplikasi Android, repo Web-Novel-Writer-Android). Tidak ada kode `app.js` yang diubah — fungsi simpan/muat
+  Drive dibungkus dari file itu.
+  - Setiap simpan langsung ditulis ke IndexedDB `novelist-sync` (per akun Google), baru dikirim ke Drive. Koneksi putus /
+    sesi Google habis: tulisan tetap aman di browser dan dikirim otomatis saat online / setelah login lagi (indikator
+    sinkron di dashboard — atau status simpan di editor — bisa diklik untuk sinkron sekarang atau login ulang).
+  - Sebelum mengunggah, `modifiedTime` file di Drive dicek. Diubah dari perangkat lain (mis. HP) sementara di sini tidak
+    ada suntingan → versi Drive langsung dimuat (tab yang aktif tetap). Dua-duanya disunting → dialog **Versi project
+    berbeda**: *Simpan keduanya* / *Pakai versi web* / *Pakai versi Drive*; versi yang tidak dipakai disimpan dulu ke
+    folder backup Drive. Tab yang dibiarkan terbuka tidak lagi menimpa tulisan dari perangkat lain.
+  - "Disunting" = ada perubahan lewat `markDirtyAndSchedule` (mengetik, Organize, Quill, Map, Timeline, Beranda, Jejaring,
+    …). Sekadar membuka tab Beranda/Jejaring/Timeline/Map (yang menambahkan struktur bawaannya ke project) tidak dihitung.
+  - Project yang terbuka dicek ke Drive saat tab kembali aktif dan tiap 2 menit; dashboard ikut menampilkan project baru
+    / menghapus project yang dipindah ke Trash dari perangkat lain. Hapus project saat offline diproses begitu online.
+  - Hapus akun ikut menghapus IndexedDB `novelist-sync`.
 
 ### v0.11.0
 

@@ -575,6 +575,12 @@ body.light .proj-float-btn:hover { background: rgba(0,0,0,.06); }
 .proj-float-sep { width: 20px; height: 1px; background: var(--glass-border); }
 /* status simpan: teks kecil di pojok kanan bawah (seperti "Charting your world..." di vvd) */
 .save-status { position: absolute; z-index: 4; right: 18px; bottom: 12px; font-size: calc(11.5px * var(--fs-scale, 1)); color: var(--text-dim); white-space: nowrap; pointer-events: none; }
+/* status yang perlu tindakan ("Perlu login ulang", "Gagal sinkron — coba lagi"): pil merah yang bisa diklik, di atas kanvas */
+.save-status[data-state="login"], .save-status[data-state="error"], .save-status[data-state="conflict"], .save-status[data-state="readonly"] { color: var(--danger); }
+.save-status.is-action { z-index: 60; pointer-events: auto; cursor: pointer; padding: 5px 11px 5px 9px; margin: -5px -11px -5px -9px; border-radius: 999px; background: var(--bg-panel); border: 1px solid rgba(225,92,92,.45); box-shadow: 0 6px 20px rgba(0,0,0,.28); transition: background .15s ease, border-color .15s ease; }
+.save-status.is-action:hover { background: rgba(225,92,92,.14); border-color: rgba(225,92,92,.7); }
+.save-status.is-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+body.light .save-status.is-action { box-shadow: 0 6px 18px rgba(0,0,0,.1); }
 
 #editorBody { position: relative; z-index: 1; flex: 1; display: flex; overflow: hidden; }
 #tabContent { flex: 1; overflow: hidden; position: relative; }
@@ -1365,6 +1371,9 @@ body.light .tw-range::-webkit-slider-thumb, body.light .tw-range::-moz-range-thu
 .tw-save[data-state="saving"] .tw-save-dot { background: var(--accent); box-shadow: 0 0 0 3px rgba(215,168,110,.18); animation: twPulse 1s ease-in-out infinite; }
 .tw-save[data-state="error"] .tw-save-dot { background: var(--danger); box-shadow: 0 0 0 3px rgba(225,92,92,.18); }
 .tw-save[data-state="error"] .tw-save-text { color: var(--danger); }
+.tw-save[data-state="local"] .tw-save-dot { background: var(--accent); box-shadow: 0 0 0 3px rgba(215,168,110,.18); }   /* aman di perangkat, Drive menyusul */
+.tw-save.is-action { cursor: pointer; border-radius: 999px; }
+.tw-save.is-action:hover .tw-save-text { text-decoration: underline; }
 @keyframes twPulse { 50% { opacity: .35; } }
 /* sembunyikan status simpan bawaan di pojok (sudah ada di bar) */
 @media (min-width: 701px) { #editorView[data-ptab="write"] .save-status { opacity: 0; } }
@@ -1969,6 +1978,20 @@ body.light .acc-range::-moz-range-thumb { box-shadow: 0 0 0 1px rgba(0,0,0,.18),
 .save-status { display: inline-flex; align-items: center; gap: 5px; }
 .app-toast .ti { color: var(--accent); }
 .app-toast.is-danger .ti { color: var(--danger); }
+/* banner aplikasi (showAppBanner di app.js): versi baru tersedia, project hanya-baca */
+.app-banner { position: fixed; z-index: 950; top: 14px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; width: max-content; max-width: calc(100vw - 32px); padding: 9px 10px 9px 14px; border-radius: 12px; background: var(--bg-panel); border: 1px solid var(--border); box-shadow: var(--shadow); color: var(--text); font-size: calc(13px * var(--fs-scale, 1)); line-height: 1.4; animation: fadeIn .2s ease; }
+.app-banner > .ti { flex-shrink: 0; color: var(--accent); }
+.app-banner.is-danger { border-color: rgba(225,92,92,.5); }
+.app-banner.is-danger > .ti { color: var(--danger); }
+.app-banner-text { min-width: 0; }
+.app-banner-btn { flex-shrink: 0; border: none; border-radius: 8px; padding: 6px 12px; background: var(--accent); color: #1a1408; font: inherit; font-weight: 600; cursor: pointer; }
+.app-banner-btn:disabled { opacity: .7; cursor: default; }
+.app-banner-x { flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; border-radius: 8px; background: transparent; color: var(--text-dim); cursor: pointer; }
+.app-banner-x:hover { background: rgba(255,255,255,.08); color: var(--text); }
+body.light .app-banner-x:hover { background: rgba(0,0,0,.06); }
+.app-banner button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 520px) { .app-banner { top: 8px; flex-wrap: wrap; } }
+@media (prefers-reduced-motion: reduce) { .app-banner { animation: none; } }
 .preview-content h2.preview-chapter { display: flex; align-items: center; gap: 8px; }
 .preview-chapter .ti { color: var(--accent); width: .95em; height: .95em; }
 @media (prefers-reduced-motion: reduce) { .cloud-action-btn.is-busy .ti { animation: none; } }

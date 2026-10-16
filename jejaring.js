@@ -130,6 +130,7 @@
   // ---------- state modul ----------
   let ctx = null;             // dari app.js: { project, onChange, closeTab, onOpen, onOrganizeChange, openCharacter, toggleTheme }
   let projId = null;
+  let dataRef = null;         // p.data saat show() terakhir (diganti = versi project lain dimuat)
   let host = null, dom = null;
   let root = null;            // React root kanvas
   let pvRoot = null, pvApi = null;   // React root pratinjau wizard
@@ -397,7 +398,8 @@
   // ================= REACT FLOW: node =================
   const UiCtx = React.createContext({ tool: "select", editing: null, setEditing: () => {}, dragging: false });
 
-  // kolom edit (nama / catatan / teks). Uncontrolled: nilai dibaca saat selesai (blur, Enter, Esc)
+  // kolom edit (nama / catatan / teks). Uncontrolled; ketikan langsung masuk data (liveInput, jeda singkat) supaya ikut
+  // autosave walau kolomnya belum ditutup. Selesai: blur, Enter (nama) / Ctrl+Enter, Esc (Esc = simpan, Ctrl+Z = urungkan).
   function EditArea({ id, value, single, className, autoGrow, max, placeholder }) {
     const ref = React.useRef(null), done = React.useRef(false);
     React.useEffect(() => {
@@ -413,14 +415,14 @@
       return () => cancelAnimationFrame(raf);
     }, []);
     const grow = () => { const t = ref.current; if (autoGrow && t) { t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; } };
-    const fin = (cancel) => { if (done.current) return; done.current = true; commitEdit(id, ref.current ? ref.current.value : value, false, cancel); };
+    const fin = () => { if (done.current) return; done.current = true; commitEdit(id, ref.current ? ref.current.value : value, false); };
     return h(single ? "input" : "textarea", {
       ref, className: "jj-edit nodrag nopan nowheel " + (className || ""), defaultValue: value || "", "data-id": id, placeholder: placeholder || "",
-      spellCheck: !single, "aria-label": single ? "Nama tokoh" : "Edit teks", maxLength: max || 5000, onBlur: () => fin(false), onInput: grow,
+      spellCheck: !single, "aria-label": single ? "Nama tokoh" : "Edit teks", maxLength: max || 5000, onBlur: fin,
+      onInput: (e) => { grow(); if (!done.current) liveInput(id, e.currentTarget.value); },
       onKeyDown: (e) => {
         e.stopPropagation();
-        if (e.key === "Escape") { e.preventDefault(); fin(true); return; }
-        if (((e.metaKey || e.ctrlKey) && e.key === "Enter") || (single && e.key === "Enter")) { e.preventDefault(); fin(false); }
+        if (e.key === "Escape" || ((e.metaKey || e.ctrlKey) && e.key === "Enter") || (single && e.key === "Enter")) { e.preventDefault(); fin(); }
       },
       onPointerDown: (e) => e.stopPropagation(), onDoubleClick: (e) => e.stopPropagation(),
     });
@@ -901,32 +903,63 @@
     if (m.t === "note") m.h = Math.round(p.height);
     pushUndo(s); save(); updateChrome();
   }
-  // selesai mengedit (nama tokoh / teks catatan); keepOpen = simpan saja (flush autosave)
-  function commitEdit(id, value, keepOpen, cancel) {
+  // ---- ketikan langsung masuk data: jeda 300 ms (maks. 1 dtk saat mengetik terus), lalu commitEdit(keepOpen) ----
+  const LIVE_MS = 300, LIVE_MAX_MS = 1000;
+  let liveTimer = 0, livePend = null, liveSince = 0;
+  let liveUndoId = null;      // kolom edit yang sudah punya titik urungkan di sesi edit ini
+  function liveInput(id, value) {
+    if (!livePend) liveSince = Date.now();
+    livePend = { id, value };
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(flushLive, Date.now() - liveSince >= LIVE_MAX_MS ? 0 : LIVE_MS);
+  }
+  function flushLive() {
+    clearTimeout(liveTimer); liveTimer = 0;
+    const x = livePend;
+    livePend = null;
+    if (x) commitEdit(x.id, x.value, true);
+  }
+  function dropLive() { clearTimeout(liveTimer); liveTimer = 0; livePend = null; liveUndoId = null; }
+  // simpan isi kolom edit (nama tokoh / teks catatan). keepOpen = kolom masih terbuka (ketikan / autosave): data +
+  // autosave saja, kanvas tidak dibangun ulang. Titik urungkan cukup sekali per sesi edit (Ctrl+Z = sebelum diedit).
+  function commitEdit(id, value, keepOpen) {
     if (!sheet) return;
+    if (livePend && livePend.id === id) { clearTimeout(liveTimer); livePend = null; }   // nilai ini sudah yang terbaru
     if (!keepOpen && api) api.setEditing((cur) => (cur === id ? null : cur));
-    if (cancel) return;
+    const live = liveUndoId === id;
+    if (!keepOpen && live) liveUndoId = null;
+    const refresh = () => { if (!keepOpen && live) { rev++; renderFlow(); updateChrome(); } };   // nilai sudah masuk saat diketik
+    const apply = (fn, sel) => {
+      if (keepOpen) {
+        if (!live) { pushUndo(snap()); liveUndoId = id; }
+        fn(); save();
+        return;
+      }
+      if (live) { fn(); changed(sel); } else mutate(fn, sel);
+    };
     if (id.indexOf("name:") === 0) {
       const m = findNode(id.slice(5));
       if (!m) return;
       const v = String(value || "").replace(/\s+/g, " ").trim().slice(0, 80);
       const c = m.charId ? charMap().get(m.charId) : null;
       if (c) {   // tertaut: nama kartu Organize ikut berubah (bukan bagian urungkan)
-        if (!v || charName(c) === v) return;
+        if (!v || charName(c) === v) { refresh(); return; }
         c.title = v; m.name = v;
-        orgChanged(); rev++; renderFlow(); save(); updateChrome();
+        orgChanged();
+        if (keepOpen) { liveUndoId = id; save(); return; }   // (tanpa titik urungkan; kanvas dibangun ulang saat kolom ditutup)
+        rev++; renderFlow(); save(); updateChrome();
         return;
       }
-      if ((m.name || "") === v) return;
-      mutate(() => { m.name = v; });
+      if ((m.name || "") === v) { refresh(); return; }
+      apply(() => { m.name = v; });
       return;
     }
     const n = findNode(id);
     if (!n) return;
     const v = String(value || "").slice(0, 5000);
     if (n.t === "text" && !v.trim() && !keepOpen) { mutate(() => { sheet.nodes = sheet.nodes.filter((m) => m.id !== id); }, []); return; }
-    if ((n.text || "") === v) return;
-    mutate(() => { n.text = v; });
+    if ((n.text || "") === v) { refresh(); return; }
+    apply(() => { n.text = v; });
   }
   function placeAt(kind, a, b, dragged) {
     let n;
@@ -2074,10 +2107,10 @@
     window.addEventListener("blur", onBlurWin);
   }
   function flushEdit(keepOpen) {
-    if (!dom) return;
-    const ta = dom.flow.querySelector(".jj-edit");
+    const ta = dom && dom.flow.querySelector(".jj-edit");
     if (ta && ta.dataset.id) commitEdit(ta.dataset.id, ta.value, keepOpen);
     else if (editingNow && api && !keepOpen) api.setEditing(null);
+    flushLive();   // sisa ketikan yang belum masuk (kolomnya sudah tidak ada)
   }
 
   // ================= API untuk app.js =================
@@ -2085,8 +2118,14 @@
     // dipanggil tiap kali tab Jejaring tampil (juga saat pindah project)
     show(c) {
       const fresh = !ctx || ctx.project !== c.project;
+      // isi project diganti (versi dari perangkat lain / backup): riwayat urungkan milik data lama dibuang,
+      // kartu & lembar dicari ulang lewat id di data baru (di bawah)
+      const replaced = !fresh && dataRef !== c.project.data;
       ctx = c;
+      dataRef = c.project.data;
       bindOnce();
+      if (fresh || replaced) dropLive();
+      if (replaced) { hist.clear(); pendingSel = null; }
       if (fresh) {
         projId = c.project.id;
         hist.clear(); clip = null; tool = "select"; space = false; pendingSel = null; focusTag = null; wiz = null;
@@ -2113,6 +2152,7 @@
     hide() {
       if (!dom) return;
       flushEdit(false);
+      dropLive();
       closeMenu();
       cancelAnimationFrame(animRaf);
       space = false; mods = { shift: false, meta: false, multi: false };
@@ -2127,6 +2167,6 @@
     open(id) { if (ctx && dom && data() && data().docs.some((d) => d.id === id) && (!doc || doc.id !== id)) switchDoc(id); },
     // dari Beranda (alat Dokumen → "Buat jejaring baru"): buka wizard jejaring baru
     create() { if (ctx && dom && !wiz) openWizard("new"); },
-    flush() { if (root) flushEdit(isShown()); },
+    flush() { flushEdit(!!root && isShown()); },
   };
 })();
