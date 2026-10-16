@@ -1,6 +1,23 @@
-# Novelist Web — v0.13.3
+# Novelist Web — v0.13.4
 
-## Riwayat perubahan terbaru (v0.13.3) — paling baru di atas
+## Riwayat perubahan terbaru (v0.13.4) — paling baru di atas
+
+**Cloud Library tampil baru.** Sekarang jadi halaman di dalam dashboard seperti Pengaturan Akun: background foto,
+dot-grid, rail & logo tetap, dan tombol Cloud di rail menyala selama terbuka. Isinya:
+- Judul dengan subjudul, tombol kembali, dan **Muat ulang** (menggantikan menu ⋮).
+- Tab bersegmen **Kirim ke Cloud · Ambil dari Cloud · Trash**, masing-masing dengan ikon, jumlah item, dan
+  keterangan singkat.
+- Daftar project di kartu kaca dengan sampul kecil bergaya buku (foto sampul atau gradasi + huruf) dan judul tanpa
+  huruf kapital paksa.
+- Status bertitik: hijau **Terkirim … lalu**, kuning **Belum pernah dikirim**. Lencana **Ada di perangkat ini**
+  muncul untuk file Drive yang sudah ada di perangkat.
+- Tombol aksi berlabel (**Kirim / Ambil / Pulihkan**, plus hapus permanen) dengan status mengirim → terkirim / gagal,
+  dan tombol baru **Kirim semua**.
+- Saat memuat tampil kerangka berkilau, dan saat kosong atau gagal tampil keadaan berikon.
+- Daftar Drive di-cache 30 detik, jadi pindah tab tidak memanggil Drive berulang.
+- **Esc** atau tombol Project di rail menutup halaman ini.
+- Tema terang dan HP (tab jadi ikon + angka) ikut disesuaikan.
+- Teks waktu "… menit/jam/hari lalu" kini ikut diterjemahkan ke English.
 
 **Bilah kanan atas Beranda lebih rapi.** Di desktop, bilah **Pintasan · zoom · menu ··· · sembunyikan antarmuka · tutup**
 naik ke bar atas, tepat di sebelah kiri jam (posisinya mengikuti lebar jam, jadi pas untuk format 24 jam maupun

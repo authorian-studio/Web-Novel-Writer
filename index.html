@@ -221,6 +221,37 @@
       <div id="projectGrid" class="dash-shelf"></div>
     </div>
 
+    <!-- Halaman Cloud Library (di dalam dashboard seperti Pengaturan Akun: rail, background & logo tetap; isi dashboard
+         lain disembunyikan lewat #dashboardView.is-cloud). Kirim / ambil / pulihkan manual — terpisah dari autosave.
+         Diisi bagian CLOUD LIBRARY di app.js. -->
+    <div id="cloudLibraryView" class="cl-view hidden" role="region" aria-labelledby="cloudTitle" tabindex="-1">
+      <div class="cl-inner">
+        <header class="cl-head">
+          <button id="btnCloudBack" class="cl-ibtn" title="Kembali ke project" aria-label="Kembali ke project"><svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-arrow-left"></use></svg></button>
+          <span class="cl-head-ic" aria-hidden="true"><svg class="ti" width="22" height="22"><use href="#ti-cloud"></use></svg></span>
+          <div class="cl-head-text">
+            <h1 id="cloudTitle" class="cl-title">Cloud library</h1>
+            <p class="cl-sub">Kirim, ambil, dan pulihkan project di Google Drive kamu</p>
+          </div>
+          <button id="btnCloudRefresh" class="cl-ibtn" title="Muat ulang" aria-label="Muat ulang"><svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-refresh"></use></svg></button>
+        </header>
+        <div class="cl-bar">
+          <div class="cl-tabs" role="tablist" aria-label="Cloud library">
+            <button id="tabSendToCloud" class="cl-tab active" role="tab" title="Kirim ke Cloud" aria-label="Kirim ke Cloud" aria-selected="true"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-cloud-upload"></use></svg><span>Kirim ke Cloud</span><b class="cl-count" id="clCountSend"></b></button>
+            <button id="tabReceiveFromCloud" class="cl-tab" role="tab" title="Ambil dari Cloud" aria-label="Ambil dari Cloud" aria-selected="false"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-cloud-download"></use></svg><span>Ambil dari Cloud</span><b class="cl-count" id="clCountReceive"></b></button>
+            <button id="tabTrash" class="cl-tab" role="tab" title="Trash" aria-label="Trash" aria-selected="false"><svg class="ti" width="16" height="16" aria-hidden="true"><use href="#ti-trash"></use></svg><span>Trash</span><b class="cl-count" id="clCountTrash"></b></button>
+          </div>
+          <button id="btnCloudSendAll" class="cl-pill cl-pill-accent hidden"><svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-cloud-upload"></use></svg><span>Kirim semua</span></button>
+        </div>
+        <p class="cl-hint" id="cloudHint"></p>
+        <div id="cloudTabContent">
+          <div id="sendToCloudPanel" class="cloud-panel" role="tabpanel"></div>
+          <div id="receiveFromCloudPanel" class="cloud-panel hidden" role="tabpanel"></div>
+          <div id="trashPanel" class="cloud-panel hidden" role="tabpanel"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Halaman Pengaturan Akun (di dalam dashboard: rail, background & logo tetap; judul, rak project & status sinkron
          disembunyikan lewat #dashboardView.is-account). Diisi oleh bagian AKUN di app.js. -->
     <div id="accountView" class="acc-view hidden" role="region" aria-labelledby="accName" tabindex="-1">
@@ -437,25 +468,6 @@
     </div>
 
     <button id="btnSupport" class="help-fab" title="Support" aria-label="Support"><svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-question-mark"></use></svg></button>
-  </section>
-
-  <!-- ============ CLOUD LIBRARY VIEW ============ -->
-  <section id="cloudLibraryView" class="view hidden">
-    <div id="cloudTopbar">
-      <button id="btnCloudBack" class="icon-btn" title="Kembali" aria-label="Kembali"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-arrow-left"></use></svg></button>
-      <div class="cloud-title">Cloud library</div>
-      <button id="btnCloudMenu" class="icon-btn" title="Menu" aria-label="Menu"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-dots-vertical"></use></svg></button>
-    </div>
-    <div class="cloud-tabs">
-      <button id="tabSendToCloud" class="cloud-tab active">SEND TO CLOUD</button>
-      <button id="tabReceiveFromCloud" class="cloud-tab">RECEIVE FROM CLOUD</button>
-      <button id="tabTrash" class="cloud-tab">TRASH</button>
-    </div>
-    <div id="cloudTabContent">
-      <div id="sendToCloudPanel" class="cloud-panel"></div>
-      <div id="receiveFromCloudPanel" class="cloud-panel hidden"></div>
-      <div id="trashPanel" class="cloud-panel hidden"></div>
-    </div>
   </section>
 
   <!-- ============ PROJECT VIEW (gaya vvd: background cover di-blur + dot-grid, top bar chip, Home + canvas scene) ============ -->
@@ -1029,10 +1041,6 @@
   <button id="menuHelp" role="menuitem"><svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-help-circle"></use></svg><span>Bantuan &amp; Panduan</span></button>
   <div class="settings-menu-sep" role="separator"></div>
   <button id="menuDriveLogout" role="menuitem"><svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-logout"></use></svg><span>Keluar</span></button>
-</div>
-
-<div id="cloudMenu" class="dropdown hidden">
-  <button id="menuCloudRefresh"><svg class="ti" width="17" height="17" aria-hidden="true"><use href="#ti-refresh"></use></svg>Refresh</button>
 </div>
 
 <div id="cardMenu" class="dropdown hidden">
