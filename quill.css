@@ -174,6 +174,29 @@ body.light .qd-book-shadow { background: radial-gradient(ellipse at 45% 50%, rgb
 .qd-stage-lg { min-height: 540px; }
 .qd-stage-md { min-height: 420px; min-width: 280px; }
 .qd-stage-sm { min-height: 380px; width: 100%; }
+/* stage + tombol "Balik buku" di bawahnya */
+.qd-stage-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.qd-stage-wrap > .qd-stage { align-self: stretch; }
+.qd-flip-btn { margin-top: -18px; position: relative; z-index: 2; }
+/* sampul belakang: gambar sendiri (tanpa digelapkan) + teks blurb */
+.qd-bf-back { overflow: hidden; }
+.qd-bf-back.has-art { filter: none; background: var(--qd-cover); }
+.qd-bf-back .qd-cover-sheen { opacity: .7; }
+.qd-back-blurb {
+  position: absolute; left: 11%; right: 11%; top: 50%; transform: translateY(-50%); z-index: 1; max-height: 78%; overflow: hidden;
+  color: var(--qd-title); font-size: calc(var(--bk-w) * .046); line-height: 1.5; text-align: center; white-space: pre-line;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 14;
+}
+.qd-back-blurb.qd-f-dancing { font-size: calc(var(--bk-w) * .06); }
+.qd-back-blurb.on-art { padding: 8% 7%; border-radius: 4px; background: rgba(0,0,0,.42); text-shadow: 0 1px 4px rgba(0,0,0,.5); }
+.qd-bf-back:not(.has-art) .qd-back-blurb { filter: brightness(1.47); }   /* sisi belakang polos digelapkan (.68) — teks dikembalikan terang */
+.qd-side-seg button { display: inline-flex; align-items: center; gap: 6px; }
+.qd-blurb-input {
+  width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--glass-border); background: var(--glass); color: var(--text);
+  font: inherit; font-size: calc(13.5px * var(--fs-scale, 1)); line-height: 1.5; resize: vertical; min-height: 90px; outline: none;
+}
+.qd-blurb-input:focus { border-color: var(--accent); }
+.qd-field-label small { font-weight: 500; text-transform: none; letter-spacing: 0; opacity: .8; }
 
 /* ================= A. PUSTAKA ================= */
 .qd-lib { padding: 10px 28px 40px; }
@@ -378,6 +401,42 @@ body.light .qd-side-item.is-active .qd-side-btn { background: rgba(0,0,0,.06); }
   font: inherit; font-size: calc(13px * var(--fs-scale, 1)); font-weight: 600; cursor: pointer;
 }
 .qd-side-new:hover { color: var(--text); background: rgba(255,255,255,.05); }
+.qd-side-foot { display: flex; align-items: center; gap: 4px; margin-top: auto; padding-top: 6px; }
+.qd-side-foot .qd-side-new { flex: 1; margin: 0; }
+.qd-side-optbtn.is-on { background: rgba(255,255,255,.1); color: var(--text); }
+body.light .qd-side-optbtn.is-on { background: rgba(0,0,0,.07); }
+/* nomor chapter di sidebar: bisa diklik untuk diganti */
+.qd-side-item .qd-num-btn { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); z-index: 1; background: none; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.qd-side-item:not(.no-num) .qd-side-btn { padding-left: 46px; }
+.qd-num-btn:hover, .qd-num-btn:focus-visible { border-color: var(--accent); background: rgba(215,168,110,.12); }
+.qd-num-btn.is-manual { border-style: dashed; }
+.qd-num-input {
+  position: absolute; left: 6px; top: 50%; transform: translateY(-50%); z-index: 2; width: 52px; height: 26px; padding: 0 4px; border-radius: 6px; border: 1px solid var(--accent);
+  background: var(--bg, #111); color: var(--text); font: inherit; font-size: calc(12px * var(--fs-scale, 1)); text-align: center; outline: none;
+}
+/* panel Opsi (menggantikan daftar chapter selama dibuka) */
+.qd-side-opts { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 2px 4px 8px; display: flex; flex-direction: column; gap: 14px; }
+.qd-opt-sec { display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: 12px; background: rgba(255,255,255,.035); border: 1px solid var(--glass-border); }
+body.light .qd-opt-sec { background: rgba(0,0,0,.025); }
+.qd-opt-head { display: flex; align-items: center; gap: 7px; font-size: calc(12.5px * var(--fs-scale, 1)); font-weight: 700; color: var(--text); }
+.qd-opt-head .ti { color: var(--text-dim); }
+.qd-opt-head small { margin-left: auto; font-weight: 500; font-size: calc(10.5px * var(--fs-scale, 1)); color: var(--text-dim); }
+.qd-opt { display: flex; flex-direction: column; gap: 6px; }
+.qd-opt-row { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
+.qd-opt-label { font-size: calc(11.5px * var(--fs-scale, 1)); color: var(--text-dim); font-weight: 600; }
+.qd-seg-sm { display: flex; width: 100%; box-sizing: border-box; }
+.qd-seg-sm button { flex: 1; height: 26px; padding: 0 6px; font-size: calc(11.5px * var(--fs-scale, 1)); }
+.qd-opt-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.qd-chip { height: 24px; padding: 0 9px; border-radius: 999px; border: 1px solid var(--glass-border); background: transparent; color: var(--text-dim); font: inherit; font-size: calc(11.5px * var(--fs-scale, 1)); font-weight: 600; cursor: pointer; }
+.qd-chip:hover { color: var(--text); border-color: rgba(255,255,255,.22); }
+.qd-chip.is-active { color: var(--text); background: rgba(255,255,255,.12); border-color: transparent; }
+body.light .qd-chip.is-active { background: rgba(0,0,0,.08); }
+.qd-opt-input { width: 100%; box-sizing: border-box; height: 30px; padding: 0 9px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(0,0,0,.18); color: var(--text); font: inherit; font-size: calc(12.5px * var(--fs-scale, 1)); outline: none; }
+body.light .qd-opt-input { background: rgba(255,255,255,.7); }
+.qd-opt-input:focus { border-color: var(--accent); }
+.qd-opt-num { width: 72px; text-align: center; }
+.qd-opt-hint { margin: 0; font-size: calc(11px * var(--fs-scale, 1)); line-height: 1.45; color: var(--text-dim); }
+.qd-opt-sec > .qd-btn-sm { align-self: flex-start; }
 body.light .qd-side-new:hover { background: rgba(0,0,0,.04); }
 .qd-scrim { display: none; }
 
@@ -386,7 +445,7 @@ body.light .qd-side-new:hover { background: rgba(0,0,0,.04); }
 .qd-side-open, .qd-panel-open { display: none; }
 .qd-editor.side-collapsed .qd-side-open, .qd-editor.panel-collapsed .qd-panel-open { display: inline-flex; }
 .qd-main-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 32px 140px; }
-.qd-page { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; }
+.qd-page { max-width: var(--qd-page-w, 760px); margin: 0 auto; display: flex; flex-direction: column; transition: max-width .25s ease; }
 .qd-ch-title {
   width: 100%; padding: 6px 0 4px; border: none; background: none; color: var(--text); outline: none; text-align: center;
   font-family: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif; font-size: calc(32px * var(--fs-scale, 1)); font-weight: 500; text-overflow: ellipsis;
@@ -427,8 +486,11 @@ body.light .qd-tb.is-on { background: rgba(0,0,0,.09); }
 .qd-wordcount { padding: 0 8px; flex-shrink: 0; font-size: calc(12px * var(--fs-scale, 1)); color: var(--text-dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .qd-body {
   position: relative; min-height: 48vh; padding: 8px 2px 40px; outline: none; color: var(--text); caret-color: var(--accent); overflow-wrap: break-word;
-  font-family: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif; font-size: calc(18px * var(--fs-scale, 1)); line-height: 1.78;
+  font-family: var(--qd-body-font, "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif); font-size: calc(var(--qd-body-fs, 18px) * var(--fs-scale, 1)); line-height: var(--qd-body-lh, 1.78);
 }
+/* opsi "Indentasi paragraf ala buku": baris pertama menjorok, tanpa jarak antar paragraf */
+.qd-indent .qd-body p { margin-bottom: 0; text-indent: 1.6em; }
+.qd-indent .qd-body h1 + p, .qd-indent .qd-body h2 + p, .qd-indent .qd-body hr + p, .qd-indent .qd-body > p:first-child { text-indent: 0; }
 .qd-body.is-empty::before { content: attr(data-placeholder); position: absolute; top: 8px; left: 2px; color: var(--text-dim); opacity: .75; pointer-events: none; }
 .qd-body p, .qd-body div { margin: 0 0 .95em; }
 .qd-body h1 { margin: 1.1em 0 .45em; font-size: 1.55em; font-weight: 600; line-height: 1.25; }

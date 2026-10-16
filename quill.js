@@ -91,7 +91,7 @@
     get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage diblokir */ } },
   };
-  const K_SIDE = "novelist_quill_side_collapsed", K_PANEL = "novelist_quill_panel_open", K_TTS = "novelist_quill_tts", K_RFS = "novelist_quill_reader_fs";
+  const K_VIEW = "novelist_quill_view", K_SIDE = "novelist_quill_side_collapsed", K_PANEL = "novelist_quill_panel_open", K_TTS = "novelist_quill_tts", K_RFS = "novelist_quill_reader_fs";
   const toast = (msg, icon) => { if (typeof window.toast === "function") window.toast(msg, icon); };
 
   function roman(n) {
@@ -172,6 +172,23 @@
       titleFont: FONTS.some((f) => f.id === b.titleFont) ? b.titleFont : "georgia",
       titleColor: HEX.test(b.titleColor || "") ? b.titleColor.toLowerCase() : LIGHT_TITLE,
       showAuthor: b.showAuthor !== false,
+      // sampul belakang: gambar sendiri (opsional) + teks blurb; warnanya mengikuti warna sampul depan
+      backJacket: typeof b.backJacket === "string" && DATA_IMG.test(b.backJacket) ? b.backJacket : null,
+      backFit: b.backFit === "contain" ? "contain" : "cover",
+      blurb: typeof b.blurb === "string" ? b.blurb.slice(0, 700) : "",
+    };
+  }
+  // Penomoran chapter per cerita: gaya (romawi / angka / tanpa), mulai dari, dan label ("Chapter", "Bab", …).
+  // Tiap chapter boleh punya nomor manual (c.num) — chapter sesudahnya melanjutkan dari nomor itu.
+  const NUM_STYLES = [["roman", "Romawi", "I, II, III"], ["arabic", "Angka", "1, 2, 3"], ["none", "Tanpa", "—"]];
+  const NUM_PREFIXES = ["Chapter", "Bab", "Bagian", "Part"];
+  function normNumbering(n) {
+    n = n && typeof n === "object" ? n : {};
+    const start = parseInt(n.start, 10);
+    return {
+      style: NUM_STYLES.some((x) => x[0] === n.style) ? n.style : "roman",
+      start: isFinite(start) ? clamp(start, 0, 3999) : 1,
+      prefix: typeof n.prefix === "string" && n.prefix.trim() ? n.prefix.trim().slice(0, 24) : "Chapter",
     };
   }
   function normStory(s) {
@@ -191,7 +208,10 @@
       c.header = typeof c.header === "string" && DATA_IMG.test(c.header) ? c.header : null;
       c.html = typeof c.html === "string" ? c.html : "";
       c.updatedAt = typeof c.updatedAt === "string" ? c.updatedAt : s.updatedAt;
+      const num = parseInt(c.num, 10);
+      if (isFinite(num) && num >= 0 && num <= 3999) c.num = num; else delete c.num;
     });
+    s.numbering = normNumbering(s.numbering);
     if (!s.panel || typeof s.panel !== "object" || Array.isArray(s.panel)) s.panel = {};
     return s;
   }
@@ -212,13 +232,39 @@
   const qdata = () => (P.data && P.data.quill && Array.isArray(P.data.quill.stories) ? P.data.quill : ensureData(P));
   const findStory = (id) => (id && P ? qdata().stories.find((s) => s.id === id) : null) || null;
   const storyTitle = (s) => (s.title || "").trim() || "Cerita tanpa judul";
-  const chapterLabel = (c, i) => (c.title || "").trim() || "Chapter " + roman(i + 1);
+  // nomor tiap chapter: nomor manual (c.num) bila ada, selain itu lanjut dari chapter sebelumnya
+  function chNumbers(s) {
+    const n = normNumbering(s.numbering), out = [];
+    let cur = n.start - 1;
+    s.chapters.forEach((c) => { cur = Number.isInteger(c.num) ? c.num : cur + 1; out.push(cur); });
+    return out;
+  }
+  const fmtChNum = (s, v) => { const st = normNumbering(s.numbering).style; return st === "none" ? "" : st === "arabic" ? String(v) : v >= 1 ? roman(v) : String(v); };
+  // tanda nomor chapter ke-i ("IV" / "4" / "" bila tanpa nomor)
+  const chMark = (s, i, nums) => fmtChNum(s, (nums || chNumbers(s))[i]);
+  function defaultChTitle(s, i, nums) { const m = chMark(s, i, nums), p = normNumbering(s.numbering).prefix; return m ? p + " " + m : p; }
+  const chapterLabel = (c, i, s) => (c.title || "").trim() || (s ? defaultChTitle(s, i) : "Chapter " + roman(i + 1));
   const storyWords = (s) => s.chapters.reduce((a, c) => a + htmlWords(c.html), 0);
-  const isDefaultChTitle = (t) => /^chapter\s+[ivxlcdm]+$/i.test((t || "").trim());
-  function renumberDefaults(s) { s.chapters.forEach((c, i) => { if (isDefaultChTitle(c.title)) c.title = "Chapter " + roman(i + 1); }); }
+  const reEsc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // judul bawaan = "<label> <nomor>" (label lama/umum maupun label cerita ini); judul seperti itu ikut dinomori ulang
+  function isDefaultChTitle(t, s) {
+    t = (t || "").trim();
+    if (/^(chapter|bab|bagian|part)(\s+([ivxlcdm]+|\d+))?$/i.test(t)) return true;
+    if (!s) return false;
+    return new RegExp("^" + reEsc(normNumbering(s.numbering).prefix) + "(\\s+([ivxlcdm]+|\\d+))?$", "i").test(t);
+  }
+  function renumberDefaults(s, oldPrefix) {
+    const nums = chNumbers(s);
+    s.chapters.forEach((c, i) => {
+      const t = (c.title || "").trim();
+      const old = oldPrefix && new RegExp("^" + reEsc(oldPrefix) + "(\\s+([ivxlcdm]+|\\d+))?$", "i").test(t);
+      if (old || isDefaultChTitle(t, s)) c.title = defaultChTitle(s, i, nums);
+    });
+  }
   function addChapter(s) {
-    const c = { id: uid("ch"), title: "Chapter " + roman(s.chapters.length + 1), header: null, html: "", updatedAt: nowIso() };
+    const c = { id: uid("ch"), title: "", header: null, html: "", updatedAt: nowIso() };
     s.chapters.push(c);
+    c.title = defaultChTitle(s, s.chapters.length - 1);
     s.updatedAt = c.updatedAt;
     return c;
   }
@@ -392,7 +438,11 @@
     return `<div class="qd-book ${size || ""} qd-k-${b.kind}${light ? " is-light" : ""}" style="--qd-cover:${gradCss(coverColors(b))};--qd-title:${b.titleColor}">
       <div class="qd-book-shadow" aria-hidden="true"></div>
       <div class="qd-book-rot" aria-hidden="true">
-        <div class="qd-bf qd-bf-back"></div>
+        <div class="qd-bf qd-bf-back${b.backJacket ? " has-art" : ""}">
+          ${b.backJacket ? `<div class="qd-jacket" style="background-image:url('${b.backJacket}');background-size:${b.backFit}"></div>` : ""}
+          ${b.blurb && b.blurb.trim() ? `<div class="qd-back-blurb qd-f-${b.titleFont}${b.backJacket ? " on-art" : ""}">${esc(b.blurb.trim())}</div>` : ""}
+          <div class="qd-cover-sheen"></div>
+        </div>
         <div class="qd-bf qd-bf-fore"></div>
         <div class="qd-bf qd-bf-top"></div>
         <div class="qd-bf qd-bf-bottom"></div>
@@ -411,8 +461,8 @@
   // Buku miring mengikuti kursor & bisa diseret untuk diputar (rotasi lewat variabel CSS --rx/--ry di stage,
   // jadi tetap bertahan walau isi buku di-render ulang).
   function attachTilt(stage) {
-    const BX = 5, BY = 26;
-    let rx = BX, ry = BY, tx = BX, ty = BY, spin = 0, drag = null, raf = 0, backT = 0;
+    const BX = 5, BY0 = 26;
+    let BY = BY0, rx = BX, ry = BY, tx = BX, ty = BY, spin = 0, drag = null, raf = 0, backT = 0;
     const apply = () => {
       stage.style.setProperty("--rx", rx.toFixed(2) + "deg");
       stage.style.setProperty("--ry", ry.toFixed(2) + "deg");
@@ -459,6 +509,9 @@
     stage.addEventListener("pointerup", end);
     stage.addEventListener("pointercancel", end);
     stage.addEventListener("pointerleave", () => { if (drag) return; tx = BX; ty = BY + spin; kick(); });
+    // putar buku ke sisi depan / belakang (dipakai pilihan "Depan / Belakang" di editor sampul & tombol "Balik buku")
+    stage.qdFlip = (back) => { clearTimeout(backT); BY = BY0 + (back ? 180 : 0); spin = 0; tx = BX; ty = BY; kick(); };
+    stage.qdIsBack = () => BY !== BY0;
     apply();
   }
 
@@ -614,12 +667,14 @@
         : { forId: null, title: "", author: userName(), book: normBook({}) };
     }
     if (!route.tab) route.tab = "style";
+    if (!route.side) route.side = "front";
     const d = route.draft;
     const tabs = [["style", tiIcon("book"), "Gaya buku"], ["jacket", tiIcon("photo"), "Sampul"], ["text", tiIcon("typography"), "Teks"]];
     host.innerHTML = `<div class="qd-screen qd-create">
       <div class="qd-topbar">${backBtn(editing ? "Kembali ke cerita" : "Kembali ke pustaka")}</div>
       <div class="qd-create-body">
-        <div class="qd-stage qd-stage-lg" title="Seret untuk memutar buku · lepas gambar di sini untuk sampul">${bookHtml(d, "is-lg")}</div>
+        <div class="qd-stage-wrap"><div class="qd-stage qd-stage-lg" title="Seret untuk memutar buku · lepas gambar di sini untuk sampul">${bookHtml(d, "is-lg")}</div>
+          <button type="button" class="qd-btn qd-btn-ghost qd-btn-sm qd-flip-btn" data-act="flip">${px(tiIcon("refresh"), 15)}<span>Balik buku</span></button></div>
         <div class="qd-create-form">
           <input class="qd-title-input" type="text" maxlength="120" placeholder="Cerita tanpa judul" aria-label="Judul cerita" value="${esc(d.title)}">
           <label class="qd-byline qd-byline-edit">oleh <input class="qd-author-input" type="text" maxlength="60" placeholder="Nama penulis" aria-label="Nama penulis" value="${esc(d.author)}"></label>
@@ -644,20 +699,27 @@
         panel.innerHTML = `<div class="qd-kind-grid">${KINDS.map((k) => `<button type="button" class="qd-kind${b.kind === k.id ? " is-active" : ""}" data-kind="${k.id}" aria-pressed="${b.kind === k.id}">
           <span class="qd-kind-ic qd-kind-ic-${k.id}" aria-hidden="true"></span><span class="qd-kind-name">${k.label}</span><span class="qd-kind-desc">${k.desc}</span></button>`).join("")}</div>`;
       } else if (route.tab === "jacket") {
-        const custom = HEX.test(b.color);
+        const custom = HEX.test(b.color), back = route.side === "back";
+        const img = back ? b.backJacket : b.jacket, fit = back ? b.backFit : b.jacketFit;
         panel.innerHTML = `
-          <div class="qd-field"><div class="qd-field-label">Gambar sampul</div>
-            ${b.jacket ? `<div class="qd-jacket-row"><span class="qd-jacket-thumb" style="background-image:url('${b.jacket}')"></span>
+          <div class="qd-field"><div class="qd-seg qd-side-seg" role="group" aria-label="Sisi sampul">
+              <button type="button" class="${back ? "" : "is-active"}" data-side="front" aria-pressed="${!back}">${px(tiIcon("book"), 15)}<span>Depan</span></button>
+              <button type="button" class="${back ? "is-active" : ""}" data-side="back" aria-pressed="${back}">${px(tiIcon("book-2"), 15)}<span>Belakang</span></button>
+            </div></div>
+          <div class="qd-field"><div class="qd-field-label">Gambar sampul ${back ? "belakang" : "depan"}</div>
+            ${img ? `<div class="qd-jacket-row"><span class="qd-jacket-thumb" style="background-image:url('${img}')"></span>
                 <div class="qd-jacket-btns"><button type="button" class="qd-btn qd-btn-ghost qd-btn-sm" data-act="jacket-pick">${px(tiIcon("replace"), 15)}<span>Ganti gambar</span></button>
                 <button type="button" class="qd-btn qd-btn-ghost qd-btn-sm is-danger" data-act="jacket-remove">${px(tiIcon("trash"), 15)}<span>Hapus</span></button></div></div>`
             : `<button type="button" class="qd-drop" data-act="jacket-pick">${px(tiIcon("photo-up"), 26)}<span>Seret gambar ke sini atau <u>pilih file</u></span><small>JPG, PNG, atau WebP · diperkecil otomatis</small></button>`}
           </div>
           <div class="qd-field"><div class="qd-field-label">Posisi gambar</div>
             <div class="qd-seg" role="group" aria-label="Posisi gambar">
-              <button type="button" class="${b.jacketFit === "cover" ? "is-active" : ""}" data-fit="cover" aria-pressed="${b.jacketFit === "cover"}">Penuhi sampul</button>
-              <button type="button" class="${b.jacketFit === "contain" ? "is-active" : ""}" data-fit="contain" aria-pressed="${b.jacketFit === "contain"}">Tampilkan utuh</button>
+              <button type="button" class="${fit === "cover" ? "is-active" : ""}" data-fit="cover" aria-pressed="${fit === "cover"}">Penuhi sampul</button>
+              <button type="button" class="${fit === "contain" ? "is-active" : ""}" data-fit="contain" aria-pressed="${fit === "contain"}">Tampilkan utuh</button>
             </div></div>
-          <div class="qd-field"><div class="qd-field-label">Warna sampul</div>
+          ${back ? `<div class="qd-field"><div class="qd-field-label">Teks sampul belakang</div>
+            <textarea class="qd-blurb-input" maxlength="700" rows="4" data-blurb placeholder="Ringkasan cerita, kutipan, atau pujian pembaca…" aria-label="Teks sampul belakang">${esc(b.blurb)}</textarea></div>` : ""}
+          <div class="qd-field"><div class="qd-field-label">Warna sampul <small>(depan &amp; belakang)</small></div>
             <div class="qd-swatches">${COVERS.map((c) => `<button type="button" class="qd-swatch${b.color === c.id ? " is-active" : ""}" data-color="${c.id}" title="${esc(c.label)}" aria-label="${esc(c.label)}" style="background:${gradCss(c.c)}"></button>`).join("")}
               <label class="qd-swatch qd-swatch-custom${custom ? " is-active" : ""}" title="Warna lain"${custom ? ` style="background:${b.color}"` : ""}><input type="color" data-color-custom value="${custom ? b.color : "#30324a"}" aria-label="Warna sampul lain">${px(tiIcon("palette"), 15)}</label>
             </div></div>`;
@@ -677,7 +739,7 @@
       if (!f) return;
       stage.classList.add("is-busy");
       readImageFile(f, 1000, 1000)
-        .then((url) => { d.book.jacket = url; if (route.tab !== "jacket") { route.tab = "jacket"; $$(scr, ".qd-tab").forEach((t) => { t.classList.toggle("is-active", t.dataset.tab === "jacket"); t.setAttribute("aria-selected", t.dataset.tab === "jacket"); }); } paintTab(); paintBook(); })
+        .then((url) => { if (route.side === "back") d.book.backJacket = url; else d.book.jacket = url; if (route.tab !== "jacket") { route.tab = "jacket"; $$(scr, ".qd-tab").forEach((t) => { t.classList.toggle("is-active", t.dataset.tab === "jacket"); t.setAttribute("aria-selected", t.dataset.tab === "jacket"); }); } paintTab(); paintBook(); })
         .catch((err) => toast(err.message || "Gambar gagal dibaca.", tiIcon("alert-triangle")))
         .finally(() => stage.classList.remove("is-busy"));
     };
@@ -688,6 +750,7 @@
     };
     paintTab();
     attachTilt(stage);
+    if (route.side === "back") stage.qdFlip(true);
     dropZone(stage, (files) => setJacket(files[0]));
     dropZone(panel, (files) => setJacket(files[0]));
     file.addEventListener("change", () => { setJacket(file.files[0]); file.value = ""; });
@@ -696,27 +759,31 @@
     $(scr, ".qd-title-input").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $(scr, ".qd-author-input").focus(); } });
     scr.addEventListener("input", (e) => {
       const t = e.target;
-      if (t.matches("[data-color-custom]")) { pickCover(t.value.toLowerCase()); const lab = t.closest(".qd-swatch"); $$(panel, ".qd-swatch").forEach((s) => s.classList.remove("is-active")); lab.classList.add("is-active"); lab.style.background = t.value; paintBook(); }
+      if (t.matches("[data-blurb]")) { d.book.blurb = t.value; paintBook(); }
+      else if (t.matches("[data-color-custom]")) { pickCover(t.value.toLowerCase()); const lab = t.closest(".qd-swatch"); $$(panel, ".qd-swatch").forEach((s) => s.classList.remove("is-active")); lab.classList.add("is-active"); lab.style.background = t.value; paintBook(); }
       else if (t.matches("[data-tcolor-custom]")) { d.book.titleColor = t.value.toLowerCase(); const lab = t.closest(".qd-swatch"); $$(panel, ".qd-swatch").forEach((s) => s.classList.remove("is-active")); lab.classList.add("is-active"); lab.style.background = t.value; paintBook(); }
     });
     scr.addEventListener("click", (e) => {
-      const t = e.target.closest("[data-tab],[data-kind],[data-fit],[data-color],[data-tcolor],[data-font],[data-act]");
+      const t = e.target.closest("[data-tab],[data-side],[data-kind],[data-fit],[data-color],[data-tcolor],[data-font],[data-act]");
       if (!t) return;
       const b = d.book;
       if (t.dataset.tab) {
         route.tab = t.dataset.tab;
         $$(scr, ".qd-tab").forEach((x) => { x.classList.toggle("is-active", x === t); x.setAttribute("aria-selected", x === t); });
+        if (route.tab !== "jacket" && route.side === "back") { route.side = "front"; stage.qdFlip(false); }
         paintTab();
         return;
       }
+      if (t.dataset.side) { route.side = t.dataset.side; stage.qdFlip(route.side === "back"); paintTab(); return; }
       if (t.dataset.kind) b.kind = t.dataset.kind;
-      else if (t.dataset.fit) b.jacketFit = t.dataset.fit;
+      else if (t.dataset.fit) { if (route.side === "back") b.backFit = t.dataset.fit; else b.jacketFit = t.dataset.fit; }
       else if (t.dataset.color) pickCover(t.dataset.color);
       else if (t.dataset.tcolor) b.titleColor = t.dataset.tcolor;
       else if (t.dataset.font) b.titleFont = t.dataset.font;
       else if (t.dataset.act === "toggle-author") b.showAuthor = !b.showAuthor;
       else if (t.dataset.act === "jacket-pick") { file.click(); return; }
-      else if (t.dataset.act === "jacket-remove") b.jacket = null;
+      else if (t.dataset.act === "jacket-remove") { if (route.side === "back") b.backJacket = null; else b.jacket = null; }
+      else if (t.dataset.act === "flip") { route.side = stage.qdIsBack() ? "front" : "back"; if (route.tab !== "jacket") { route.tab = "jacket"; $$(scr, ".qd-tab").forEach((x) => { x.classList.toggle("is-active", x.dataset.tab === "jacket"); x.setAttribute("aria-selected", x.dataset.tab === "jacket"); }); } stage.qdFlip(route.side === "back"); paintTab(); return; }
       else if (t.dataset.act === "back") { route.draft = null; if (editing) go("story", { storyId: editing.id }); else go("library"); return; }
       else if (t.dataset.act === "save") { save(); return; }
       else return;
@@ -740,17 +807,18 @@
 
   /* ============================ C. HALAMAN CERITA ============================ */
   function renderStory() {
-    const s = findStory(route.storyId), n = s.chapters.length;
+    const s = findStory(route.storyId), n = s.chapters.length, nums = chNumbers(s);
     const chl = (c, i) => `<li class="qd-chl-item" data-id="${esc(c.id)}">
         <span class="qd-grip" title="Seret untuk mengurutkan" aria-hidden="true">${px(tiIcon("grip-vertical"), 16)}</span>
-        <span class="qd-roman">${roman(i + 1)}</span>
-        <button type="button" class="qd-chl-open" data-act="opench" data-id="${esc(c.id)}" title="Buka chapter (Alt+↑/↓ untuk memindah)"><span class="qd-chl-title">${esc(chapterLabel(c, i))}</span><span class="qd-chl-words">${fmtNum(htmlWords(c.html))} kata</span></button>
-        <button type="button" class="qd-icon-btn qd-chl-del" data-act="delch" data-id="${esc(c.id)}" title="Hapus chapter" aria-label="Hapus ${esc(chapterLabel(c, i))}">${px(tiIcon("trash"), 16)}</button>
+        ${chMark(s, i, nums) ? `<span class="qd-roman">${chMark(s, i, nums)}</span>` : ""}
+        <button type="button" class="qd-chl-open" data-act="opench" data-id="${esc(c.id)}" title="Buka chapter (Alt+↑/↓ untuk memindah)"><span class="qd-chl-title">${esc(chapterLabel(c, i, s))}</span><span class="qd-chl-words">${fmtNum(htmlWords(c.html))} kata</span></button>
+        <button type="button" class="qd-icon-btn qd-chl-del" data-act="delch" data-id="${esc(c.id)}" title="Hapus chapter" aria-label="Hapus ${esc(chapterLabel(c, i, s))}">${px(tiIcon("trash"), 16)}</button>
       </li>`;
     host.innerHTML = `<div class="qd-screen qd-story">
       <div class="qd-topbar">${backBtn("Kembali ke cerita-cerita")}</div>
       <div class="qd-story-body">
-        <div class="qd-stage qd-stage-md" title="Seret untuk memutar buku">${bookHtml(s, "is-md")}</div>
+        <div class="qd-stage-wrap"><div class="qd-stage qd-stage-md" title="Seret untuk memutar buku">${bookHtml(s, "is-md")}</div>
+          <button type="button" class="qd-btn qd-btn-ghost qd-btn-sm qd-flip-btn" data-act="flip">${px(tiIcon("refresh"), 15)}<span>Balik buku</span></button></div>
         <div class="qd-story-info">
           <h1 class="qd-story-title">${esc(storyTitle(s))}</h1>
           ${s.author ? `<div class="qd-byline">oleh ${esc(s.author)}</div>` : ""}
@@ -794,6 +862,7 @@
       if (!t) return;
       const act = t.dataset.act || "pill-" + t.dataset.pill;
       if (act === "back") go("library");
+      else if (act === "flip") { const st = $(scr, ".qd-stage"); st.qdFlip(!st.qdIsBack()); }
       else if (act === "newch") { const c = addChapter(s); changed(); go("editor", { storyId: s.id, chapterId: c.id }); }
       else if (act === "opench") go("editor", { storyId: s.id, chapterId: t.dataset.id });
       else if (act === "editcover") go("create", { editId: s.id });
@@ -801,7 +870,7 @@
       else if (act === "pill-publish") go("publish", { storyId: s.id, from: "story" });
       else if (act === "delch") {
         const i = s.chapters.findIndex((c) => c.id === t.dataset.id);
-        if (i < 0 || !confirm(`Hapus "${chapterLabel(s.chapters[i], i)}"? Isi chapter ini akan hilang.`)) return;
+        if (i < 0 || !confirm(`Hapus "${chapterLabel(s.chapters[i], i, s)}"? Isi chapter ini akan hilang.`)) return;
         s.chapters.splice(i, 1);
         renumberDefaults(s);
         s.updatedAt = nowIso();
@@ -852,7 +921,7 @@
     const narrow = isNarrow();
     const sideCollapsed = !narrow && LS.get(K_SIDE, "0") === "1";
     const panelOpen = !narrow && LS.get(K_PANEL, "1") === "1";
-    host.innerHTML = `<div class="qd-screen qd-editor${sideCollapsed ? " side-collapsed" : ""}${panelOpen ? "" : " panel-collapsed"}">
+    host.innerHTML = `<div class="qd-screen qd-editor${sideCollapsed ? " side-collapsed" : ""}${panelOpen ? "" : " panel-collapsed"}" style="${viewStyle()}">
       <aside class="qd-side" aria-label="Daftar chapter">
         <div class="qd-side-head">
           <button type="button" class="qd-icon-btn" data-act="tostory" title="Kembali ke halaman cerita" aria-label="Kembali ke halaman cerita">${px(tiIcon("chevron-left"), 18)}</button>
@@ -861,7 +930,11 @@
         </div>
         <div class="qd-side-label">Chapter</div>
         <ol class="qd-side-list"></ol>
-        <button type="button" class="qd-side-new" data-act="newch">${px(tiIcon("plus"), 16)}<span>Chapter baru</span></button>
+        <div class="qd-side-opts hidden" role="region" aria-label="Opsi Quill"></div>
+        <div class="qd-side-foot">
+          <button type="button" class="qd-side-new" data-act="newch">${px(tiIcon("plus"), 16)}<span>Chapter baru</span></button>
+          <button type="button" class="qd-icon-btn qd-side-optbtn" data-act="side-opts" title="Opsi" aria-label="Opsi Quill" aria-expanded="false">${px(tiIcon("adjustments-horizontal"), 17)}</button>
+        </div>
       </aside>
       <div class="qd-scrim" data-act="close-drawers"></div>
       <section class="qd-main" aria-label="Editor chapter">
@@ -906,11 +979,13 @@
       story: s, ch, scr,
       bodyEl: $(scr, ".qd-body"), titleEl: $(scr, ".qd-ch-title"), zoneEl: $(scr, ".qd-header-zone"), wcEl: $(scr, ".qd-wordcount"),
       scrollEl: $(scr, ".qd-main-scroll"), sideList: $(scr, ".qd-side-list"), tilesEl: $(scr, ".qd-tiles"), toolsEl: $(scr, ".qd-tools-row"),
-      mountEl: $(scr, ".qd-panel-mount"), audioEl: $(scr, ".qd-audio-bar"), ptabsEl: $(scr, ".qd-ptabs"),
+      mountEl: $(scr, ".qd-panel-mount"), audioEl: $(scr, ".qd-audio-bar"), ptabsEl: $(scr, ".qd-ptabs"), optsEl: $(scr, ".qd-side-opts"),
       dirty: false, timer: 0, range: null, pendingSize: 0, internalDrag: false, mounted: new Map(), ctxs: [], tsRaf: 0,
     };
     loadChapter();
     renderSide();
+    applyView();
+    wireOpts();
     renderPanelTabs();
     renderTools();
     mountTiles();
@@ -931,7 +1006,7 @@
   function loadChapter() {
     const { story: s, ch } = ed, i = s.chapters.indexOf(ch);
     ed.titleEl.value = ch.title;
-    ed.titleEl.placeholder = "Chapter " + roman(i + 1);
+    ed.titleEl.placeholder = defaultChTitle(s, i);
     ed.bodyEl.innerHTML = sanitizeHtml(ch.html) || "<p><br></p>";
     ed.range = null;
     ed.dirty = false;
@@ -944,10 +1019,150 @@
     const { story: s, ch } = ed;
     $(ed.scr, ".qd-side-title").textContent = storyTitle(s);
     $(ed.scr, ".qd-side-meta").textContent = s.chapters.length + " chapter";
-    ed.sideList.innerHTML = s.chapters.map((c, i) => `<li class="qd-side-item${c === ch ? " is-active" : ""}" data-id="${esc(c.id)}">
-        <button type="button" class="qd-side-btn" data-act="opench" data-id="${esc(c.id)}"${c === ch ? ' aria-current="true"' : ""}><span class="qd-roman">${roman(i + 1)}</span><span class="qd-side-name">${esc(chapterLabel(c, i))}</span></button>
+    const nums = chNumbers(s), noNum = normNumbering(s.numbering).style === "none";
+    // nomor di kiri bisa diklik untuk mengganti nomor chapter itu (chapter sesudahnya ikut melanjutkan)
+    ed.sideList.innerHTML = s.chapters.map((c, i) => `<li class="qd-side-item${c === ch ? " is-active" : ""}${noNum ? " no-num" : ""}" data-id="${esc(c.id)}">
+        ${noNum ? "" : `<button type="button" class="qd-roman qd-num-btn${Number.isInteger(c.num) ? " is-manual" : ""}" data-act="chnum" data-id="${esc(c.id)}" title="Ganti nomor chapter ini${Number.isInteger(c.num) ? " (nomor manual)" : ""}" aria-label="Nomor ${esc(chMark(s, i, nums))}, klik untuk mengganti">${esc(chMark(s, i, nums))}</button>`}
+        <button type="button" class="qd-side-btn" data-act="opench" data-id="${esc(c.id)}"${c === ch ? ' aria-current="true"' : ""}><span class="qd-side-name" data-no-i18n>${esc(chapterLabel(c, i, s))}</span></button>
         <span class="qd-grip qd-side-grip" title="Seret untuk mengurutkan" aria-hidden="true">${px(tiIcon("grip-vertical"), 14)}</span>
       </li>`).join("");
+  }
+  /* ---------- OPSI (sidebar): penomoran chapter per cerita + tampilan editor per perangkat ---------- */
+  const VIEW_WIDTH = [["narrow", "Sempit", 620], ["normal", "Sedang", 760], ["wide", "Luas", 940]];
+  const VIEW_SIZE = [[16, "16"], [18, "18"], [20, "20"], [22, "22"]];
+  const VIEW_LH = [["tight", "Rapat", 1.5], ["normal", "Normal", 1.78], ["loose", "Longgar", 2.05]];
+  const VIEW_FONT = [["palatino", "Palatino"], ["georgia", "Georgia"], ["inter", "Inter"]];
+  function viewPrefs() {
+    let v = {};
+    try { v = JSON.parse(LS.get(K_VIEW, "{}")) || {}; } catch (e) { v = {}; }
+    return {
+      width: VIEW_WIDTH.some((x) => x[0] === v.width) ? v.width : "normal",
+      size: VIEW_SIZE.some((x) => x[0] === v.size) ? v.size : 18,
+      lh: VIEW_LH.some((x) => x[0] === v.lh) ? v.lh : "normal",
+      font: VIEW_FONT.some((x) => x[0] === v.font) ? v.font : "palatino",
+      indent: v.indent === true,
+    };
+  }
+  function viewStyle() {
+    const v = viewPrefs();
+    return `--qd-page-w:${VIEW_WIDTH.find((x) => x[0] === v.width)[2]}px;--qd-body-fs:${v.size}px;--qd-body-lh:${VIEW_LH.find((x) => x[0] === v.lh)[2]};--qd-body-font:${fontCss(v.font).replace(/"/g, "'")}`;
+  }
+  function applyView() {
+    if (!ed) return;
+    ed.scr.setAttribute("style", viewStyle());
+    ed.scr.classList.toggle("qd-indent", viewPrefs().indent);
+  }
+  function setView(patch) { LS.set(K_VIEW, JSON.stringify(Object.assign(viewPrefs(), patch))); applyView(); }
+  const seg = (name, list, cur) => `<div class="qd-seg qd-seg-sm" role="group">${list.map((x) => `<button type="button" class="${x[0] === cur ? "is-active" : ""}" data-opt="${name}" data-val="${esc(String(x[0]))}" aria-pressed="${x[0] === cur}"${x[2] && name === "numstyle" ? ` title="${esc(x[2])}"` : ""}>${esc(x[1])}</button>`).join("")}</div>`;
+  function renderOpts() {
+    if (!ed) return;
+    const s = ed.story, n = normNumbering(s.numbering), v = viewPrefs();
+    const manual = s.chapters.some((c) => Number.isInteger(c.num));
+    ed.optsEl.innerHTML = `
+      <div class="qd-opt-sec">
+        <div class="qd-opt-head">${px(tiIcon("list-numbers"), 15)}<span>Penomoran chapter</span></div>
+        <div class="qd-opt"><span class="qd-opt-label">Gaya nomor</span>${seg("numstyle", NUM_STYLES, n.style)}</div>
+        <div class="qd-opt"><span class="qd-opt-label">Label</span>
+          <div class="qd-opt-chips">${NUM_PREFIXES.map((x) => `<button type="button" class="qd-chip${n.prefix === x ? " is-active" : ""}" data-opt="prefix" data-val="${x}" data-no-i18n>${x}</button>`).join("")}</div>
+          <input class="qd-opt-input" type="text" maxlength="24" data-no-i18n data-opt-input="prefix" value="${esc(n.prefix)}" aria-label="Label chapter sendiri" placeholder="Label sendiri…"></div>
+        <div class="qd-opt qd-opt-row"><span class="qd-opt-label">Mulai dari nomor</span>
+          <input class="qd-opt-input qd-opt-num" type="number" min="0" max="3999" data-opt-input="start" value="${n.start}" aria-label="Nomor chapter pertama"></div>
+        <p class="qd-opt-hint">Klik nomor di samping nama chapter untuk mengganti nomornya. Chapter sesudahnya melanjutkan dari nomor itu.</p>
+        ${manual ? `<button type="button" class="qd-btn qd-btn-ghost qd-btn-sm" data-opt="num-reset">${px(tiIcon("restore"), 14)}<span>Kembalikan nomor otomatis</span></button>` : ""}
+      </div>
+      <div class="qd-opt-sec">
+        <div class="qd-opt-head">${px(tiIcon("typography"), 15)}<span>Tampilan editor</span><small>perangkat ini</small></div>
+        <div class="qd-opt"><span class="qd-opt-label">Lebar halaman</span>${seg("width", VIEW_WIDTH, v.width)}</div>
+        <div class="qd-opt"><span class="qd-opt-label">Ukuran huruf</span>${seg("size", VIEW_SIZE, v.size)}</div>
+        <div class="qd-opt"><span class="qd-opt-label">Spasi baris</span>${seg("lh", VIEW_LH, v.lh)}</div>
+        <div class="qd-opt"><span class="qd-opt-label">Font isi</span>${seg("font", VIEW_FONT, v.font)}</div>
+        <div class="qd-opt qd-opt-row"><span class="qd-opt-label">Indentasi paragraf ala buku</span>
+          <button type="button" role="switch" aria-checked="${v.indent}" aria-label="Indentasi paragraf" class="qd-switch${v.indent ? " is-on" : ""}" data-opt="indent"><span></span></button></div>
+      </div>`;
+  }
+  function toggleOpts(open) {
+    if (!ed) return;
+    open = open == null ? ed.optsEl.classList.contains("hidden") : open;
+    ed.optsEl.classList.toggle("hidden", !open);
+    ed.sideList.classList.toggle("hidden", open);
+    $(ed.scr, ".qd-side-label").textContent = open ? "Opsi" : "Chapter";
+    const b = $(ed.scr, ".qd-side-optbtn");
+    b.classList.toggle("is-on", open);
+    b.setAttribute("aria-expanded", String(open));
+    if (open) renderOpts();
+  }
+  // penomoran berubah: judul bawaan ("Chapter IV") ikut dinomori ulang di semua tempat
+  function setNumbering(patch) {
+    const s = ed.story, old = normNumbering(s.numbering);
+    s.numbering = normNumbering(Object.assign({}, old, patch));
+    syncEditor();
+    renumberDefaults(s, old.prefix);
+    s.updatedAt = nowIso();
+    changed();
+    renderSide();
+    ed.titleEl.placeholder = defaultChTitle(s, s.chapters.indexOf(ed.ch));
+    if (ed.titleEl.value !== ed.ch.title) ed.titleEl.value = ed.ch.title;
+  }
+  function wireOpts() {
+    const o = ed.optsEl;
+    o.addEventListener("click", (e) => {
+      const t = e.target.closest("[data-opt]");
+      if (!t || !ed) return;
+      const k = t.dataset.opt, val = t.dataset.val;
+      if (k === "numstyle") setNumbering({ style: val });
+      else if (k === "prefix") setNumbering({ prefix: val });
+      else if (k === "num-reset") { ed.story.chapters.forEach((c) => { delete c.num; }); setNumbering({}); }
+      else if (k === "width" || k === "lh" || k === "font") setView({ [k]: val });
+      else if (k === "size") setView({ size: parseInt(val, 10) });
+      else if (k === "indent") setView({ indent: !viewPrefs().indent });
+      else return;
+      renderOpts();
+      const again = $(o, `[data-opt="${k}"]${val ? `[data-val="${CSS.escape(val)}"]` : ""}`);
+      if (again) again.focus({ preventScroll: true });
+    });
+    o.addEventListener("change", (e) => {
+      const t = e.target.closest("[data-opt-input]");
+      if (!t || !ed) return;
+      if (t.dataset.optInput === "prefix") { if (t.value.trim()) setNumbering({ prefix: t.value }); }
+      else if (t.dataset.optInput === "start") setNumbering({ start: t.value });
+      renderOpts();
+    });
+    o.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("[data-opt-input]")) { e.preventDefault(); e.target.blur(); } });
+  }
+  // ganti nomor satu chapter langsung dari sidebar
+  function editChNum(btn) {
+    const s = ed.story, c = s.chapters.find((x) => x.id === btn.dataset.id);
+    if (!c) return;
+    const i = s.chapters.indexOf(c), nums = chNumbers(s);
+    const inp = document.createElement("input");
+    inp.type = "number"; inp.min = "0"; inp.max = "3999"; inp.className = "qd-num-input"; inp.value = nums[i];
+    inp.setAttribute("aria-label", "Nomor chapter " + chapterLabel(c, i, s));
+    btn.replaceWith(inp);
+    inp.focus(); inp.select();
+    let done = false;
+    const finish = (commit) => {
+      if (done) return;
+      done = true;
+      if (commit) {
+        const v = parseInt(inp.value, 10);
+        if (isFinite(v) && v >= 0 && v <= 3999) {
+          delete c.num;
+          if (chNumbers(s)[i] !== v) c.num = v;   // sama dengan nomor otomatis -> tidak perlu nomor manual
+          setNumbering({});
+          if (!ed.optsEl.classList.contains("hidden")) renderOpts();
+          const nb = $(ed.sideList, `.qd-num-btn[data-id="${CSS.escape(c.id)}"]`);
+          if (nb) nb.focus();
+          return;
+        }
+      }
+      renderSide();
+    };
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); finish(true); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(false); }
+    });
+    inp.addEventListener("blur", () => finish(true));
+    inp.addEventListener("pointerdown", (e) => e.stopPropagation());
   }
   function renderHeaderZone() {
     const { ch, zoneEl } = ed;
@@ -1148,7 +1363,7 @@
   }
   function deleteCurrentChapter() {
     const { story: s, ch } = ed, i = s.chapters.indexOf(ch);
-    if (!confirm(`Hapus "${chapterLabel(ch, i)}"? Isi chapter ini akan hilang.`)) return;
+    if (!confirm(`Hapus "${chapterLabel(ch, i, s)}"? Isi chapter ini akan hilang.`)) return;
     ed.dirty = false;
     s.chapters.splice(i, 1);
     renumberDefaults(s);
@@ -1199,7 +1414,7 @@
       ed.ch.title = title.value;
       ed.ch.updatedAt = ed.story.updatedAt = nowIso();
       const nm = $(ed.sideList, `.qd-side-item[data-id="${CSS.escape(ed.ch.id)}"] .qd-side-name`);
-      if (nm) nm.textContent = chapterLabel(ed.ch, ed.story.chapters.indexOf(ed.ch));
+      if (nm) nm.textContent = chapterLabel(ed.ch, ed.story.chapters.indexOf(ed.ch), ed.story);
       changed();
     });
     title.addEventListener("keydown", (e) => {
@@ -1244,7 +1459,7 @@
       s.updatedAt = nowIso();
       changed();
       renderSide();
-      ed.titleEl.placeholder = "Chapter " + roman(s.chapters.indexOf(ed.ch) + 1);
+      ed.titleEl.placeholder = defaultChTitle(s, s.chapters.indexOf(ed.ch));
       if (ed.titleEl.value !== ed.ch.title) ed.titleEl.value = ed.ch.title;
     });
     makeSortable(ed.tilesEl, ".qd-tile", ".qd-tile-grip", (order) => {
@@ -1263,7 +1478,9 @@
       const act = t.dataset.act || "pill-" + t.dataset.pill;
       if (act === "tostory") go("story", { storyId: ed.story.id });
       else if (act === "opench") { if (t.dataset.id !== ed.ch.id) openChapter(t.dataset.id); else closeDrawers(); }
-      else if (act === "newch") newChapter();
+      else if (act === "newch") { toggleOpts(false); newChapter(); }
+      else if (act === "side-opts") toggleOpts();
+      else if (act === "chnum") editChNum(t);
       else if (act === "side-toggle") {
         if (isNarrow()) { scr.classList.toggle("side-open"); scr.classList.remove("panel-open"); }
         else { const c = !scr.classList.contains("side-collapsed"); scr.classList.toggle("side-collapsed", c); LS.set(K_SIDE, c ? "1" : "0"); }
@@ -1655,9 +1872,9 @@
   function readerContent(s) {
     return `<section class="qd-r-titlepage"><div class="qd-r-tp-title">${esc(storyTitle(s))}</div>${FLOURISH}${s.author ? `<div class="qd-r-tp-author">${esc(s.author)}</div>` : ""}</section>` +
       s.chapters.map((c, i) => {
-        const label = chapterLabel(c, i);
+        const label = chapterLabel(c, i, s);
         return `<section class="qd-r-ch" data-ch="${esc(c.id)}">
-          ${isDefaultChTitle(label) ? `<div class="qd-r-num">${roman(i + 1)}</div>` : `<div class="qd-r-num">${roman(i + 1)}</div><h2 class="qd-r-title">${esc(label)}</h2>`}
+          ${chMark(s, i) ? `<div class="qd-r-num">${chMark(s, i)}</div>` : ""}${isDefaultChTitle(label, s) && chMark(s, i) ? "" : `<h2 class="qd-r-title">${esc(label)}</h2>`}
           ${FLOURISH}
           ${c.header ? `<img class="qd-r-header" src="${esc(c.header)}" alt="">` : ""}
           <div class="qd-r-body">${sanitizeHtml(c.html) || '<p class="qd-r-empty">(Chapter ini masih kosong)</p>'}</div>
@@ -1677,7 +1894,7 @@
     ov.innerHTML = `<div class="qd-r-top">
         <div class="qd-r-head"><span class="qd-r-story">${esc(storyTitle(s))}</span><span class="qd-r-chap"></span></div>
         <div class="qd-r-tools">
-          <select class="qd-sel qd-r-toc" aria-label="Daftar isi" title="Daftar isi">${s.chapters.map((c, i) => `<option value="${esc(c.id)}">${roman(i + 1)}. ${esc(chapterLabel(c, i))}</option>`).join("")}</select>
+          <select class="qd-sel qd-r-toc" aria-label="Daftar isi" title="Daftar isi">${s.chapters.map((c, i) => `<option value="${esc(c.id)}">${chMark(s, i) ? chMark(s, i) + ". " : ""}${esc(chapterLabel(c, i, s))}</option>`).join("")}</select>
           <button type="button" class="qd-icon-btn" data-act="r-smaller" title="Perkecil huruf" aria-label="Perkecil huruf">${px(tiIcon("text-decrease"), 18)}</button>
           <button type="button" class="qd-icon-btn" data-act="r-bigger" title="Perbesar huruf" aria-label="Perbesar huruf">${px(tiIcon("text-increase"), 18)}</button>
           <button type="button" class="qd-icon-btn" data-act="r-close" title="Tutup (Esc)" aria-label="Tutup mode baca">${px(tiIcon("x"), 18)}</button>
@@ -1811,7 +2028,7 @@
     const cur = readerChapterAt(r.spread);
     if (cur) {
       const i = r.s.chapters.findIndex((c) => c.id === cur.id);
-      $(ov, ".qd-r-chap").textContent = i >= 0 ? " · " + chapterLabel(r.s.chapters[i], i) : "";
+      $(ov, ".qd-r-chap").textContent = i >= 0 ? " · " + chapterLabel(r.s.chapters[i], i, r.s) : "";
       $(ov, ".qd-r-toc").value = cur.id;
     }
   }
@@ -1827,7 +2044,7 @@
   /* ============================ F. TERBITKAN ============================ */
   function manuscriptHtml(s) {
     return `<div class="qd-ms-title">${esc(storyTitle(s))}</div>${s.author ? `<div class="qd-ms-author">oleh ${esc(s.author)}</div>` : ""}${FLOURISH}` +
-      s.chapters.map((c, i) => `<section class="qd-ms-ch"><div class="qd-ms-num">${roman(i + 1)}</div><h2 class="qd-ms-ch-title">${esc(chapterLabel(c, i))}</h2>
+      s.chapters.map((c, i) => `<section class="qd-ms-ch">${chMark(s, i) ? `<div class="qd-ms-num">${chMark(s, i)}</div>` : ""}<h2 class="qd-ms-ch-title">${esc(chapterLabel(c, i, s))}</h2>
         ${c.header ? `<img class="qd-ms-header" src="${esc(c.header)}" alt="">` : ""}<div class="qd-ms-body">${sanitizeHtml(c.html) || '<p class="qd-muted">(kosong)</p>'}</div></section>`).join("");
   }
   function renderPublish() {
@@ -2035,11 +2252,11 @@ nav ol{list-style:none;padding:0;} nav li{margin:.4em 0;}`;
     manifest.push(`<item id="titlepage" href="title.xhtml" media-type="application/xhtml+xml"/>`);
     const chapters = [];
     for (let i = 0; i < s.chapters.length; i++) {
-      const c = s.chapters[i], label = chapterLabel(c, i), href = `chapter-${i + 1}.xhtml`;
+      const c = s.chapters[i], label = chapterLabel(c, i, s), href = `chapter-${i + 1}.xhtml`;
       let head = "";
       if (c.header) { try { head = `<div class="ch-header"><img src="${await addImage(c.header)}" alt=""/></div>`; } catch (e) { head = ""; } }
       const body = await toXhtml(c.html, addImage);
-      files.push({ name: "OEBPS/" + href, data: page(label, `<section epub:type="chapter" class="chapter" id="ch${i + 1}"><p class="ch-num">${roman(i + 1)}</p><h1 class="ch-title">${xmlEsc(label)}</h1>${head}${body}</section>`) });
+      files.push({ name: "OEBPS/" + href, data: page(label, `<section epub:type="chapter" class="chapter" id="ch${i + 1}">${chMark(s, i) ? `<p class="ch-num">${chMark(s, i)}</p>` : ""}<h1 class="ch-title">${xmlEsc(label)}</h1>${head}${body}</section>`) });
       manifest.push(`<item id="ch${i + 1}" href="${href}" media-type="application/xhtml+xml"/>`);
       chapters.push({ href, label, id: "ch" + (i + 1) });
     }
@@ -2084,8 +2301,8 @@ nav ol{list-style:none;padding:0;} nav li{margin:.4em 0;}`;
     const body = (html) => sanitizeHtml(html).replace(/<hr class="qd-break">/g, '<p style="text-align:center;color:#888;">&#10022; &#10022; &#10022;</p>');
     let html = `<div style="text-align:center;margin-top:160pt;"><h1 style="font-family:Georgia,serif;font-size:30pt;font-weight:normal;">${esc(title)}</h1>${s.author ? `<p style="font-family:Georgia,serif;font-size:14pt;color:#555;">oleh ${esc(s.author)}</p>` : ""}</div>`;
     s.chapters.forEach((c, i) => {
-      html += `<br clear="all" style="page-break-before:always" /><p style="text-align:center;font-family:Georgia,serif;color:#888;letter-spacing:3pt;margin-top:40pt;">${roman(i + 1)}</p>`;
-      html += `<h1 style="text-align:center;font-family:Georgia,serif;font-weight:normal;font-size:22pt;">${esc(chapterLabel(c, i))}</h1>`;
+      html += `<br clear="all" style="page-break-before:always" /><p style="text-align:center;font-family:Georgia,serif;color:#888;letter-spacing:3pt;margin-top:40pt;">${chMark(s, i)}&nbsp;</p>`;
+      html += `<h1 style="text-align:center;font-family:Georgia,serif;font-weight:normal;font-size:22pt;">${esc(chapterLabel(c, i, s))}</h1>`;
       if (c.header) html += `<p style="text-align:center;"><img src="${esc(c.header)}" style="max-width:100%;" width="560" alt=""></p>`;
       html += `<div style="font-family:Georgia,serif;font-size:12pt;line-height:1.6;">${body(c.html)}</div>`;
     });
@@ -2096,8 +2313,8 @@ nav ol{list-style:none;padding:0;} nav li{margin:.4em 0;}`;
     const title = storyTitle(s);
     let cover = "";
     try { cover = await renderCover(s, 800, 1200, "image/jpeg"); } catch (e) { cover = ""; }
-    const toc = s.chapters.map((c, i) => `<li><a href="#ch${i + 1}"><span>${roman(i + 1)}</span>${esc(chapterLabel(c, i))}</a></li>`).join("");
-    const chs = s.chapters.map((c, i) => `<section class="ch" id="ch${i + 1}"><p class="num">${roman(i + 1)}</p><h2>${esc(chapterLabel(c, i))}</h2>
+    const toc = s.chapters.map((c, i) => `<li><a href="#ch${i + 1}"><span>${chMark(s, i)}</span>${esc(chapterLabel(c, i, s))}</a></li>`).join("");
+    const chs = s.chapters.map((c, i) => `<section class="ch" id="ch${i + 1}">${chMark(s, i) ? `<p class="num">${chMark(s, i)}</p>` : ""}<h2>${esc(chapterLabel(c, i, s))}</h2>
       ${c.header ? `<img class="hdr" src="${esc(c.header)}" alt="">` : ""}${sanitizeHtml(c.html)}</section>`).join("\n");
     const doc = `<!DOCTYPE html>
 <html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="generator" content="Novelist Quill">

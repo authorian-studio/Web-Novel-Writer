@@ -710,6 +710,7 @@ function openProject(id) {
   markSaved();
   restoreProjectTabs(p);   // TAB PROJECT: tab terbuka + tab aktif project ini (bawaan: Beranda)
   restoreProjSidebar();
+  setTwView(twView, true);   // KERANGKA: Papan / Halaman terakhir
   el("dashboardView").classList.add("hidden");
   el("editorView").classList.remove("hidden");
   startProjClock();
@@ -812,7 +813,7 @@ function flushCurrentEdits() {
 // Quill, Home, riwayat, ...) otomatis membuka tab x kalau sedang tertutup (disisipkan setelah tab aktif).
 const TAB_DEFS = [
   { id: "home", panel: "home", name: "Beranda", icon: tiIcon("home"), desc: "Jejak semua dokumenmu & papan ide — zoom, susun, hubungkan" },
-  { id: "write", panel: "write", name: "Tulis", icon: tiIcon("pencil"), desc: "Editor scene: bab & adegan bertingkat" },
+  { id: "write", panel: "write", name: "Kerangka", icon: tiIcon("list-details"), desc: "Rencanakan bab & adegan: sinopsis, POV, lokasi, tujuan, target kata" },
   { id: "quill", panel: "write", name: "Quill", icon: tiIcon("feather"), desc: "Tulis cerita bergaya buku, lalu terbitkan" },
   { id: "organize", panel: "organize", name: "Kodeks", icon: tiIcon("books"), desc: "Wiki dunia: karakter, lokasi, faksi, sihir, sejarah & lainnya" },
   { id: "jejaring", panel: "jejaring", name: "Tree Relations", icon: tiIcon("affiliate"), desc: "Pohon relasi tokoh: keluarga, kantor, militer, istana" },
@@ -2054,6 +2055,7 @@ function toggleFolder(id, row) {
 }
 
 function renderSceneList() {
+  if (twView === "board") setTimeout(() => renderTwBoard(), 0);   // papan kerangka mengikuti perubahan daftar
   const p = getProject(currentProjectId);
   const box = el("sceneList");
   if (!p || !box) return;
@@ -2426,6 +2428,7 @@ function initTwList() {
 }
 
 function selectScene(id, addToHistory = true) {
+  if (twView === "board") setTwView("page", true);   // membuka adegan dari daftar/papan -> tampilan Halaman
   const col = el("sceneDetailCol");
   if (currentSceneId && col && el("sceneEditor")) twScrollMem.set(currentSceneId, col.scrollTop);
   syncSceneFromDetail();
@@ -2484,6 +2487,7 @@ function renderSceneDetail() {
           <span class="tw-meta-item" id="twMetaRead"></span>
         </div>
         <textarea id="twSynopsis" class="tw-syn" rows="1" placeholder="Tambah sinopsis singkat…" aria-label="Sinopsis scene"></textarea>
+        ${twPlanPageHtml(s)}
       </header>
       ${twToolbarHtml()}
       <div id="sceneEditor" class="tw-editor" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="Isi scene" data-placeholder="Mulai menulis di sini…"></div>
@@ -2512,6 +2516,7 @@ function renderSceneDetail() {
   syn.addEventListener("focus", () => syn.classList.add("is-open"));
   syn.addEventListener("blur", () => { syn.classList.remove("is-open"); twAutoGrow(syn); });
   el("twStatus").onclick = () => twSetStatus(s, TW_STATUS_NEXT[twStatusOf(s)]);
+  twWirePlanInputs(el("twPlan"), s);
   ed.addEventListener("input", twOnEditorInput);
   ed.addEventListener("paste", twOnPaste);
   ed.addEventListener("keydown", twEditorKeys);
@@ -2526,6 +2531,182 @@ function renderSceneDetail() {
 
   renderSceneDrawerBody(s);
   updateSceneDrawerVisibility();
+}
+// ================= KERANGKA: mode Scene dialihkan jadi tempat merencanakan cerita =================
+// Papan = semua adegan sebagai kartu rencana per bab; Halaman = satu adegan (rencana di atas, catatan/draf di bawah).
+// Rencana tiap adegan disimpan di scene.plan { pov, place, time, goal, conflict, outcome, target }.
+const TW_VIEW_KEY = "novelist_tw_view";
+let twView = "board";
+try { twView = localStorage.getItem(TW_VIEW_KEY) === "page" ? "page" : "board"; } catch (e) { twView = "board"; }
+let twBoardStale = false;
+const TW_PLAN_FIELDS = [["pov", "user", "POV", "Sudut pandang siapa?"], ["place", "map-pin", "Lokasi", "Di mana?"], ["time", "clock", "Waktu", "Kapan?"]];
+const TW_GCO = [["goal", "Tujuan", "Apa yang ingin dicapai tokoh?"], ["conflict", "Konflik", "Apa yang menghalanginya?"], ["outcome", "Hasil", "Bagaimana adegan ini berakhir?"]];
+function twPlan(s) { if (!s.plan || typeof s.plan !== "object" || Array.isArray(s.plan)) s.plan = {}; return s.plan; }
+const twPlanStr = (s, k) => (s.plan && typeof s.plan[k] === "string" ? s.plan[k] : "");
+function twTarget(s) { const t = s.plan && parseInt(s.plan.target, 10); return t > 0 ? t : 0; }
+function twPlanFieldsHtml(s, cls) {
+  return TW_PLAN_FIELDS.map(([k, ic, label, ph]) => `<label class="${cls}" title="${label}">${tiPx(tiIcon(ic), 14)}<span class="tw-sr">${label}</span><input type="text" maxlength="80" data-plan="${k}" value="${twAttr(twPlanStr(s, k))}" placeholder="${label}" aria-label="${label}: ${ph}"></label>`).join("");
+}
+function twGcoHtml(s, cls) {
+  const any = TW_GCO.some(([k]) => twPlanStr(s, k).trim());
+  return `<details class="${cls}"${any ? " open" : ""}><summary>${tiPx(tiIcon("target-arrow"), 14)}<span>Tujuan · Konflik · Hasil</span></summary>
+    ${TW_GCO.map(([k, label, ph]) => `<label class="tw-gco-row"><span>${label}</span><textarea rows="1" maxlength="600" data-plan="${k}" placeholder="${ph}" aria-label="${label}">${escapeHtml(twPlanStr(s, k))}</textarea></label>`).join("")}
+  </details>`;
+}
+// rencana di halaman adegan (di bawah sinopsis)
+function twPlanPageHtml(s) {
+  const t = twTarget(s);
+  return `<div class="tw-plan" id="twPlan">
+    <div class="tw-plan-fields">${twPlanFieldsHtml(s, "tw-plan-field")}
+      <label class="tw-plan-field tw-plan-target" title="Target kata adegan ini">${tiPx(tiIcon("flag"), 14)}<input type="number" min="0" max="100000" step="100" data-plan="target" value="${t || ""}" placeholder="Target kata" aria-label="Target kata adegan ini"></label>
+    </div>
+    ${twGcoHtml(s, "tw-gco")}
+  </div>`;
+}
+function twGrow(t) { if (t && t.tagName === "TEXTAREA" && t.offsetParent) { t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; } }
+// isi rencana diketik (halaman maupun kartu papan)
+function twSetPlan(s, key, raw) {
+  const plan = twPlan(s);
+  if (key === "target") { const n = parseInt(raw, 10); if (n > 0) plan.target = Math.min(100000, n); else delete plan.target; }
+  else plan[key] = String(raw).slice(0, key === "goal" || key === "conflict" || key === "outcome" ? 600 : 80);
+  markDirtyAndSchedule();
+}
+function twWirePlanInputs(box, s) {
+  if (!box) return;
+  box.addEventListener("input", (e) => { const t = e.target.closest("[data-plan]"); if (!t) return; twSetPlan(s, t.dataset.plan, t.value); twGrow(t); });
+  box.addEventListener("toggle", () => box.querySelectorAll("textarea").forEach(twGrow), true);
+  requestAnimationFrame(() => box.querySelectorAll("textarea").forEach(twGrow));
+}
+function setTwView(v, quiet) {
+  twView = v === "page" ? "page" : "board";
+  try { localStorage.setItem(TW_VIEW_KEY, twView); } catch (e) { /* diblokir */ }
+  const main = el("twMain");
+  if (!main) return;
+  main.classList.toggle("is-board", twView === "board");
+  el("twBoard").classList.toggle("hidden", twView !== "board");
+  el("twViewSwitch").querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === twView)));
+  if (twView === "board") { syncSceneFromDetail(); twHideBubble(); twCloseStats(); renderTwBoard(true); twRenderCrumbs(null); }
+  else if (!quiet) { renderSceneDetail(); }
+}
+function twBoardCardHtml(s, n) {
+  const st = twStatusOf(s), w = twWords(s), t = twTarget(s), pct = t ? Math.min(100, Math.round(w / t * 100)) : 0;
+  return `<article class="kb-card is-${st}${s.id === currentSceneId ? " is-current" : ""}" data-id="${twAttr(s.id)}">
+    <div class="kb-card-top">
+      <button type="button" class="kb-status" data-act="status" title="Status — klik untuk ganti (Todo → Draft → Done)"><i class="tw-dot ${st}"></i><span>${STATUS_LABELS[st]}</span></button>
+      <span class="kb-num">${n}</span>
+      <button type="button" class="kb-open" data-act="open" title="Buka halaman adegan" aria-label="Buka halaman ${twAttr(s.title || "adegan")}">${tiPx(tiIcon("arrow-up-right"), 15)}</button>
+    </div>
+    <input class="kb-title" type="text" maxlength="140" data-f="title" value="${twAttr(s.title)}" placeholder="Judul adegan" aria-label="Judul adegan">
+    <textarea class="kb-syn" rows="2" maxlength="1200" data-f="synopsis" placeholder="Apa yang terjadi di adegan ini?" aria-label="Sinopsis">${escapeHtml(s.synopsis || "")}</textarea>
+    <div class="kb-fields">${twPlanFieldsHtml(s, "kb-field")}</div>
+    ${twGcoHtml(s, "tw-gco kb-gco")}
+    <div class="kb-foot">
+      <div class="kb-prog${t && w >= t ? " is-full" : ""}" aria-hidden="true"><i style="width:${pct}%"></i></div>
+      <span class="kb-words">${twFmt(w)} kata</span>
+      <label class="kb-target" title="Target kata">${tiPx(tiIcon("flag"), 13)}<input type="number" min="0" max="100000" step="100" data-plan="target" value="${t || ""}" placeholder="target" aria-label="Target kata"></label>
+    </div>
+  </article>`;
+}
+// papan: satu bagian per bab (sub-bab ditulis "Bab › Sub"), adegan di luar bab dikelompokkan "Tanpa bab"
+function renderTwBoard(force) {
+  const box = el("twBoard"), p = getProject(currentProjectId);
+  if (!box || !p || twView !== "board") return;
+  if (!force && box.contains(document.activeElement)) { twBoardStale = true; return; }   // jangan memutus ketikan
+  twBoardStale = false;
+  const sections = [];
+  let loose = null;
+  (function walk(list, trail) {
+    (list || []).forEach((n) => {
+      if (n.type === "folder") {
+        loose = null;
+        const name = n.title || "Bab tanpa judul";
+        const sec = { folder: n, title: trail.concat(name).join(" › "), scenes: (n.children || []).filter((c) => c.type !== "folder") };
+        sections.push(sec);
+        walk((n.children || []).filter((c) => c.type === "folder"), trail.concat(name));
+        loose = null;
+      } else {
+        if (!loose) { loose = { folder: null, title: "Tanpa bab", scenes: [] }; sections.push(loose); }
+        loose.scenes.push(n);
+      }
+    });
+  })(p.data.scenes, []);
+  const all = flattenScenes(p.data.scenes);
+  const words = all.reduce((a, s) => a + twWords(s), 0), target = all.reduce((a, s) => a + twTarget(s), 0);
+  const cnt = { todo: 0, draft: 0, done: 0 };
+  all.forEach((s) => { cnt[twStatusOf(s)]++; });
+  let k = 0;
+  const scroll = box.scrollTop;
+  box.innerHTML = !all.length && !sections.length ? twEmptyHtml(p) : `
+    <header class="kb-head">
+      <div><h2 class="kb-h">Kerangka cerita</h2>
+        <p class="kb-sub"><span>${all.length} scene</span> · <span>${twFmt(words)} kata</span>${target ? ` · <span>${tiPx(tiIcon("flag"), 12)} ${twFmt(target)}</span>` : ""}</p></div>
+      <div class="kb-legend">${["todo", "draft", "done"].map((x) => `<span><i class="tw-dot ${x}"></i>${cnt[x]} ${STATUS_LABELS[x]}</span>`).join("")}</div>
+    </header>
+    ${sections.map((sec) => `<section class="kb-sec" data-folder="${sec.folder ? twAttr(sec.folder.id) : ""}">
+      <header class="kb-sec-head">${tiPx(tiIcon(sec.folder ? "folder" : "files"), 16)}<h3>${escapeHtml(sec.title)}</h3>
+        <span class="kb-sec-meta"><span>${sec.scenes.length} scene</span> · <span>${twFmt(sec.scenes.reduce((a, s) => a + twWords(s), 0))} kata</span></span></header>
+      <div class="kb-grid">${sec.scenes.map((s) => twBoardCardHtml(s, ++k)).join("")}
+        <button type="button" class="kb-add" data-act="add" data-folder="${sec.folder ? twAttr(sec.folder.id) : ""}">${tiPx(tiIcon("plus"), 16)}<span>Adegan</span></button></div>
+    </section>`).join("")}
+    <button type="button" class="tw-btn kb-add-folder" data-act="add-folder">${tiPx(tiIcon("folder-plus"), 16)}<span>Bab baru</span></button>`;
+  box.scrollTop = scroll;
+  box.querySelectorAll("textarea").forEach(twGrow);
+}
+// adegan baru dari papan: tetap di papan, judul kartu baru langsung siap diketik
+function twBoardAddScene(folderId) {
+  const p = getProject(currentProjectId);
+  if (!p) return;
+  const all = flattenScenes(p.data.scenes);
+  const node = { id: twNewId("scene"), type: "scene", title: twFreeTitle("Scene", all.length + 1, all), synopsis: "", status: "todo", content: "" };
+  const par = folderId ? findSceneNode(folderId, p.data.scenes) : null;
+  if (par && par.node.type === "folder") { (par.node.children = par.node.children || []).push(node); expandedFolders.add(par.node.id); }
+  else p.data.scenes.push(node);
+  markDirtyAndSchedule();
+  renderSceneList();
+  renderTwBoard(true);
+  if (window.NovelHome) window.NovelHome.refresh();
+  const t = el("twBoard").querySelector(`.kb-card[data-id="${CSS.escape(node.id)}"] .kb-title`);
+  if (t) { t.scrollIntoView({ block: "nearest", behavior: "smooth" }); t.focus({ preventScroll: true }); t.select(); }
+}
+function initTwBoard() {
+  const box = el("twBoard");
+  el("twViewSwitch").addEventListener("click", (e) => { const b = e.target.closest("[data-view]"); if (b && b.dataset.view !== twView) setTwView(b.dataset.view); });
+  box.addEventListener("input", (e) => {
+    const t = e.target, card = t.closest(".kb-card"), s = card && findScene(card.dataset.id);
+    if (!s) return;
+    if (t.dataset.f === "title") { s.title = t.value; twTitleChanged(s, "board"); }
+    else if (t.dataset.f === "synopsis") {
+      s.synopsis = t.value;
+      if (el("sceneEditor") && el("sceneEditor").dataset.sceneId === s.id) { el("twSynopsis").value = s.synopsis; if (el("sceneSynopsis")) el("sceneSynopsis").value = s.synopsis; }
+      markDirtyAndSchedule();
+    } else if (t.dataset.plan) {
+      twSetPlan(s, t.dataset.plan, t.value);
+      if (t.dataset.plan === "target") {
+        const tg = twTarget(s), w = twWords(s), bar = card.querySelector(".kb-prog");
+        bar.firstElementChild.style.width = (tg ? Math.min(100, Math.round(w / tg * 100)) : 0) + "%";
+        bar.classList.toggle("is-full", !!tg && w >= tg);
+      }
+    }
+    twGrow(t);
+  });
+  box.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches(".kb-title")) { e.preventDefault(); const syn = e.target.closest(".kb-card").querySelector(".kb-syn"); if (syn) syn.focus(); } });
+  box.addEventListener("toggle", (e) => { if (e.target.tagName === "DETAILS") e.target.querySelectorAll("textarea").forEach(twGrow); }, true);
+  box.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-act]");
+    if (!b) return;
+    const card = b.closest(".kb-card"), s = card && findScene(card.dataset.id);
+    if (b.dataset.act === "status" && s) {
+      const st = TW_STATUS_NEXT[twStatusOf(s)];
+      twSetStatus(s, st);
+      card.className = card.className.replace(/\bis-(todo|draft|done)\b/, "is-" + st);
+      b.innerHTML = `<i class="tw-dot ${st}"></i><span>${STATUS_LABELS[st]}</span>`;
+    } else if (b.dataset.act === "open" && s) selectScene(s.id);
+    else if (b.dataset.act === "add") twBoardAddScene(b.dataset.folder || null);
+    else if (b.dataset.act === "add-folder") { twAddFolder(); renderTwBoard(true); }
+    else if (b.dataset.act === "add-scene") twBoardAddScene(null);
+    else if (b.dataset.act === "first") { const f = twSceneOrder()[0]; if (f) selectScene(f.id); }
+  });
+  box.addEventListener("focusout", (e) => { if (twBoardStale && !box.contains(e.relatedTarget)) setTimeout(() => { if (!box.contains(document.activeElement)) renderTwBoard(); }, 0); });
 }
 function twEmptyHtml(p) {
   const any = !!(p && flattenScenes(p.data.scenes).length);
@@ -2973,8 +3154,9 @@ function twMirrorSave() {
 function initTwUi() {
   initTwList();
   el("twBubble").innerHTML = twBubbleHtml();
-  el("btnAddScene").onclick = () => twAddScene(null);
-  el("btnAddFolder").onclick = twAddFolder;
+  el("btnAddScene").onclick = () => (twView === "board" ? twBoardAddScene(null) : twAddScene(null));
+  el("btnAddFolder").onclick = () => { twAddFolder(); if (twView === "board") renderTwBoard(true); };
+  initTwBoard();
   el("twSideClose").onclick = () => toggleTwSide(false);
   el("twSideOpen").onclick = () => toggleTwSide();
   el("twScrim").onclick = () => toggleTwSide(false);

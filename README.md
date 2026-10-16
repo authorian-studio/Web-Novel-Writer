@@ -1,6 +1,30 @@
-# Novelist Web — v0.14.3
+# Novelist Web — v0.15.0
 
-## Riwayat perubahan terbaru (v0.14.3) — paling baru di atas
+## Riwayat perubahan terbaru (v0.15.0) — paling baru di atas
+
+**Mode Scene kini menjadi Kerangka.** Di tab Write, pilihan "Scene | Quill" sekarang menjadi **Kerangka | Quill**. Tab
+"Tulis" pun bernama Kerangka. Kerangka adalah tempat *merencanakan* cerita, sedangkan menulis versi bukunya di Quill.
+- **Papan** (tampilan baru, bawaan): semua adegan tampil sebagai kartu rencana, dikelompokkan per bab. Tiap kartu
+  berisi status (klik untuk ganti), judul, sinopsis, POV, lokasi, waktu, **Tujuan · Konflik · Hasil**, dan target
+  kata dengan bilah kemajuan. Semuanya bisa diisi langsung di kartu. Ada tombol "+ Adegan" per bab dan "Bab baru".
+- **Halaman**: satu adegan seperti dulu, tapi kini rencananya (POV, lokasi, waktu, target, Tujuan/Konflik/Hasil) ada di
+  bawah sinopsis, dan isi editornya menjadi catatan/draf adegan.
+- Pindah tampilan lewat tombol **Papan | Halaman** di kiri atas. Klik adegan di daftar kiri atau ikon ↗ di kartu untuk
+  membuka Halaman-nya. Pilihan tampilan diingat di perangkat ini.
+
+**Quill: sampul belakang.** Di "Edit sampul" → Sampul, sekarang ada pilihan **Depan | Belakang**:
+- Sampul belakang bisa diberi gambar sendiri (penuhi / tampilkan utuh) dan **teks sampul belakang** (blurb).
+- Buku 3D otomatis berputar memperlihatkan sisi yang sedang diedit.
+- Tombol **Balik buku** di bawah buku (editor sampul & halaman cerita) memutar buku depan ↔ belakang.
+
+**Quill: panel Opsi di sidebar chapter.** Tombol ⚙ di samping "Chapter baru" membuka **Opsi**:
+- **Penomoran chapter** (per cerita): gaya Romawi / Angka / Tanpa nomor, label (Chapter, Bab, Bagian, Part, atau
+  tulisan sendiri), dan mulai dari nomor berapa. Judul bawaan ("Chapter IV") ikut berubah, juga di mode baca & ekspor.
+- **Tampilan editor** (perangkat ini): lebar halaman, ukuran huruf, spasi baris, font isi, dan indentasi paragraf ala buku.
+
+**Ganti nomor chapter dari sidebar**: klik nomor di samping nama chapter, ketik nomor baru, lalu Enter. Chapter
+sesudahnya melanjutkan dari nomor itu, dan nomor manual ditandai garis putus-putus. "Kembalikan nomor otomatis" di
+Opsi menghapus semua nomor manual.
 
 **Sidebar logo jadi rail ramping yang tertanam.** Klik logo Novelist di kiri atas project tidak lagi memunculkan panel
 besar yang menutupi layar. Sekarang muncul rail ikon selebar 60 px yang menempel di kiri, dan seluruh isi project
