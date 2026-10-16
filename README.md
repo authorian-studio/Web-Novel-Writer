@@ -1,6 +1,15 @@
-# Novelist Web — v0.12.2
+# Novelist Web — v0.12.3
 
-## Riwayat perubahan terbaru (v0.12.2) — paling baru di atas
+## Riwayat perubahan terbaru (v0.12.3) — paling baru di atas
+
+**Perbaikan Tree Relations (garis & label):**
+- Dua kartu yang hampir segaris (selisih beberapa px) kini disambung garis **lurus**, bukan belokan mini bersudut bulat
+  yang tampak miring/bengkok. Ujung garis yang berbagi sisi kartu dengan garis lain tetap di titik sambungnya.
+- Label relasi yang **tidak muat** di garis pendek (kartu berdekatan) tidak lagi menutupi kartu: tampil sebagai ikon kecil
+  saja (nama relasi muncul saat kursor diarahkan; klik tetap membuka menu relasi).
+- Label pada garis lurus kini tepat di tengah garis.
+
+### v0.12.2
 
 **Jejaring Tokoh berganti nama jadi Tree Relations** (`jejaring.js`, `jejaring.css`; id tab & data `data.jejaring`
 tetap sama, jadi tree lama langsung terbaca).
