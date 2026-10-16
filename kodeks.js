@@ -380,10 +380,14 @@
     else dom.coll.innerHTML = listHtml(list);
     dom.coll.scrollTop = scrollTop;
   }
+  // warna entri: pilihan pengguna (item.color, hex) atau warna jenisnya
+  const HEX = /^#[0-9a-f]{6}$/i;
+  const SWATCHES = ["#ec7fb0", "#e15c5c", "#f08a5d", "#e3c27a", "#9ccc65", "#4caf82", "#5fc3a0", "#3fb8c9", "#6aa8ff", "#7c8cff", "#b58cff", "#d98ad9", "#a3a8b4", "#8d6e63"];
+  const colorOf = (kind, it) => (it && typeof it.color === "string" && HEX.test(it.color) ? it.color : K[kind].c);
   const thumb = (kind, it, cls) => {
     const ph = photoOf(kind, it), k = K[kind];
     return ph ? `<span class="${cls}" style="background-image:url('${safeUrl(ph)}')"></span>`
-      : `<span class="${cls} is-empty" style="--kc:${k.c}">${String(it.title || "").trim() ? esc(String(it.title).trim().charAt(0).toUpperCase()) : ic(k.icon, 14)}</span>`;
+      : `<span class="${cls} is-empty" style="--kc:${colorOf(kind, it)}">${String(it.title || "").trim() ? esc(String(it.title).trim().charAt(0).toUpperCase()) : ic(k.icon, 14)}</span>`;
   };
   const kindChip = (kind) => `<span class="kx-kchip" style="--kc:${K[kind].c}">${ic(K[kind].icon, 12)}${K[kind].name}</span>`;
   const tagChips = (it, max) => { const t = tagsOf(it); return t.length ? `<span class="kx-tags">${t.slice(0, max || 3).map((x) => `<span class="kx-tag">#${esc(x)}</span>`).join("")}${t.length > (max || 3) ? `<span class="kx-tag is-more">+${t.length - (max || 3)}</span>` : ""}</span>` : ""; };
@@ -395,7 +399,7 @@
   };
   function rowHtml(kind, it) {
     const sub = subOf(kind, it) || summaryOf(kind, it).slice(0, 90);
-    return `<div class="kx-row${kind === currentOrgCat && it.id === currentOrgItemId ? " is-on" : ""}" role="listitem" draggable="true" data-id="${esc(it.id)}" data-kind="${kind}" tabindex="0">
+    return `<div class="kx-row${kind === currentOrgCat && it.id === currentOrgItemId ? " is-on" : ""}" role="listitem" draggable="true" data-id="${esc(it.id)}" data-kind="${kind}" tabindex="0" style="--kc:${colorOf(kind, it)}">
       ${thumb(kind, it, "kx-row-ph")}
       <span class="kx-row-main"><span class="kx-row-title">${esc(String(it.title || "").trim() || "(tanpa judul)")}</span>${sub ? `<span class="kx-row-sub">${esc(sub)}</span>` : ""}</span>
       ${st.all ? kindChip(kind) : tagChips(it, 1)}
@@ -432,7 +436,7 @@
     if (!list.length) return emptyHtml();
     return `<div class="kx-gallery" role="list">${list.map(({ kind, it }) => {
       const sub = subOf(kind, it), sum = summaryOf(kind, it).slice(0, 140), f = folderOf(it);
-      return `<button type="button" class="kx-card${kind === currentOrgCat && it.id === currentOrgItemId ? " is-on" : ""}" role="listitem" data-id="${esc(it.id)}" data-kind="${kind}" style="--kc:${K[kind].c}">
+      return `<button type="button" class="kx-card${kind === currentOrgCat && it.id === currentOrgItemId ? " is-on" : ""}" role="listitem" data-id="${esc(it.id)}" data-kind="${kind}" style="--kc:${colorOf(kind, it)}">
         ${thumb(kind, it, "kx-card-ph")}
         <span class="kx-card-body">
           <span class="kx-card-top">${st.all ? kindChip(kind) : f ? `<span class="kx-card-folder">${ic("folder", 12)}${esc(f)}</span>` : ""}</span>
@@ -696,7 +700,8 @@
         ? `<label class="kx-field is-area" for="${id}"><span>${esc(d[1])}</span><textarea id="${id}" data-field="${d[0]}" rows="2" placeholder="${esc(d[3] || "")}">${esc(v)}</textarea></label>`
         : `<label class="kx-field" for="${id}"><span>${esc(d[1])}</span><input id="${id}" data-field="${d[0]}" value="${esc(v)}" placeholder="${esc(d[3] || "")}" autocomplete="off"></label>`;
     };
-    box.style.setProperty("--kc", k.c);
+    const col = colorOf(kind, it), ownC = HEX.test(String(it.color || ""));
+    box.style.setProperty("--kc", col);
     box.innerHTML = `
       <div class="kx-d-top">
         <button type="button" class="kx-icon-btn kx-d-close" data-d="close" title="Tutup" aria-label="Tutup entri">${ic("x", 16)}</button>
@@ -713,6 +718,14 @@
         </div>
       </header>
       <div class="kx-d-meta">
+        <div class="kx-colorpick">
+          <button type="button" class="kx-color-btn" data-d="colors" aria-haspopup="true" aria-expanded="false" title="Warna entri" aria-label="Warna entri"><span class="kx-color-dot" style="background:${col}"></span>Warna</button>
+          <div class="kx-color-pop" hidden role="group" aria-label="Pilih warna entri">
+            ${SWATCHES.map((c) => `<button type="button" class="kx-sw${ownC && it.color.toLowerCase() === c ? " is-on" : ""}" data-d="color" data-c="${c}" style="--sw:${c}" aria-label="Warna ${c}" aria-pressed="${ownC && it.color.toLowerCase() === c}"></button>`).join("")}
+            <label class="kx-sw is-custom" title="Warna lain…" style="--sw:${col}"><input type="color" class="kx-color-in" value="${col}" aria-label="Warna lain"></label>
+            <button type="button" class="kx-sw-reset" data-d="color" data-c=""${ownC ? "" : " disabled"}>Warna bawaan ${esc(k.name)}</button>
+          </div>
+        </div>
         <label class="kx-select is-field" title="Folder">${ic("folder", 14)}<select data-meta="folder" aria-label="Folder">
           <option value="">Tanpa folder</option>${folders.map((x) => `<option value="${esc(x)}"${x === fo ? " selected" : ""}>${esc(x)}</option>`).join("")}<option value="\u0001new">+ Folder baru…</option></select></label>
         <div class="kx-tagbox" title="Tag">${ic("tag", 14)}${tagsOf(it).map((t) => `<span class="kx-tag is-edit">#${esc(t)}<button type="button" data-d="untag" data-tag="${esc(t)}" aria-label="Hapus tag ${esc(t)}">${ic("x", 11)}</button></span>`).join("")}
@@ -746,7 +759,18 @@
   function autoGrow(t) { t.style.height = "auto"; t.style.height = Math.min(480, t.scrollHeight + 2) + "px"; }
   let listTimer = 0;
   const softList = () => { clearTimeout(listTimer); listTimer = setTimeout(renderList, 250); };
+  function setColor(it, c) {
+    if (c && HEX.test(c)) it.color = c.toLowerCase(); else delete it.color;
+    markDirtyAndSchedule();
+    renderList(); renderDetail();
+  }
   function bindDetail(box, kind, it) {
+    const cin = box.querySelector(".kx-color-in");
+    if (cin) {
+      cin.addEventListener("input", () => { box.style.setProperty("--kc", cin.value); cin.parentElement.style.setProperty("--sw", cin.value); const d = box.querySelector(".kx-color-dot"); if (d) d.style.background = cin.value; });
+      cin.addEventListener("change", () => setColor(it, cin.value));
+    }
+    box.addEventListener("keydown", (e) => { if (e.key === "Escape") { const pop = box.querySelector(".kx-color-pop"); if (pop && !pop.hidden) { pop.hidden = true; const b = box.querySelector(".kx-color-btn"); b.setAttribute("aria-expanded", "false"); b.focus(); } } });
     const title = box.querySelector(".kx-title-in"), ed = box.querySelector(".kx-editor");
     title.addEventListener("input", () => { it.title = title.value; markDirtyAndSchedule(); softList(); });
     title.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); const n = box.querySelector(".kx-alias-in"); if (n) n.focus(); } });
@@ -807,6 +831,8 @@
       else if (d === "photo") dom.file.click();
       else if (d === "untag") { it.tags = tagsOf(it).filter((t) => t !== b.dataset.tag); if (!it.tags.length) delete it.tags; markDirtyAndSchedule(); renderList(); renderDetail(); }
       else if (d === "delete") deleteEntry(kind, it.id);
+      else if (d === "colors") { const pop = box.querySelector(".kx-color-pop"); pop.hidden = !pop.hidden; b.setAttribute("aria-expanded", String(!pop.hidden)); if (!pop.hidden) { const f = pop.querySelector(".is-on") || pop.querySelector(".kx-sw"); if (f) f.focus(); } }
+      else if (d === "color") setColor(it, b.dataset.c);
       else if (d === "close") { sync(); currentOrgItemId = null; renderList(); renderDetail(); }
       else if (d === "mention") openMention(b.dataset.type, b.dataset.id);
     });

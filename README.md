@@ -1,6 +1,12 @@
-# Novelist Web — v0.12.5
+# Novelist Web — v0.12.6
 
-## Riwayat perubahan terbaru (v0.12.5) — paling baru di atas
+## Riwayat perubahan terbaru (v0.12.6) — paling baru di atas
+
+**Kodeks: warna kustom per entri.** Tombol **Warna** di detail entri (di samping folder): 14 warna siap pakai, pemilih
+warna bebas, dan "Warna bawaan <jenis>". Warnanya dipakai di foto/inisial, aksen detail (garis fokus, ikon, chip),
+baris daftar, kartu galeri & tabel. Data: `item.color = "#rrggbb"` (tanpa nilai = warna jenisnya).
+
+### v0.12.5
 
 **Beranda dipisah jadi dua jenis papan** (`home-canvas.js`, `home-canvas.css`).
 - **Beranda (utama) = graf dokumen saja:** titik semua yang sudah kamu buat (scene, bab, karakter, lokasi, timeline,
