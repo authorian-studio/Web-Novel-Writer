@@ -1,6 +1,18 @@
-# Novelist Web — v0.13.7
+# Novelist Web — v0.13.8
 
-## Riwayat perubahan terbaru (v0.13.7) — paling baru di atas
+## Riwayat perubahan terbaru (v0.13.8) — paling baru di atas
+
+**Ingat saya di halaman login.** Ada kotak centang **Ingat saya** di bawah tombol Google, tercentang secara bawaan.
+Bila dicentang, sesi Google (token akses ±1 jam yang otomatis diperpanjang, dan email akun) disimpan di perangkat ini:
+- **Muat ulang halaman saat token masih berlaku** langsung masuk ke dashboard tanpa login. Token diuji dulu ke Drive;
+  kalau sudah dicabut, kamu tetap di halaman login.
+- **Token sudah habis** (mis. besok paginya): Novelist mencoba meminta token baru diam-diam untuk akun yang sama. Kalau
+  browser memblokir popup otomatis, tombol berubah jadi **Lanjutkan sebagai email@kamu**. Cukup satu klik, tanpa memilih
+  akun atau layar izin lagi.
+- **Logout** menghapus token dan tidak masuk otomatis lagi sampai kamu login lagi.
+- **Tidak dicentang** berarti tidak ada yang disimpan.
+
+Kebijakan Privasi sudah diperbarui.
 
 **Pohon peta jadi gambar ilustrasi 2D, dan di 3D selalu menghadap kamera.** Semua pohon kini digambar langsung sebagai
 ilustrasi datar: isi rata dengan bayang & sorot sederhana, plus garis tinta tegas, seperti vvd. Jenisnya pinus, pinus
