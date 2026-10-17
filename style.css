@@ -2762,27 +2762,17 @@ body.light.perf-boost .tp-overlay { background: rgba(0,0,0,.4); }
     --cur-default: url("cursors/light/arrow.png") 2 2, default;
     --cur-pointer: url("cursors/light/hand.png") 6 1, pointer;
     --cur-text: url("cursors/light/ibeam.png") 16 16, text;
-    --cur-no: url("cursors/light/no.png") 16 16, not-allowed;
-    --cur-progress: url("cursors/light/appstarting.png") 2 2, progress;
-    --cur-wait: url("cursors/light/wait.png") 16 16, wait;
-    --cur-cross: url("cursors/light/crosshair.png") 16 16, crosshair;
     --cur-move: url("cursors/light/sizeall.png") 13 13, move;
     --cur-ew: url("cursors/light/sizewe.png") 13 16, ew-resize;
     --cur-ns: url("cursors/light/sizens.png") 16 13, ns-resize;
-    --cur-help: url("cursors/light/help.png") 2 2, help;
   }
   html.cur-set body.light {
     --cur-default: url("cursors/dark/arrow.png") 2 2, default;
     --cur-pointer: url("cursors/dark/hand.png") 6 1, pointer;
     --cur-text: url("cursors/dark/ibeam.png") 16 16, text;
-    --cur-no: url("cursors/dark/no.png") 16 16, not-allowed;
-    --cur-progress: url("cursors/dark/appstarting.png") 2 2, progress;
-    --cur-wait: url("cursors/dark/wait.png") 16 16, wait;
-    --cur-cross: url("cursors/dark/crosshair.png") 16 16, crosshair;
     --cur-move: url("cursors/dark/sizeall.png") 13 13, move;
     --cur-ew: url("cursors/dark/sizewe.png") 13 16, ew-resize;
     --cur-ns: url("cursors/dark/sizens.png") 16 13, ns-resize;
-    --cur-help: url("cursors/dark/help.png") 2 2, help;
   }
   html.cur-on, html.cur-on body { cursor: var(--cur-default); }
   html.cur-on :is(input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]), textarea, [contenteditable="true"], [contenteditable=""]) { cursor: var(--cur-text, text); }

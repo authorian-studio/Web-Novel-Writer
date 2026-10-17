@@ -4,3 +4,4 @@ karena browser tidak mendukung kursor animasi.
 cursors/light = versi putih (dipakai di tema gelap), cursors/dark = versi hitam (dipakai di tema terang).
 v0.21.1: bayangan hitam bawaan dihapus (hanya bentuk kursor + garis tepi 1 px). Versi hitam dibuat dari versi putih yang
 warnanya dibalik (abu-abu saja; biru/merah tetap) supaya bentuk & titik tunjuknya identik.
+v0.21.2: appstarting, wait, crosshair, help dan no dihapus (atas permintaan) — memakai kursor sistem.

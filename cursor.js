@@ -2,8 +2,8 @@
    Mode (disimpan di perangkat, localStorage "novelist_cursor"):
      "novelist" (bawaan) = set kursor "W11 Cursor Free" (Jepri Creations; PNG 32 px di folder cursors/, dikonversi dari
                            .cur/.ani Windows): versi putih (cursors/light) di tema gelap, versi hitam (cursors/dark) di
-                           tema terang — otomatis ikut body.light. Panah, tangan, I-beam, dilarang, sibuk, crosshair,
-                           geser & ubah ukuran semuanya ikut set ini (variabel --cur-* di style.css, html.cur-set).
+                           tema terang — otomatis ikut body.light. Panah, tangan, I-beam, geser &
+                           ubah ukuran ikut set ini (sibuk, crosshair, bantuan & dilarang = kursor sistem) (variabel --cur-* di style.css, html.cur-set).
      "system"            = kursor bawaan sistem operasi.
      "custom"            = gambar pilihan pengguna (diperkecil ke 24/32/48 px, PNG), titik tunjuk di ujung kiri atas
                            atau di tengah; dipakai untuk kursor biasa & di atas tombol.

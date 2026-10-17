@@ -1,6 +1,12 @@
-# Novelist Web — v0.21.1
+# Novelist Web — v0.21.2
 
-## Riwayat perubahan terbaru (v0.21.1) — paling baru di atas
+## Riwayat perubahan terbaru (v0.21.2) — paling baru di atas
+
+**Set kursor dirampingkan.** Kursor sibuk (panah + lingkaran & lingkaran saja), crosshair, bantuan (?) dan dilarang dihapus
+dari set W11 — di tempat-tempat itu kini kembali ke kursor bawaan sistem. Yang tetap memakai set: panah, tangan, I-beam,
+geser dan ubah ukuran.
+
+## v0.21.1
 
 **Kursor tanpa bayangan.** Bayangan hitam tebal di set W11 dihapus: kini hanya kursor putih (tema gelap) atau hitam
 (tema terang) dengan garis tepi tipis 1 px. Versi hitam dibuat dari versi putih yang dibalik warnanya, jadi bentuk dan
