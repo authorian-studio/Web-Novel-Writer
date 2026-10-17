@@ -1,6 +1,19 @@
-# Novelist Web — v0.21.2
+# Novelist Web — v0.22.0
 
-## Riwayat perubahan terbaru (v0.21.2) — paling baru di atas
+## Riwayat perubahan terbaru (v0.22.0) — paling baru di atas
+
+**Modal Add / Edit project: kaca bening + sampul gambar atau warna bebas.**
+- Kotak modal kini **bening** (kaca buram tipis, kilau tepi atas) — dashboard tetap terlihat samar di belakangnya.
+- Bagian **Sampul** punya tab **Warna / Gambar**:
+  - **Warna:** 6 gradien siap pakai + tombol **+** untuk **warna sendiri** — panel pemilih warna (kanvas
+    saturasi/kecerahan, rel hue, kolom HEX/RGB/HSL yang bisa diganti, pipet layar di Chrome/Edge, 12 swatch cepat).
+    Pasangan gelap gradiennya dibuat otomatis. Port vanilla dari komponen ColorPicker React → `color-picker.js`.
+  - **Gambar:** klik, seret file ke kotak, atau tempel (Ctrl+V). Gambar diperkecil ke maks. 1000 px (JPEG) supaya file
+    .novj tetap ringan; "Hapus gambar" untuk kembali. Saat Edit, sampul yang sudah ada langsung tampil.
+- Warna sampul kini **ikut tersimpan di file project** (`coverColors`), jadi tidak berubah acak saat dibuka di perangkat
+  lain atau setelah memuat ulang dari Drive.
+
+## v0.21.2
 
 **Set kursor dirampingkan.** Kursor sibuk (panah + lingkaran & lingkaran saja), crosshair, bantuan (?) dan dilarang dihapus
 dari set W11 — di tempat-tempat itu kini kembali ke kursor bawaan sistem. Yang tetap memakai set: panah, tangan, I-beam,

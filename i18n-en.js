@@ -1,6 +1,16 @@
 /* i18n-en.js — kamus Bahasa Indonesia -> English untuk i18n.js (DIHASILKAN dari teks antarmuka di kode; boleh diedit
    manual). exact = teks utuh, patterns = teks dengan nilai dinamis ({} di sumber, {1} {2} … di terjemahan). */
-window.NOVELIST_EN = {"exact":{"Pratinjau sampul":"Cover preview",
+window.NOVELIST_EN = {"exact":{"Jenis sampul":"Cover type",
+"Warna sendiri":"Custom color",
+"Pilih warna sendiri":"Pick your own color",
+"Unggah gambar sampul":"Upload cover image",
+"Ganti gambar sampul":"Change cover image",
+"Klik, seret ke sini, atau tempel (Ctrl+V) · JPG, PNG, WEBP":"Click, drag here, or paste (Ctrl+V) · JPG, PNG, WEBP",
+"Ubah judul, deskripsi atau sampul.":"Change the title, description or cover.",
+"Saturasi dan kecerahan":"Saturation and brightness",
+"Ganti format warna":"Switch color format",
+"Gambar tidak bisa dibuka":"The image could not be opened",
+"Pratinjau sampul":"Cover preview",
 "Buat project":"Create project",
 "Mulai cerita baru — semuanya bisa diubah nanti.":"Start a new story — you can change everything later.",
 "Ubah judul, deskripsi atau warna sampul.":"Change the title, description or cover color.",

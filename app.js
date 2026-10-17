@@ -556,8 +556,20 @@ function renderDashboard() {
 }
 
 // ================= ADD / EDIT PROJECT MODAL =================
-// Dua panel: kiri pratinjau sampul (live: judul, deskripsi, warna / foto sampul), kanan formulir + pilihan warna & template.
-let pmColor = null;   // [colorA, colorB] yang dipilih di modal
+// Dua panel: kiri pratinjau sampul (live: judul, deskripsi, warna / gambar), kanan formulir. Sampul = Warna (6 gradien
+// siap pakai atau warna sendiri lewat NovelColorPicker — color-picker.js) atau Gambar (unggah / seret / tempel).
+// Warna disimpan di p.colorA/colorB DAN p.data.coverColors (ikut file .novj, jadi tidak acak lagi di perangkat lain).
+let pmColor = null;      // [colorA, colorB] yang dipilih
+let pmCover = null;      // data URL gambar sampul (mode Gambar)
+let pmMode = "color";    // "color" | "image"
+let pmPicker = null;     // instance NovelColorPicker (dibuat sekali)
+const PM_PICKER_SWATCHES = ["#e15c5c", "#f08a4b", "#e1b25c", "#d7a86e", "#4caf82", "#2fb5a5", "#5c9ee1", "#6c7ae0", "#8b5cf6", "#e15ca0", "#8f8f97", "#2a2a30"];
+function projColorPair(data) {
+  const c = data && Array.isArray(data.coverColors) ? data.coverColors : null;
+  if (c && c.length === 2 && c.every((x) => /^#[0-9a-f]{6}$/i.test(x))) return c.slice();
+  return COLOR_PAIRS[Math.floor(Math.random() * COLOR_PAIRS.length)].slice();
+}
+const pmIsPreset = () => COLOR_PAIRS.some((pair) => pmColor && pair[0] === pmColor[0] && pair[1] === pmColor[1]);
 function pmRenderSwatches() {
   const box = el("pmSwatches");
   box.innerHTML = "";
@@ -568,31 +580,105 @@ function pmRenderSwatches() {
     b.className = "pm-swatch" + (on ? " active" : "");
     b.setAttribute("role", "radio");
     b.setAttribute("aria-checked", on ? "true" : "false");
-    b.setAttribute("aria-label", "Warna sampul");
+    b.setAttribute("aria-label", "Warna sampul " + pair[0]);
     b.style.background = `linear-gradient(135deg, ${pair[0]}, ${pair[1]})`;
     b.innerHTML = tiPx(tiIcon("check"), 13);
-    b.onclick = () => { pmColor = pair.slice(); pmRenderSwatches(); pmUpdatePreview(); };
+    b.onclick = () => { pmColor = pair.slice(); pmTogglePicker(false); pmSyncCover(); };
     box.appendChild(b);
   });
+  const custom = !pmIsPreset() && !!pmColor;
+  const cb = el("pmCustomBtn");
+  cb.classList.toggle("active", custom);
+  cb.classList.toggle("has-color", custom);
+  cb.style.background = custom ? `linear-gradient(135deg, ${pmColor[0]}, ${pmColor[1]})` : "";
+  cb.innerHTML = custom ? tiPx(tiIcon("check"), 13) : tiPx(tiIcon("plus"), 14);
+  el("pmCustomHex").textContent = custom ? pmColor[0].toUpperCase() : "";
+}
+function pmTogglePicker(open) {
+  const box = el("pmPicker");
+  if (open === undefined) open = box.classList.contains("hidden");
+  if (open && !pmPicker) {
+    pmPicker = NovelColorPicker.create(box, {
+      value: pmColor[0], swatches: PM_PICKER_SWATCHES,
+      onChange: (hex) => { pmColor = [hex, NovelColorPicker.shade(hex)]; pmSyncCover(); }
+    });
+  }
+  if (open && pmPicker) pmPicker.set(pmColor[0]);
+  box.classList.toggle("hidden", !open);
+  el("pmCustomBtn").setAttribute("aria-expanded", String(open));
+  if (open) pmPlacePicker();
+}
+// di bawah tombol "+" (atau di atasnya kalau tidak muat), selalu di dalam layar
+function pmPlacePicker() {
+  const box = el("pmPicker");
+  if (box.classList.contains("hidden")) return;
+  const r = el("pmCustomBtn").getBoundingClientRect(), w = box.offsetWidth, h = box.offsetHeight, pad = 12;
+  let top = r.bottom + 10;
+  if (top + h > innerHeight - pad) top = Math.max(pad, r.top - 10 - h);
+  box.style.left = Math.max(pad, Math.min(r.left - 8, innerWidth - w - pad)) + "px";
+  box.style.top = top + "px";
+}
+function pmSetMode(mode) {
+  pmMode = mode;
+  el("projectModal").querySelectorAll("[data-pm-mode]").forEach((b) => { const on = b.dataset.pmMode === mode; b.classList.toggle("is-on", on); b.setAttribute("aria-selected", String(on)); });
+  el("pmCoverColor").classList.toggle("hidden", mode !== "color");
+  el("pmCoverImage").classList.toggle("hidden", mode !== "image");
+  if (mode !== "color") pmTogglePicker(false);
+  pmSyncCover();
+}
+function pmSyncCover() {
+  pmRenderSwatches();
+  const has = !!pmCover;
+  el("pmDropThumb").style.backgroundImage = has ? `url("${pmCover}")` : "";
+  el("pmDropThumb").classList.toggle("has-img", has);
+  el("pmDropTitle").textContent = has ? "Ganti gambar sampul" : "Unggah gambar sampul";
+  el("pmRemoveImg").classList.toggle("hidden", !has);
+  pmUpdatePreview();
 }
 function pmUpdatePreview() {
   const title = el("fieldTitle").value.trim(), desc = el("fieldDesc").value.trim();
-  const book = el("pmBook");
-  const p = editingProjectId ? getProject(editingProjectId) : null;
+  const book = el("pmBook"), img = pmMode === "image" && pmCover;
   book.style.setProperty("--pm-a", pmColor[0]);
   book.style.setProperty("--pm-b", pmColor[1]);
-  book.style.backgroundImage = p && p.cover ? `linear-gradient(180deg, transparent 40%, rgba(0,0,0,.75)), url("${p.cover}")` : "";
-  book.classList.toggle("has-cover", !!(p && p.cover));
+  book.style.backgroundImage = img ? `linear-gradient(180deg, transparent 40%, rgba(0,0,0,.75)), url("${pmCover}")` : "";
+  book.classList.toggle("has-cover", !!img);
   el("pmBookLetter").textContent = (title || "N").charAt(0).toUpperCase();
   el("pmBookTitle").textContent = title || "Tanpa Judul";
   el("pmBookTitle").classList.toggle("placeholder", !title);
   el("pmBookDesc").textContent = desc;
   el("pmTitleCount").textContent = el("fieldTitle").value.length + "/120";
-  el("projectModal").querySelector(".pm-glow").style.background = `radial-gradient(closest-side, ${pmColor[0]}, transparent)`;
+  el("projectModal").querySelector(".pm-glow").style.background = img ? "" : `radial-gradient(closest-side, ${pmColor[0]}, transparent)`;
+}
+// gambar sampul -> maks. 1000 px sisi terpanjang, JPEG (data URL ikut file .novj di Drive, jadi dijaga kecil)
+function pmPrepareCover(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\//.test(file.type)) { reject(new Error("File yang dipilih bukan gambar")); return; }
+    if (file.size > 25 * 1024 * 1024) { reject(new Error("Gambar terlalu besar (maks. 25 MB)")); return; }
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      try {
+        const k = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+        const ctx = c.getContext("2d");
+        ctx.fillStyle = "#1d1d22"; ctx.fillRect(0, 0, c.width, c.height);   // latar untuk gambar transparan
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL("image/jpeg", 0.86));
+      } catch (e) { reject(new Error("Gambar tidak bisa diproses")); }
+      finally { URL.revokeObjectURL(url); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Gambar tidak bisa dibuka")); };
+    img.src = url;
+  });
+}
+async function pmUseCoverFile(file) {
+  try { pmCover = await pmPrepareCover(file); pmSetMode("image"); }
+  catch (e) { toast(e.message, tiIcon("alert-triangle")); }
 }
 function pmOpen() {
-  pmRenderSwatches();
-  pmUpdatePreview();
+  pmTogglePicker(false);
+  pmSetMode(pmMode);
   el("projectModal").classList.remove("hidden");
   el("fieldTitle").focus();
 }
@@ -606,22 +692,25 @@ function openAddProjectModal() {
   el("templateBlock").classList.remove("hidden");
   document.querySelector('input[name="template"][value="standard"]').checked = true;
   pmColor = COLOR_PAIRS[Math.floor(Math.random() * COLOR_PAIRS.length)].slice();
+  pmCover = null; pmMode = "color";
   pmOpen();
 }
 function openEditProjectModal(id) {
   const p = getProject(id);
   editingProjectId = id;
   el("projectModalTitle").textContent = "Edit project";
-  el("projectModalSub").textContent = "Ubah judul, deskripsi atau warna sampul.";
+  el("projectModalSub").textContent = "Ubah judul, deskripsi atau sampul.";
   el("pmSaveLabel").textContent = "Simpan";
   el("fieldTitle").value = p.title; el("fieldDesc").value = p.description || "";
   el("templateBlock").classList.add("hidden");
   pmColor = [p.colorA, p.colorB];
+  pmCover = p.cover || null; pmMode = p.cover ? "image" : "color";
   pmOpen();
 }
 async function saveProjectModal() {
   const title = el("fieldTitle").value.trim() || "Tanpa Judul";
   const desc = el("fieldDesc").value.trim();
+  const cover = pmMode === "image" ? pmCover : null;   // mode Warna = tanpa gambar
   let p;
   if (editingProjectId) {
     p = getProject(editingProjectId);
@@ -632,6 +721,8 @@ async function saveProjectModal() {
     p = createProject(title, desc, template, pmColor);
     projects.unshift(p);
   }
+  p.cover = cover;
+  if (p.data) p.data.coverColors = pmColor.slice();
   closeProjectModal();
   renderDashboard();
   await saveProjectToDriveMain(p); // langsung disimpan begitu dibuat/diedit
@@ -4282,7 +4373,7 @@ async function loadProjectsFromDrive(isInitialLogin = false) {
       const content = await driveGetContent(f.id);
       const rawData = JSON.parse(content);
       const data = migrateOldData(rawData);
-      const colorPair = COLOR_PAIRS[Math.floor(Math.random() * COLOR_PAIRS.length)];
+      const colorPair = projColorPair(data);
       projects.push({
         id: "proj-" + f.id, title: data.title || f.name.replace(".novj", ""), description: "",
         template: "standard", cover: rawData.cover || null,
@@ -4501,8 +4592,9 @@ async function pullFromCloud(f) {
     let p = projects.find((x) => x.driveFileId === f.id);
     if (p) {
       p.data = data; p.title = data.title || p.title; p.cover = data.cover || null; p.updatedAt = f.modifiedTime;
+      if (Array.isArray(data.coverColors)) [p.colorA, p.colorB] = projColorPair(data);
     } else {
-      const colorPair = COLOR_PAIRS[Math.floor(Math.random() * COLOR_PAIRS.length)];
+      const colorPair = projColorPair(data);
       p = { id: "proj-" + f.id, title: data.title || f.name.replace(/\.novj$/, ""), description: "", template: "standard", cover: data.cover || null, colorA: colorPair[0], colorB: colorPair[1], driveFileId: f.id, updatedAt: f.modifiedTime, data };
       projects.unshift(p);
     }
@@ -4545,7 +4637,7 @@ async function restoreFromTrash(f) {
     const content = await driveGetContent(f.id);
     const rawData = JSON.parse(content);
     const data = migrateOldData(rawData);
-    const colorPair = COLOR_PAIRS[Math.floor(Math.random() * COLOR_PAIRS.length)];
+    const colorPair = projColorPair(data);
     const p = { id: "proj-" + f.id, title: data.title || f.name.replace(/\.novj$/, ""), description: "", template: "standard", cover: data.cover || null, colorA: colorPair[0], colorB: colorPair[1], driveFileId: f.id, updatedAt: new Date().toISOString(), data };
     if (!projects.some((x) => x.driveFileId === f.id)) projects.unshift(p);
     toast('Project "' + p.title + '" dipulihkan', tiIcon("restore"));
@@ -6132,11 +6224,32 @@ window.addEventListener("DOMContentLoaded", () => {
   el("btnCancelProject").onclick = closeProjectModal;
   el("btnCloseProject").onclick = closeProjectModal;
   el("btnSaveProject").onclick = saveProjectModal;
+  el("projectModal").querySelectorAll("[data-pm-mode]").forEach((b) => { b.onclick = () => pmSetMode(b.dataset.pmMode); });
+  el("pmCustomBtn").onclick = () => pmTogglePicker();
+  el("pmDrop").onclick = () => el("pmCoverFile").click();
+  el("pmCoverFile").onchange = (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) pmUseCoverFile(f); };
+  el("pmRemoveImg").onclick = () => { pmCover = null; pmSyncCover(); };
+  const drop = el("pmDrop");
+  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("is-over"); }));
+  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, () => drop.classList.remove("is-over")));
+  drop.addEventListener("drop", (e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) pmUseCoverFile(f); });
+  el("projectModal").addEventListener("paste", (e) => {
+    const item = [...(e.clipboardData ? e.clipboardData.items : [])].find((i) => i.type.startsWith("image/"));
+    if (item) { e.preventDefault(); pmUseCoverFile(item.getAsFile()); }
+  });
+  window.addEventListener("resize", pmPlacePicker);
+  el("projectModal").querySelector(".pm-form").addEventListener("scroll", pmPlacePicker);
+  // klik di luar panel warna = tutup panelnya (bukan modalnya)
+  el("projectModal").addEventListener("pointerdown", (e) => {
+    if (!el("pmPicker").classList.contains("hidden") && !e.target.closest("#pmPicker, #pmCustomBtn")) pmTogglePicker(false);
+  });
   el("fieldTitle").addEventListener("input", pmUpdatePreview);
   el("fieldDesc").addEventListener("input", pmUpdatePreview);
   el("projectModal").addEventListener("mousedown", (e) => { if (e.target === e.currentTarget) closeProjectModal(); });
-  el("projectModal").addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeProjectModal(); }
+  // di dokumen (bukan modal): fokus bisa jatuh ke <body> setelah swatch digambar ulang
+  document.addEventListener("keydown", (e) => {
+    if (el("projectModal").classList.contains("hidden")) return;
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); if (!el("pmPicker").classList.contains("hidden")) { pmTogglePicker(false); el("pmCustomBtn").focus(); } else closeProjectModal(); }
     else if (e.key === "Enter" && (e.ctrlKey || e.metaKey || e.target === el("fieldTitle"))) { e.preventDefault(); saveProjectModal(); }
   });
 
