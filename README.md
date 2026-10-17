@@ -1,6 +1,15 @@
-# Novelist Web — v0.19.0
+# Novelist Web — v0.20.0
 
-## Riwayat perubahan terbaru (v0.19.0) — paling baru di atas
+## Riwayat perubahan terbaru (v0.20.0) — paling baru di atas
+
+**Modal Add / Edit project didesain ulang** mengikuti tema modern (kaca buram, aksen emas).
+- **Pratinjau sampul live** di kiri: buku 3D miring yang langsung menampilkan judul, deskripsi dan warna (atau foto
+  sampul saat Edit). Di layar sempit pratinjau mengecil di atas formulir.
+- **Pilihan warna sampul** (6 gradien) — sebelumnya selalu acak; kini bisa dipilih saat membuat maupun mengedit project.
+- **Template sebagai kartu** berikon dengan tanda centang; judul dengan penghitung karakter, deskripsi jadi textarea.
+- Tombol ✕, klik di luar kotak atau Esc = tutup; Enter di judul atau Ctrl/⌘+Enter = simpan.
+
+## v0.19.0
 
 **Conversation: tombol "+ Tambah dialog" kini membuka panel lengkap.**
 - **Siapa yang bicara?** Kartu semua tokoh (yang sudah di percakapan ditandai titik hijau, lalu karakter Kodeks

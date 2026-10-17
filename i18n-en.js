@@ -1,6 +1,11 @@
 /* i18n-en.js — kamus Bahasa Indonesia -> English untuk i18n.js (DIHASILKAN dari teks antarmuka di kode; boleh diedit
    manual). exact = teks utuh, patterns = teks dengan nilai dinamis ({} di sumber, {1} {2} … di terjemahan). */
-window.NOVELIST_EN = {"exact":{"Pikiran batin":"Inner thought",
+window.NOVELIST_EN = {"exact":{"Pratinjau sampul":"Cover preview",
+"Buat project":"Create project",
+"Mulai cerita baru — semuanya bisa diubah nanti.":"Start a new story — you can change everything later.",
+"Ubah judul, deskripsi atau warna sampul.":"Change the title, description or cover color.",
+"untuk simpan":"to save",
+"Pikiran batin":"Inner thought",
 "Suara hati, ditulis miring":"Inner voice, set in italics",
 "Pesan / telepon":"Message / call",
 "Chat, surat, telepon":"Chat, letter, phone call",

@@ -102,8 +102,8 @@ function deepCloneNode(node) {
 
 
 
-function createProject(title, description, template) {
-  const colorPair = COLOR_PAIRS[Math.floor(Math.random() * COLOR_PAIRS.length)];
+function createProject(title, description, template, colors) {
+  const colorPair = colors || COLOR_PAIRS[Math.floor(Math.random() * COLOR_PAIRS.length)];
   return {
     id: "proj-" + Date.now() + Math.floor(Math.random() * 1000),
     title: title || "Tanpa Judul",
@@ -556,23 +556,68 @@ function renderDashboard() {
 }
 
 // ================= ADD / EDIT PROJECT MODAL =================
+// Dua panel: kiri pratinjau sampul (live: judul, deskripsi, warna / foto sampul), kanan formulir + pilihan warna & template.
+let pmColor = null;   // [colorA, colorB] yang dipilih di modal
+function pmRenderSwatches() {
+  const box = el("pmSwatches");
+  box.innerHTML = "";
+  COLOR_PAIRS.forEach((pair) => {
+    const on = !!pmColor && pmColor[0] === pair[0] && pmColor[1] === pair[1];
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pm-swatch" + (on ? " active" : "");
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", on ? "true" : "false");
+    b.setAttribute("aria-label", "Warna sampul");
+    b.style.background = `linear-gradient(135deg, ${pair[0]}, ${pair[1]})`;
+    b.innerHTML = tiPx(tiIcon("check"), 13);
+    b.onclick = () => { pmColor = pair.slice(); pmRenderSwatches(); pmUpdatePreview(); };
+    box.appendChild(b);
+  });
+}
+function pmUpdatePreview() {
+  const title = el("fieldTitle").value.trim(), desc = el("fieldDesc").value.trim();
+  const book = el("pmBook");
+  const p = editingProjectId ? getProject(editingProjectId) : null;
+  book.style.setProperty("--pm-a", pmColor[0]);
+  book.style.setProperty("--pm-b", pmColor[1]);
+  book.style.backgroundImage = p && p.cover ? `linear-gradient(180deg, transparent 40%, rgba(0,0,0,.75)), url("${p.cover}")` : "";
+  book.classList.toggle("has-cover", !!(p && p.cover));
+  el("pmBookLetter").textContent = (title || "N").charAt(0).toUpperCase();
+  el("pmBookTitle").textContent = title || "Tanpa Judul";
+  el("pmBookTitle").classList.toggle("placeholder", !title);
+  el("pmBookDesc").textContent = desc;
+  el("pmTitleCount").textContent = el("fieldTitle").value.length + "/120";
+  el("projectModal").querySelector(".pm-glow").style.background = `radial-gradient(closest-side, ${pmColor[0]}, transparent)`;
+}
+function pmOpen() {
+  pmRenderSwatches();
+  pmUpdatePreview();
+  el("projectModal").classList.remove("hidden");
+  el("fieldTitle").focus();
+}
+function closeProjectModal() { el("projectModal").classList.add("hidden"); }
 function openAddProjectModal() {
   editingProjectId = null;
   el("projectModalTitle").textContent = "Add project";
+  el("projectModalSub").textContent = "Mulai cerita baru — semuanya bisa diubah nanti.";
+  el("pmSaveLabel").textContent = "Buat project";
   el("fieldTitle").value = ""; el("fieldDesc").value = "";
   el("templateBlock").classList.remove("hidden");
   document.querySelector('input[name="template"][value="standard"]').checked = true;
-  el("projectModal").classList.remove("hidden");
-  el("fieldTitle").focus();
+  pmColor = COLOR_PAIRS[Math.floor(Math.random() * COLOR_PAIRS.length)].slice();
+  pmOpen();
 }
 function openEditProjectModal(id) {
   const p = getProject(id);
   editingProjectId = id;
   el("projectModalTitle").textContent = "Edit project";
+  el("projectModalSub").textContent = "Ubah judul, deskripsi atau warna sampul.";
+  el("pmSaveLabel").textContent = "Simpan";
   el("fieldTitle").value = p.title; el("fieldDesc").value = p.description || "";
   el("templateBlock").classList.add("hidden");
-  el("projectModal").classList.remove("hidden");
-  el("fieldTitle").focus();
+  pmColor = [p.colorA, p.colorB];
+  pmOpen();
 }
 async function saveProjectModal() {
   const title = el("fieldTitle").value.trim() || "Tanpa Judul";
@@ -581,12 +626,13 @@ async function saveProjectModal() {
   if (editingProjectId) {
     p = getProject(editingProjectId);
     p.title = title; p.description = desc; p.updatedAt = new Date().toISOString();
+    p.colorA = pmColor[0]; p.colorB = pmColor[1];
   } else {
     const template = document.querySelector('input[name="template"]:checked').value;
-    p = createProject(title, desc, template);
+    p = createProject(title, desc, template, pmColor);
     projects.unshift(p);
   }
-  el("projectModal").classList.add("hidden");
+  closeProjectModal();
   renderDashboard();
   await saveProjectToDriveMain(p); // langsung disimpan begitu dibuat/diedit
 }
@@ -6083,8 +6129,16 @@ window.addEventListener("DOMContentLoaded", () => {
   el("btnAddProject").onclick = openAddProjectModal;
   el("emptyStateBtn").onclick = openAddProjectModal;
   el("emptyStateLink").onclick = (e) => { e.preventDefault(); openAddProjectModal(); };
-  el("btnCancelProject").onclick = () => el("projectModal").classList.add("hidden");
+  el("btnCancelProject").onclick = closeProjectModal;
+  el("btnCloseProject").onclick = closeProjectModal;
   el("btnSaveProject").onclick = saveProjectModal;
+  el("fieldTitle").addEventListener("input", pmUpdatePreview);
+  el("fieldDesc").addEventListener("input", pmUpdatePreview);
+  el("projectModal").addEventListener("mousedown", (e) => { if (e.target === e.currentTarget) closeProjectModal(); });
+  el("projectModal").addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeProjectModal(); }
+    else if (e.key === "Enter" && (e.ctrlKey || e.metaKey || e.target === el("fieldTitle"))) { e.preventDefault(); saveProjectModal(); }
+  });
 
   document.querySelectorAll("#cardMenu button").forEach((btn) => btn.onclick = () => handleCardMenuAction(btn.dataset.action));
 

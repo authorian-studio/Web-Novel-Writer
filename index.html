@@ -1089,27 +1089,62 @@
 </div>
 
 <!-- ============ ADD PROJECT MODAL ============ -->
-<div id="projectModal" class="modal hidden">
-  <div class="modal-box">
-    <h3 id="projectModalTitle">Add project</h3>
-    <label class="field-label">Title</label>
-    <input id="fieldTitle" class="field-input" placeholder="Judul novel..." />
-    <label class="field-label">Description</label>
-    <input id="fieldDesc" class="field-input" placeholder="Deskripsi singkat (opsional)" />
-    <div id="templateBlock">
-      <label class="field-label">Template</label>
-      <label class="template-option">
-        <input type="radio" name="template" value="standard" checked />
-        <div><strong>Novel standard</strong><p>Kategori &amp; metadata untuk karakter, lokasi, catatan</p></div>
-      </label>
-      <label class="template-option">
-        <input type="radio" name="template" value="empty" />
-        <div><strong>Empty</strong><p>Fully customizable</p></div>
-      </label>
+<div id="projectModal" class="modal pm-modal hidden">
+  <div class="modal-box pm-box" role="dialog" aria-modal="true" aria-labelledby="projectModalTitle">
+    <button id="btnCloseProject" class="pm-close" type="button" aria-label="Tutup"><svg class="ti" width="18" height="18" aria-hidden="true"><use href="#ti-x"></use></svg></button>
+    <!-- kiri: pratinjau sampul (live, ikut judul/deskripsi/warna) -->
+    <div class="pm-preview" aria-hidden="true">
+      <div class="pm-glow"></div>
+      <div id="pmBook" class="pm-book">
+        <div class="pm-book-spine"></div>
+        <span id="pmBookLetter" class="pm-book-letter">N</span>
+        <div class="pm-book-text">
+          <div id="pmBookTitle" class="pm-book-title">Tanpa Judul</div>
+          <div id="pmBookDesc" class="pm-book-desc"></div>
+        </div>
+      </div>
+      <div class="pm-preview-cap">Pratinjau sampul</div>
     </div>
-    <div class="modal-buttons">
-      <button id="btnCancelProject" class="btn-secondary">Cancel</button>
-      <button id="btnSaveProject" class="btn-primary">Save</button>
+    <!-- kanan: formulir -->
+    <div class="pm-form">
+      <div class="pm-head">
+        <span class="pm-head-ic"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-sparkles"></use></svg></span>
+        <div>
+          <h3 id="projectModalTitle">Add project</h3>
+          <p id="projectModalSub" class="pm-sub">Mulai cerita baru — semuanya bisa diubah nanti.</p>
+        </div>
+      </div>
+      <label class="field-label" for="fieldTitle">Title</label>
+      <div class="pm-input-wrap">
+        <input id="fieldTitle" class="field-input pm-input" placeholder="Judul novel..." maxlength="120" autocomplete="off" />
+        <span id="pmTitleCount" class="pm-count">0/120</span>
+      </div>
+      <label class="field-label" for="fieldDesc">Description</label>
+      <textarea id="fieldDesc" class="field-input pm-input pm-desc" rows="2" maxlength="300" placeholder="Deskripsi singkat (opsional)"></textarea>
+      <label class="field-label">Warna sampul</label>
+      <div id="pmSwatches" class="pm-swatches" role="radiogroup" aria-label="Warna sampul"></div>
+      <div id="templateBlock">
+        <label class="field-label">Template</label>
+        <div class="pm-templates">
+          <label class="template-option pm-tpl">
+            <input type="radio" name="template" value="standard" checked />
+            <span class="pm-tpl-ic"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-books"></use></svg></span>
+            <div><strong>Novel standard</strong><p>Kategori &amp; metadata untuk karakter, lokasi, catatan</p></div>
+            <span class="pm-tpl-check"><svg class="ti" width="13" height="13" aria-hidden="true"><use href="#ti-check"></use></svg></span>
+          </label>
+          <label class="template-option pm-tpl">
+            <input type="radio" name="template" value="empty" />
+            <span class="pm-tpl-ic"><svg class="ti" width="20" height="20" aria-hidden="true"><use href="#ti-file"></use></svg></span>
+            <div><strong>Empty</strong><p>Fully customizable</p></div>
+            <span class="pm-tpl-check"><svg class="ti" width="13" height="13" aria-hidden="true"><use href="#ti-check"></use></svg></span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-buttons pm-buttons">
+        <span class="pm-kbd-hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> untuk simpan</span>
+        <button id="btnCancelProject" class="btn-secondary" type="button">Cancel</button>
+        <button id="btnSaveProject" class="btn-primary pm-save" type="button"><svg class="ti" width="15" height="15" aria-hidden="true"><use href="#ti-check"></use></svg><span id="pmSaveLabel">Buat project</span></button>
+      </div>
     </div>
   </div>
 </div>
