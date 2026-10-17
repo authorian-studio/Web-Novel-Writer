@@ -1,6 +1,12 @@
-# Novelist Web — v0.21.0
+# Novelist Web — v0.21.1
 
-## Riwayat perubahan terbaru (v0.21.0) — paling baru di atas
+## Riwayat perubahan terbaru (v0.21.1) — paling baru di atas
+
+**Kursor tanpa bayangan.** Bayangan hitam tebal di set W11 dihapus: kini hanya kursor putih (tema gelap) atau hitam
+(tema terang) dengan garis tepi tipis 1 px. Versi hitam dibuat dari versi putih yang dibalik warnanya, jadi bentuk dan
+titik tunjuknya sama persis di kedua tema.
+
+## v0.21.0
 
 **Kursor baru: set "W11 Cursor" (JepriCreations)** menggantikan kursor pena Novelist sebagai bawaan
 (Pengaturan Akun → Kursor → Novelist).

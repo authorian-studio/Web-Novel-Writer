@@ -2757,7 +2757,7 @@ body.light.perf-boost .tp-overlay { background: rgba(0,0,0,.4); }
 
 /* ============ KURSOR KUSTOM (cursor.js) — hanya perangkat dengan mouse/trackpad ============ */
 @media (any-pointer: fine) {
-  /* set W11 (mode "novelist"): putih di tema gelap, hitam di tema terang. Titik tunjuk = hotspot asli file .cur */
+  /* set W11 (mode "novelist"): putih di tema gelap, hitam di tema terang, tanpa bayangan. Titik tunjuk = hotspot asli file .cur */
   html.cur-set, html.cur-set body {
     --cur-default: url("cursors/light/arrow.png") 2 2, default;
     --cur-pointer: url("cursors/light/hand.png") 6 1, pointer;
@@ -2779,9 +2779,9 @@ body.light.perf-boost .tp-overlay { background: rgba(0,0,0,.4); }
     --cur-progress: url("cursors/dark/appstarting.png") 2 2, progress;
     --cur-wait: url("cursors/dark/wait.png") 16 16, wait;
     --cur-cross: url("cursors/dark/crosshair.png") 16 16, crosshair;
-    --cur-move: url("cursors/dark/sizeall.png") 16 16, move;
-    --cur-ew: url("cursors/dark/sizewe.png") 16 16, ew-resize;
-    --cur-ns: url("cursors/dark/sizens.png") 16 16, ns-resize;
+    --cur-move: url("cursors/dark/sizeall.png") 13 13, move;
+    --cur-ew: url("cursors/dark/sizewe.png") 13 16, ew-resize;
+    --cur-ns: url("cursors/dark/sizens.png") 16 13, ns-resize;
     --cur-help: url("cursors/dark/help.png") 2 2, help;
   }
   html.cur-on, html.cur-on body { cursor: var(--cur-default); }
