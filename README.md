@@ -1,6 +1,24 @@
-# Novelist Web — v0.18.0
+# Novelist Web — v0.19.0
 
-## Riwayat perubahan terbaru (v0.18.0) — paling baru di atas
+## Riwayat perubahan terbaru (v0.19.0) — paling baru di atas
+
+**Conversation: tombol "+ Tambah dialog" kini membuka panel lengkap.**
+- **Siapa yang bicara?** Kartu semua tokoh (yang sudah di percakapan ditandai titik hijau, lalu karakter Kodeks
+  lainnya) dengan pencarian. Klik beberapa tokoh sekaligus — nomor di kartu = urutan bicara. **Ulangi 1× / 2× / 3×**
+  untuk giliran bergantian (mis. Arlan, Mira ×2 = 4 baris). "Semua di percakapan" / "Kosongkan". Tanpa pilihan, satu
+  baris ditambahkan untuk pembicara berikutnya seperti biasa.
+- **Ucapan bersama:** satu baris yang diucapkan beberapa tokoh sekaligus ("Sera!" seru Mira dan Arlan.).
+- **Ke daftar tokoh:** masukkan tokoh terpilih ke percakapan tanpa menambah baris.
+- **Jenis baris baru:** Dialog + aksi (gerak tokoh sebelum ucapannya → Mira menyilangkan tangan. “Kau bohong.”),
+  Pikiran batin (miring, "pikir Arlan"), Pesan / telepon, Narasi / aksi, Pemisah adegan (✦ ✦ ✦ + keterangan opsional
+  seperti "Keesokan paginya"; jadi pemisah adegan di Write/Quill) dan Catatan penulis (tidak ikut disisipkan).
+- **Templat cepat:** Tanya-jawab (A-B-A-B), Pembuka adegan, Konfrontasi, Pergulatan batin — memakai tokoh yang dipilih.
+- **Menu ⋮ tiap baris:** ganti jenis baris, tambah/hapus aksi pembuka, tambah pembicara (ucapan bersama), sisipkan dialog
+  di bawahnya, duplikat, pindah ke atas/bawah.
+- Tag otomatis kini juga "seru" untuk kalimat berakhiran "!".
+
+## v0.18.0
+
 
 **Tab baru: Conversation.** Susun dialog antar tokoh dari Kodeks seperti obrolan, lalu sisipkan hasilnya sebagai prosa ke
 adegan di Write (Kerangka) atau ke chapter Quill. Buka dari "Tambah tab" (ikon gelembung obrolan).

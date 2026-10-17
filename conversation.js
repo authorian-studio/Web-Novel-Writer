@@ -20,6 +20,18 @@
     id: ["kata", "tanya", "jawab", "sahut", "bisik", "seru", "teriak", "gumam", "desis", "ujar", "isak", "geram"],
     en: ["said", "asked", "replied", "answered", "whispered", "exclaimed", "shouted", "murmured", "hissed", "muttered", "sobbed", "growled"],
   };
+  const TAGS_THINK = { id: ["pikir", "batin", "renung", "sesal"], en: ["thought", "wondered", "mused", "realized"] };
+  // jenis baris: "say" / "think" / "msg" punya pembicara (gelembung); "act" / "note" / "break" di tengah
+  const KINDS = [
+    ["say", "#ti-message", "Dialog", "Ucapan tokoh"],
+    ["think", "#ti-bubble", "Pikiran batin", "Suara hati, ditulis miring"],
+    ["msg", "#ti-device-mobile-message", "Pesan / telepon", "Chat, surat, telepon"],
+    ["act", "#ti-feather", "Narasi / aksi", "Gerak tokoh & suasana"],
+    ["break", "#ti-separator", "Pemisah adegan", "Lompatan waktu / tempat"],
+    ["note", "#ti-note", "Catatan penulis", "Tidak ikut disisipkan"],
+  ];
+  const KIND_BY = Object.fromEntries(KINDS.map((k) => [k[0], k]));
+  const SPEAK = new Set(["say", "think", "msg"]);
   const QUOTES = { curly: ["“", "”"], straight: ['"', '"'], single: ["‘", "’"], corner: ["「", "」"], guillemet: ["«", "»"], dash: ["— ", ""] };
   const STYLES = [
     ["novel", "Novel — dengan tag dialog", "“Aku pergi,” kata Raka."],
@@ -58,7 +70,9 @@
       x.lines = x.lines.filter((l) => l && typeof l === "object");
       x.lines.forEach((l) => {
         if (!l.id) l.id = uid("ln");
-        if (l.kind !== "act") l.kind = "say";
+        if (!KIND_BY[l.kind]) l.kind = "say";
+        if (l.beat != null && typeof l.beat !== "string") delete l.beat;
+        if (l.with != null && !Array.isArray(l.with)) delete l.with;
         if (typeof l.text !== "string") l.text = "";
         if (typeof l.tag !== "string") l.tag = "";
         if (typeof l.who !== "string") l.who = "";
@@ -81,6 +95,16 @@
     const ch = charById(line.who);
     return ch ? (ch.title || T("Tanpa nama")) : (line.name || T("Tokoh terhapus"));
   }
+  function speakersOf(line) { return [line.who].concat((line.with || []).filter((x) => x && x !== line.who)); }
+  function joinNames(names, lang) {
+    if (names.length < 2) return names[0] || "";
+    const and = lang === "en" ? "and" : "dan";
+    if (names.length === 2) return `${names[0]} ${and} ${names[1]}`;
+    return names.slice(0, -1).join(", ") + `, ${and} ` + names[names.length - 1];
+  }
+  // nama pembicara (ucapan bersama: "Mira dan Arlan")
+  function namesOf(line, lang) { return joinNames(speakersOf(line).map((id, i) => (i === 0 ? nameOf(line) : nameOf({ who: id }))), lang || uiLang()); }
+  const hasOutput = (conv) => conv.lines.some((l) => l.kind === "break" || (l.kind !== "note" && l.text.trim()));
   function colorOf(id) {
     if (!id) return "var(--text-dim)";
     let h = 0;
@@ -111,7 +135,7 @@
   function addCast(conv, id) { if (id && !conv.cast.includes(id)) conv.cast.push(id); }
   // pembicara berikutnya: pembicara sebelum baris terakhir yang berbeda (A-B-A-B), lalu tokoh cast berikutnya
   function nextSpeaker(conv, afterIdx) {
-    const lines = conv.lines.slice(0, afterIdx + 1).filter((l) => l.kind === "say" && l.who);
+    const lines = conv.lines.slice(0, afterIdx + 1).filter((l) => SPEAK.has(l.kind) && l.who);
     const last = lines.length ? lines[lines.length - 1].who : null;
     if (!last) return conv.cast[0] || "";
     for (let i = lines.length - 2; i >= 0; i--) if (lines[i].who !== last) return lines[i].who;
@@ -122,7 +146,9 @@
     const o = opts || {};
     const who = o.who !== undefined ? o.who : nextSpeaker(conv, afterIdx);
     const ch = charById(who);
-    const line = { id: uid("ln"), who, name: ch ? ch.title : "", kind: o.kind || "say", text: "", tag: "" };
+    const line = { id: uid("ln"), who, name: ch ? ch.title : "", kind: o.kind || "say", text: o.text || "", tag: "" };
+    if (o.beat != null) line.beat = o.beat;
+    if (o.with && o.with.length) { line.with = o.with.filter((x) => x && x !== who); line.with.forEach((x) => addCast(conv, x)); }
     addCast(conv, who);
     conv.lines.splice(afterIdx + 1, 0, line);
     changed(conv);
@@ -141,13 +167,24 @@
     };
   }
   function autoTag(text, lang) {
-    const q = /\?\s*$/.test(text);
-    return lang === "en" ? (q ? "asked" : "said") : (q ? "tanya" : "kata");
+    const q = /\?\s*$/.test(text), x = /!\s*$/.test(text);
+    return lang === "en" ? (q ? "asked" : x ? "exclaimed" : "said") : (q ? "tanya" : x ? "seru" : "kata");
   }
-  // satu baris dialog -> { text, html } (html sudah di-escape; nama tokoh tebal di gaya naskah)
+  const endsPunct = (t) => /[.?!…—–-]["'”’»」]?$/.test(t);
+  function tagBody(raw) {   // "Aku pergi." -> "Aku pergi," (diikuti tag)
+    if (/\.$/.test(raw) && !/\.\.$/.test(raw)) return raw.slice(0, -1) + ",";
+    return endsPunct(raw) ? raw : raw + ",";
+  }
+  // satu baris -> { text, html, block? } (html sudah di-escape; block = sudah berupa elemen blok, tidak dibungkus <p>)
+  // f = { style, quote, lang, target: "scene" | "chapter" }
   function lineOut(line, f) {
     const raw = line.text.replace(/\s*\n+\s*/g, " ").trim();
-    const nm = nameOf(line);
+    const en = f.lang === "en";
+    if (line.kind === "note") return null;
+    if (line.kind === "break") {
+      const hr = `<hr class="${f.target === "chapter" ? "qd-break" : "scene-break"}">`;
+      return { text: "* * *" + (raw ? "\n\n" + raw : ""), html: hr + (raw ? `<p><em>${esc(raw)}</em></p>` : ""), block: true };
+    }
     if (line.kind === "act" || !line.who) {
       if (!raw) return null;
       if (f.style === "script") return { text: `(${raw})`, html: `<em>(${esc(raw)})</em>` };
@@ -155,29 +192,41 @@
     }
     if (!raw) return null;
     const [o, c] = QUOTES[f.quote];
+    const nm = namesOf(line, f.lang);
+    const beat = (line.beat || "").replace(/\s+/g, " ").trim();
     if (f.style === "script") {
       const N = nm.toLocaleUpperCase();
-      return { text: `${N}: ${raw}`, html: `<strong>${esc(N)}:</strong> ${esc(raw)}` };
+      const how = line.kind === "think" ? (en ? " (thinking)" : " (dalam hati)") : line.kind === "msg" ? (en ? " (message)" : " (pesan)") : "";
+      const pre = line.kind === "say" && beat ? `(${beat}) ` : "";
+      const body = line.kind === "think" ? `<em>${esc(raw)}</em>` : esc(raw);
+      return { text: `${N}${how}: ${pre}${raw}`, html: `<strong>${esc(N + how)}:</strong> ${esc(pre)}${body}` };
     }
-    const endsPunct = /[.?!…—–-]["'”’»」]?$/.test(raw);
+    if (line.kind === "msg") return { text: `${nm}: ${raw}`, html: `<strong>${esc(nm)}:</strong> <em>${esc(raw)}</em>` };
+    if (line.kind === "think") {
+      if (f.style === "plain" || line.tag === "-") return { text: raw, html: `<em>${esc(raw)}</em>` };
+      const body = tagBody(raw), tag = line.tag || (en ? "thought" : "pikir");
+      const tail = en ? ` ${nm} ${tag}.` : ` ${tag} ${nm}.`;
+      return { text: body + tail, html: `<em>${esc(body)}</em>${esc(tail)}` };
+    }
+    // dialog dengan aksi pembuka (action beat): Mira menyilangkan tangan. “Kau bohong.”
+    if (beat) {
+      const s = (endsPunct(beat) ? beat : beat + ".") + " " + o + (endsPunct(raw) ? raw : raw + ".") + c;
+      return { text: s, html: esc(s) };
+    }
     if (f.style === "plain" || line.tag === "-") {
-      const t = endsPunct ? raw : raw + ".";
-      const s = o + t + c;
+      const s = o + (endsPunct(raw) ? raw : raw + ".") + c;
       return { text: s, html: esc(s) };
     }
     const tag = line.tag || autoTag(raw, f.lang);
-    let body = raw;
-    if (/\.$/.test(body) && !/\.\.$/.test(body)) body = body.slice(0, -1) + ",";
-    else if (!endsPunct) body += ",";
-    const quoted = o + body + c;
-    const tail = f.lang === "en" ? ` ${nm} ${tag}.` : ` ${tag} ${nm}.`;
-    // "kata Raka" lebih umum di prosa Indonesia; dalam English, "Raka said" — tag yang diawali huruf besar dibiarkan apa adanya
+    const quoted = o + tagBody(raw) + c;
+    // "kata Raka" lebih umum di prosa Indonesia; dalam English, "Raka said"
+    const tail = en ? ` ${nm} ${tag}.` : ` ${tag} ${nm}.`;
     return { text: quoted + tail, html: esc(quoted) + esc(tail) };
   }
   function buildOutput(conv, f) {
     const rows = conv.lines.map((l) => lineOut(l, f)).filter(Boolean);
     return {
-      html: rows.map((r) => `<p>${r.html}</p>`).join(""),
+      html: rows.map((r) => (r.block ? r.html : `<p>${r.html}</p>`)).join(""),
       text: rows.map((r) => r.text).join("\n\n"),
       count: rows.length,
     };
@@ -203,7 +252,7 @@
           <span class="cv-count">${conv.lines.length} baris</span>
           <span class="cv-spacer"></span>
           <button type="button" class="cv-btn is-ghost" data-act="new" title="Percakapan baru">${ic("#ti-plus", 15)}<span>Baru</span></button>
-          <button type="button" class="cv-btn is-primary" data-act="insert" ${conv.lines.some((l) => l.text.trim()) ? "" : "disabled"} title="Sisipkan ke adegan (Write) atau chapter Quill">${ic("#ti-file-import", 15)}<span>Sisipkan</span></button>
+          <button type="button" class="cv-btn is-primary" data-act="insert" ${hasOutput(conv) ? "" : "disabled"} title="Sisipkan ke adegan (Write) atau chapter Quill">${ic("#ti-file-import", 15)}<span>Sisipkan</span></button>
           <button type="button" class="cv-ibtn" data-act="more" aria-haspopup="menu" title="Lainnya">${ic("#ti-dots", 16)}</button>
         </header>
         <div class="cv-scroll">
@@ -227,7 +276,7 @@
               ? "Pilih tokoh lalu tulis dialognya. <b>Enter</b> = baris berikutnya (pembicara bergantian), <b>Shift+Enter</b> = baris baru di dialog yang sama, <b>Ctrl+1–9</b> = ganti pembicara."
               : "Kodeks belum punya karakter. Buat karakter dulu di Kodeks supaya bisa dipilih sebagai pembicara — atau mulai dengan narasi."}</div>`}
             <div class="cv-adds">
-              <button type="button" class="cv-add" data-act="add">${ic("#ti-plus", 15)}<span>Tambah dialog</span></button>
+              <button type="button" class="cv-add" data-act="add" aria-haspopup="menu" title="Pilih tokoh, jenis baris & templat">${ic("#ti-plus", 15)}<span>Tambah dialog</span>${ic("#ti-chevron-down", 13)}</button>
               <button type="button" class="cv-add is-soft" data-act="add-act">${ic("#ti-feather", 15)}<span>Narasi / aksi</span></button>
               ${chars().length ? "" : `<button type="button" class="cv-add is-soft" data-act="kodeks">${ic("#ti-books", 15)}<span>Buka Kodeks</span></button>`}
             </div>
@@ -236,14 +285,37 @@
           </div>
         </div>
       </div>`;
-    host.querySelectorAll(".cv-text").forEach(grow);
+    host.querySelectorAll("textarea.cv-text").forEach(grow);
   }
+  const GRIP = () => `<button type="button" class="cv-grip" data-act="grip" title="Seret untuk memindah (Alt+↑/↓)" aria-label="Pindahkan baris">${ic("#ti-grip-vertical", 14)}</button>`;
   function lineHtml(l, i, pov) {
     const nm = nameOf(l);
-    if (l.kind === "act") {
+    if (l.kind === "break") {
       return `
-        <div class="cv-line is-act" role="listitem" data-id="${esc(l.id)}" draggable="false">
-          <button type="button" class="cv-grip" data-act="grip" title="Seret untuk memindah (Alt+↑/↓)" aria-label="Pindahkan baris">${ic("#ti-grip-vertical", 14)}</button>
+        <div class="cv-line is-break" role="listitem" data-id="${esc(l.id)}">
+          ${GRIP()}
+          <div class="cv-break">
+            <span class="cv-break-mk" aria-hidden="true">✦ ✦ ✦</span>
+            <input class="cv-text cv-break-in" data-f="text" value="${esc(l.text)}" placeholder="Keterangan (opsional) — mis. Keesokan paginya…" aria-label="Keterangan pemisah adegan" spellcheck="false">
+          </div>
+          ${toolsHtml(l)}
+        </div>`;
+    }
+    if (l.kind === "note") {
+      return `
+        <div class="cv-line is-note" role="listitem" data-id="${esc(l.id)}">
+          ${GRIP()}
+          <div class="cv-note">
+            <span class="cv-note-h">${ic("#ti-note", 13)}<span>Catatan penulis · tidak ikut disisipkan</span></span>
+            <textarea class="cv-text" rows="1" data-f="text" placeholder="Catatan untukmu sendiri… (mis. Arlan sebenarnya berbohong di sini)" aria-label="Catatan penulis" spellcheck="false">${esc(l.text)}</textarea>
+          </div>
+          ${toolsHtml(l)}
+        </div>`;
+    }
+    if (l.kind === "act" || !SPEAK.has(l.kind)) {
+      return `
+        <div class="cv-line is-act" role="listitem" data-id="${esc(l.id)}">
+          ${GRIP()}
           <div class="cv-act">
             <button type="button" class="cv-who-s" data-act="who" title="Ganti pembicara / jenis baris" data-no-i18n>${l.who ? esc(nm) : ""}${ic("#ti-feather", 13)}</button>
             <textarea class="cv-text" rows="1" data-f="text" placeholder="Narasi atau gerak tokoh… (mis. Raka menutup pintu pelan-pelan.)" aria-label="Narasi" spellcheck="false">${esc(l.text)}</textarea>
@@ -252,23 +324,29 @@
         </div>`;
     }
     const side = l.who && l.who === pov ? "r" : "l";
+    const co = speakersOf(l).slice(1);
+    const badge = l.kind === "think" ? `<span class="cv-kb">${ic("#ti-bubble", 11)}<span>dalam hati</span></span>`
+      : l.kind === "msg" ? `<span class="cv-kb">${ic("#ti-device-mobile-message", 11)}<span>pesan</span></span>` : "";
+    const ph = l.kind === "think" ? "Apa yang dipikirkannya…" : l.kind === "msg" ? "Isi pesan / telepon…" : "Tulis dialog…";
     return `
-      <div class="cv-line is-say side-${side}" role="listitem" data-id="${esc(l.id)}" style="--av:${colorOf(l.who)}">
-        <button type="button" class="cv-grip" data-act="grip" title="Seret untuk memindah (Alt+↑/↓)" aria-label="Pindahkan baris">${ic("#ti-grip-vertical", 14)}</button>
-        <button type="button" class="cv-who" data-act="who" title="Ganti pembicara" aria-haspopup="menu">${avatar(l.who, 34, l.name)}</button>
+      <div class="cv-line is-say is-${l.kind} side-${side}" role="listitem" data-id="${esc(l.id)}" style="--av:${colorOf(l.who)}">
+        ${GRIP()}
+        <button type="button" class="cv-who${co.length ? " has-co" : ""}" data-act="who" title="Ganti pembicara" aria-haspopup="menu">${avatar(l.who, 34, l.name)}${co.slice(0, 2).map((id) => `<span class="cv-co">${avatar(id, 18)}</span>`).join("")}</button>
         <div class="cv-bub">
           <div class="cv-meta">
-            <b class="cv-name" data-no-i18n>${esc(nm)}</b>
-            <button type="button" class="cv-tag${l.tag ? "" : " is-auto"}" data-act="tag" title="Kata kerja dialog (tag)" aria-haspopup="menu"><span data-no-i18n>${l.tag === "-" ? "—" : esc(l.tag || "auto")}</span>${ic("#ti-chevron-down", 11)}</button>
+            <b class="cv-name" data-no-i18n>${esc(co.length ? namesOf(l) : nm)}</b>
+            ${badge}
+            ${l.kind === "msg" ? "" : `<button type="button" class="cv-tag${l.tag ? "" : " is-auto"}" data-act="tag" title="Kata kerja dialog (tag)" aria-haspopup="menu"><span data-no-i18n>${l.tag === "-" ? "—" : esc(l.tag || "auto")}</span>${ic("#ti-chevron-down", 11)}</button>`}
           </div>
-          <textarea class="cv-text" rows="1" data-f="text" placeholder="Tulis dialog…" aria-label="Dialog ${esc(nm)}" spellcheck="false">${esc(l.text)}</textarea>
+          ${l.beat != null && l.kind === "say" ? `<input class="cv-beat" data-f="beat" value="${esc(l.beat)}" placeholder="Aksi sebelum dialog… (mis. Mira menyilangkan tangan.)" aria-label="Aksi sebelum dialog" spellcheck="false">` : ""}
+          <textarea class="cv-text" rows="1" data-f="text" placeholder="${ph}" aria-label="Dialog ${esc(nm)}" spellcheck="false">${esc(l.text)}</textarea>
         </div>
         ${toolsHtml(l)}
       </div>`;
   }
   function toolsHtml(l) {
     return `<div class="cv-tools">
-      <button type="button" class="cv-ibtn" data-act="kind" title="${l.kind === "act" ? "Jadikan dialog" : "Jadikan narasi / aksi"}" aria-label="${l.kind === "act" ? "Jadikan dialog" : "Jadikan narasi / aksi"}">${ic(l.kind === "act" ? "#ti-message" : "#ti-feather", 15)}</button>
+      <button type="button" class="cv-ibtn" data-act="line-menu" title="Jenis baris & opsi lain" aria-label="Jenis baris & opsi lain" aria-haspopup="menu">${ic("#ti-dots-vertical", 15)}</button>
       <button type="button" class="cv-ibtn is-danger" data-act="del" title="Hapus baris" aria-label="Hapus baris">${ic("#ti-trash", 15)}</button>
     </div>`;
   }
@@ -299,7 +377,7 @@
     const cnt = r.querySelector(".cv-count");
     if (cnt) cnt.textContent = conv.lines.length + " baris";
     const ins = r.querySelector('[data-act="insert"]');
-    if (ins) ins.disabled = !conv.lines.some((l) => l.text.trim());
+    if (ins) ins.disabled = !hasOutput(conv);
   }
 
   // ---------- popover / menu ----------
@@ -377,10 +455,11 @@
   }
   function pickTag(anchor, conv, line) {
     const lang = fmtPrefs().lang;
-    const list = TAGS[lang];
+    const think = line.kind === "think";
+    const list = (think ? TAGS_THINK : TAGS)[lang];
     const html = `
       <div class="cv-ph">Tag dialog</div>
-      <button type="button" class="cv-pi${!line.tag ? " is-on" : ""}" data-v=""><span>Otomatis</span><small data-no-i18n>${lang === "en" ? "said / asked" : "kata / tanya"}</small></button>
+      <button type="button" class="cv-pi${!line.tag ? " is-on" : ""}" data-v=""><span>Otomatis</span><small data-no-i18n>${think ? (lang === "en" ? "thought" : "pikir") : lang === "en" ? "said / asked" : "kata / tanya"}</small></button>
       <button type="button" class="cv-pi${line.tag === "-" ? " is-on" : ""}" data-v="-"><span>Tanpa tag</span><small>“…”</small></button>
       <div class="cv-tags" data-no-i18n>${list.map((t) => `<button type="button" class="cv-tg${line.tag === t ? " is-on" : ""}" data-v="${esc(t)}">${esc(t)}</button>`).join("")}</div>
       <div class="cv-psep"></div>
@@ -433,6 +512,171 @@
         setActive(c.list[0] || null); changed(null); render();
       }
     }, { alignRight: true });
+  }
+  // ---------- panel "Tambah dialog": pilih banyak tokoh (urutan = urutan bicara), jenis baris lain & templat ----------
+  const TEMPLATES = [
+    ["qa", "#ti-arrows-exchange", "Tanya-jawab", "A – B – A – B"],
+    ["open", "#ti-player-play", "Pembuka adegan", "Narasi, lalu A & B bicara"],
+    ["clash", "#ti-bolt", "Konfrontasi", "Aksi, A, B (dengan aksi), A, narasi"],
+    ["inner", "#ti-bubble", "Pergulatan batin", "B bicara, A berpikir lalu menjawab"],
+  ];
+  function addMenu(anchor, conv) {
+    const sel = [];
+    let rep = 1, q = "";
+    const pool = () => {
+      const cast = conv.cast.map(charById).filter(Boolean);
+      const list = cast.concat(chars().filter((ch) => !conv.cast.includes(ch.id)));
+      const k = q.trim().toLowerCase();
+      return k ? list.filter((ch) => (ch.title || "").toLowerCase().includes(k) || (ch.aliases || "").toLowerCase().includes(k)) : list;
+    };
+    const tiles = () => {
+      const list = pool();
+      if (!list.length) return `<div class="cv-pe">${chars().length ? "Tidak ada yang cocok" : "Kodeks belum punya karakter"}</div>`;
+      return list.map((ch) => {
+        const n = sel.indexOf(ch.id);
+        return `<button type="button" class="cv-am-t${n >= 0 ? " is-on" : ""}" data-c="${esc(ch.id)}" aria-pressed="${n >= 0}" title="${conv.cast.includes(ch.id) ? "Sudah ada di percakapan" : "Dari Kodeks"}">
+          ${avatar(ch.id, 32)}${n >= 0 ? `<b class="cv-am-n">${n + 1}</b>` : ""}
+          <span data-no-i18n>${esc(ch.title || T("Tanpa nama"))}</span>
+          ${conv.cast.includes(ch.id) ? `<i class="cv-am-dot" aria-hidden="true"></i>` : ""}
+        </button>`;
+      }).join("");
+    };
+    const row = (v, icon, name, desc, dis) => `<button type="button" class="cv-am-k" data-v="${v}"${dis ? " disabled" : ""}>${ic(icon, 16)}<span><b>${name}</b><small>${desc}</small></span></button>`;
+    const html = `
+      <div class="cv-am-h"><b>Siapa yang bicara?</b><small>Klik beberapa tokoh — nomor menunjukkan urutan bicara.</small></div>
+      <input class="cv-psearch" data-q placeholder="Cari tokoh…" aria-label="Cari tokoh" spellcheck="false">
+      <div class="cv-am-grid" data-grid></div>
+      <div class="cv-am-bar">
+        <span class="cv-am-rep" role="radiogroup" aria-label="Ulangi giliran">
+          <span>Ulangi</span>${[1, 2, 3].map((n) => `<button type="button" role="radio" data-rep="${n}" aria-checked="${n === 1}" class="${n === 1 ? "is-on" : ""}">${n}×</button>`).join("")}
+        </span>
+        <span class="cv-spacer"></span>
+        <button type="button" class="cv-am-link" data-all>Semua di percakapan</button>
+        <button type="button" class="cv-am-link" data-clear>Kosongkan</button>
+      </div>
+      <div class="cv-am-go">
+        <button type="button" class="cv-btn is-primary" data-v="add">${ic("#ti-plus", 15)}<span data-addlbl></span></button>
+        <button type="button" class="cv-btn" data-v="chorus" title="Satu baris diucapkan bersamaan oleh semua tokoh terpilih">${ic("#ti-users", 15)}<span>Ucapan bersama</span></button>
+        <button type="button" class="cv-btn is-ghost" data-v="cast" title="Masukkan tokoh terpilih ke daftar tokoh tanpa menambah baris">${ic("#ti-user-plus", 15)}<span>Ke daftar tokoh</span></button>
+      </div>
+      <div class="cv-ph">Jenis baris lain</div>
+      <div class="cv-am-kinds">
+        ${row("k:beat", "#ti-hand-finger", "Dialog + aksi", "Gerak tokoh sebelum ucapannya")}
+        ${row("k:think", "#ti-bubble", "Pikiran batin", "Suara hati, ditulis miring")}
+        ${row("k:msg", "#ti-device-mobile-message", "Pesan / telepon", "Chat, surat, telepon")}
+        ${row("k:act", "#ti-feather", "Narasi / aksi", "Gerak tokoh & suasana")}
+        ${row("k:break", "#ti-separator", "Pemisah adegan", "Lompatan waktu / tempat")}
+        ${row("k:note", "#ti-note", "Catatan penulis", "Tidak ikut disisipkan")}
+      </div>
+      <div class="cv-ph">Templat cepat</div>
+      <div class="cv-am-kinds">${TEMPLATES.map((t) => row("t:" + t[0], t[1], t[2], t[3])).join("")}</div>`;
+    const el = openPop(anchor, html, (v) => { closePop(); runAdd(conv, v, sel.slice(), rep); }, { cls: "is-add" });
+    const grid = el.querySelector("[data-grid]");
+    function refresh() {
+      grid.innerHTML = tiles();
+      const n = Math.max(1, sel.length) * rep;
+      el.querySelector("[data-addlbl]").textContent = n > 1 ? `Tambah ${n} dialog` : "Tambah dialog";   // diterjemahkan oleh i18n
+      el.querySelector('[data-v="chorus"]').disabled = sel.length < 2;
+      el.querySelector('[data-v="cast"]').disabled = !sel.some((id) => !conv.cast.includes(id));
+      el.querySelector("[data-clear]").disabled = !sel.length;
+      el.querySelector("[data-all]").disabled = !conv.cast.some((id) => charById(id));
+      el.querySelectorAll("[data-rep]").forEach((b) => { const on = +b.dataset.rep === rep; b.classList.toggle("is-on", on); b.setAttribute("aria-checked", String(on)); });
+    }
+    el.addEventListener("click", (e) => {
+      const t = e.target.closest("[data-c]");
+      if (t) {
+        const id = t.dataset.c, i = sel.indexOf(id);
+        if (i >= 0) sel.splice(i, 1); else sel.push(id);
+        refresh();
+        const again = grid.querySelector(`[data-c="${CSS.escape(id)}"]`);
+        if (again) again.focus();
+        return;
+      }
+      const r = e.target.closest("[data-rep]");
+      if (r) { rep = +r.dataset.rep; refresh(); return; }
+      if (e.target.closest("[data-all]")) { conv.cast.filter((id) => charById(id) && !sel.includes(id)).forEach((id) => sel.push(id)); refresh(); }
+      else if (e.target.closest("[data-clear]")) { sel.length = 0; refresh(); }
+    });
+    const inp = el.querySelector("[data-q]");
+    inp.addEventListener("input", () => { q = inp.value; refresh(); });
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (q.trim()) { const t = grid.querySelector("[data-c]"); if (t) { t.click(); inp.value = q = ""; refresh(); inp.focus(); } }
+        else el.querySelector('[data-v="add"]').click();
+      }
+    });
+    refresh();
+    inp.focus();
+  }
+  // jalankan pilihan panel Tambah dialog; baris baru selalu di akhir percakapan
+  function runAdd(conv, v, sel, rep) {
+    const end = () => conv.lines.length - 1;
+    const push = (o) => addLine(conv, end(), o);
+    const A = sel[0] || nextSpeaker(conv, end());
+    const B = sel[1] || conv.cast.find((x) => x && x !== A && charById(x)) || (chars().find((ch) => ch.id !== A) || {}).id || A;
+    let first = null, focusBeat = false;
+    const keep = (l) => { if (!first) first = l; return l; };
+    if (v === "add") {
+      const order = sel.length ? sel : [nextSpeaker(conv, end())];
+      for (let r = 0; r < rep; r++) order.forEach((id) => keep(push({ who: id })));
+    } else if (v === "chorus") keep(push({ who: sel[0], with: sel.slice(1) }));
+    else if (v === "cast") { sel.forEach((id) => addCast(conv, id)); changed(conv); render(); return; }
+    else if (v === "k:beat") { keep(push({ who: A, beat: "" })); focusBeat = true; }
+    else if (v === "k:think" || v === "k:msg") keep(push({ who: A, kind: v.slice(2) }));
+    else if (v === "k:act" || v === "k:break" || v === "k:note") keep(push({ who: "", kind: v.slice(2) }));
+    else if (v === "t:qa") [A, B, A, B].forEach((id) => keep(push({ who: id })));
+    else if (v === "t:open") { keep(push({ who: "", kind: "act" })); push({ who: A }); push({ who: B }); }
+    else if (v === "t:clash") { keep(push({ who: "", kind: "act" })); push({ who: A }); push({ who: B, beat: "" }); push({ who: A }); push({ who: "", kind: "act" }); }
+    else if (v === "t:inner") { keep(push({ who: B })); push({ who: A, kind: "think" }); push({ who: A }); }
+    sel.forEach((id) => addCast(conv, id));
+    changed(conv);
+    render();
+    if (!first) return;
+    if (focusBeat) { const b = lineEl(first.id).querySelector(".cv-beat"); if (b) { b.focus(); return; } }
+    focusLine(first.id);
+    if (v === "add" && !first.who && chars().length) { const w = lineEl(first.id).querySelector(".cv-who"); if (w) w.click(); }
+  }
+  // menu ⋮ tiap baris: ganti jenis, aksi pembuka, ucapan bersama, duplikat, sisipkan baris, pindah
+  function lineMenu(anchor, conv, line) {
+    const i = conv.lines.indexOf(line), sp = SPEAK.has(line.kind);
+    const html = `
+      <div class="cv-ph">Jenis baris</div>
+      ${KINDS.map((k) => `<button type="button" class="cv-pi${k[0] === line.kind ? " is-on" : ""}" data-v="k:${k[0]}">${ic(k[1], 16)}<span>${k[2]}</span><small>${k[3]}</small></button>`).join("")}
+      <div class="cv-psep"></div>
+      ${line.kind === "say" ? `<button type="button" class="cv-pi" data-v="beat">${ic("#ti-hand-finger", 16)}<span>${line.beat != null ? "Hapus aksi pembuka" : "Tambah aksi pembuka"}</span></button>` : ""}
+      ${sp ? `<button type="button" class="cv-pi" data-v="with">${ic("#ti-users", 16)}<span>Tambah pembicara (ucapan bersama)</span></button>` : ""}
+      ${sp && line.with && line.with.length ? `<button type="button" class="cv-pi" data-v="solo">${ic("#ti-user", 16)}<span>Jadikan ucapan satu tokoh</span></button>` : ""}
+      <button type="button" class="cv-pi" data-v="below">${ic("#ti-row-insert-bottom", 16)}<span>Sisipkan dialog di bawahnya</span></button>
+      <button type="button" class="cv-pi" data-v="dup">${ic("#ti-copy", 16)}<span>Duplikat baris</span></button>
+      <button type="button" class="cv-pi" data-v="up" ${i <= 0 ? "disabled" : ""}>${ic("#ti-arrow-up", 16)}<span>Pindah ke atas</span><small>Alt+↑</small></button>
+      <button type="button" class="cv-pi" data-v="down" ${i >= conv.lines.length - 1 ? "disabled" : ""}>${ic("#ti-arrow-down", 16)}<span>Pindah ke bawah</span><small>Alt+↓</small></button>`;
+    openPop(anchor, html, (v) => {
+      closePop();
+      let focusId = line.id;
+      if (v.startsWith("k:")) {
+        const k = v.slice(2);
+        line.kind = k;
+        if (SPEAK.has(k) && !line.who) { line.who = nextSpeaker(conv, i - 1); const ch = charById(line.who); line.name = ch ? ch.title : ""; addCast(conv, line.who); }
+        if (!SPEAK.has(k)) { delete line.with; if (k !== "act") line.who = ""; }
+        if (k !== "say") delete line.beat;
+      } else if (v === "beat") { if (line.beat != null) delete line.beat; else line.beat = ""; }
+      else if (v === "with") {
+        pickCharacter(anchor, conv, null, false, (id) => {
+          if (!id || id === line.who) return;
+          line.with = (line.with || []).filter((x) => x !== id).concat(id);
+          addCast(conv, id);
+          changed(conv); render(); focusLine(line.id);
+        });
+        return;
+      } else if (v === "solo") delete line.with;
+      else if (v === "below") focusId = addLine(conv, i).id;
+      else if (v === "dup") { const c = JSON.parse(JSON.stringify(line)); c.id = uid("ln"); conv.lines.splice(i + 1, 0, c); focusId = c.id; }
+      else if (v === "up" || v === "down") { const j = v === "up" ? i - 1 : i + 1; conv.lines.splice(i, 1); conv.lines.splice(j, 0, line); }
+      changed(conv); render();
+      if (v === "beat" && line.beat != null) { const b = lineEl(line.id).querySelector(".cv-beat"); if (b) { b.focus(); return; } }
+      focusLine(focusId);
+    }, { alignRight: true, cls: "is-line" });
   }
   // judul diganti di tempat: tombol judul menjadi kolom ketik
   function focusTitle() {
@@ -549,7 +793,7 @@
     const cur = ctx.currentChapter();
     if (cur && stories.some((s) => s.id === cur.storyId)) $("#cvStory").value = cur.storyId;
     fillChapters();
-    const fmt = () => ({ style: $("#cvStyle").value, quote: $("#cvQuote").value, lang: $("#cvLang").value });
+    const fmt = () => ({ style: $("#cvStyle").value, quote: $("#cvQuote").value, lang: $("#cvLang").value, target: tgt });
     const target = () => (tgt === "scene"
       ? ($("#cvScene").value ? { kind: "scene", id: $("#cvScene").value, label: $("#cvScene").selectedOptions[0].textContent } : null)
       : ($("#cvChap").value ? { kind: "chapter", storyId: $("#cvStory").value, id: $("#cvChap").value, label: $("#cvChap").selectedOptions[0].textContent } : null));
@@ -581,7 +825,7 @@
       const t = target(), fm = fmt(), out = buildOutput(conv, fm);
       if (!t || !out.count) return;
       const open = $("#cvOpen").checked;
-      store(FMT_KEY, Object.assign({}, fm, { target: tgt, open }));
+      store(FMT_KEY, Object.assign({}, fm, { open }));
       const atCursor = ov.querySelector('input[name="cvPos"]:checked').value === "cursor";
       if (!ctx.insert(t, out.html, atCursor)) { toast("Gagal menyisipkan — tujuan tidak ditemukan", "#ti-alert-triangle"); return; }
       conv.inserted = [{ kind: t.kind, id: t.id, story: t.storyId || "", label: t.label, t: now() }].concat(conv.inserted.filter((r) => r.id !== t.id)).slice(0, 6);
@@ -626,27 +870,21 @@
         const id = b.dataset.id;
         conv.cast = conv.cast.filter((x) => x !== id);
         changed(conv); render();
-      } else if (act === "add" || act === "add-act") {
-        const l = addLine(conv, conv.lines.length - 1, act === "add-act" ? { kind: "act", who: "" } : null);
-        render(); focusLine(l.id);
-        if (act === "add" && !l.who && chars().length) { const w = lineEl(l.id).querySelector(".cv-who"); if (w) w.click(); }
-      } else if (act === "goto") ctx.openTarget({ kind: b.dataset.kind, id: b.dataset.id, storyId: b.dataset.story });
+      } else if (act === "add") addMenu(b, conv);
+      else if (act === "add-act") { const l = addLine(conv, conv.lines.length - 1, { kind: "act", who: "" }); render(); focusLine(l.id); } else if (act === "goto") ctx.openTarget({ kind: b.dataset.kind, id: b.dataset.id, storyId: b.dataset.story });
       else if (!line) return;
       else if (act === "who") {
         pickCharacter(b, conv, line.who, true, (id) => {
           line.who = id;
           const ch = charById(id);
           line.name = ch ? ch.title : "";
-          if (!id) line.kind = "act";
-          else { addCast(conv, id); if (line.kind === "act" && b.classList.contains("cv-who")) line.kind = "say"; }
+          if (!id) { line.kind = "act"; delete line.with; delete line.beat; }
+          else { addCast(conv, id); if (line.with) line.with = line.with.filter((x) => x !== id); }
           changed(conv); render(); focusLine(line.id);
         });
       } else if (act === "tag") pickTag(b, conv, line);
-      else if (act === "kind") {
-        line.kind = line.kind === "act" ? "say" : "act";
-        if (line.kind === "say" && !line.who) { line.who = nextSpeaker(conv, conv.lines.indexOf(line) - 1); addCast(conv, line.who); const ch = charById(line.who); line.name = ch ? ch.title : ""; }
-        changed(conv); render(); focusLine(line.id);
-      } else if (act === "del") {
+      else if (act === "line-menu") lineMenu(b, conv, line);
+      else if (act === "del") {
         const i = conv.lines.indexOf(line);
         conv.lines.splice(i, 1);
         changed(conv); render();
@@ -658,18 +896,25 @@
       const t = e.target, conv = convOf(e);
       if (!conv || !t.dataset.f) return;
       if (t.dataset.f === "situation") conv.situation = t.value;
-      else if (t.dataset.f === "text") { const l = lineOf(conv, e); if (!l) return; l.text = t.value; grow(t); updateHeader(conv); }
+      else if (t.dataset.f === "text") { const l = lineOf(conv, e); if (!l) return; l.text = t.value; if (t.tagName === "TEXTAREA") grow(t); updateHeader(conv); }
+      else if (t.dataset.f === "beat") { const l = lineOf(conv, e); if (!l) return; l.beat = t.value; }
       changed(conv);
     });
     host.addEventListener("keydown", (e) => {
       const t = e.target;
+      if (t.classList && t.classList.contains("cv-beat") && (e.key === "Enter" || (e.key === "ArrowDown" && !e.altKey))) {
+        e.preventDefault();   // aksi pembuka -> lanjut ke kolom dialognya
+        const ta = t.closest(".cv-bub").querySelector(".cv-text");
+        ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+        return;
+      }
       if (!t.classList || !t.classList.contains("cv-text")) return;
       const conv = convOf(e), line = lineOf(conv, e);
       if (!line) return;
       const i = conv.lines.indexOf(line);
       if (e.key === "Enter" && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey && !e.isComposing) {
         e.preventDefault();
-        const l = addLine(conv, i, line.kind === "act" ? { kind: "say" } : null);
+        const l = addLine(conv, i);
         render(); focusLine(l.id);
       } else if (e.key === "Backspace" && !t.value && t.selectionStart === 0 && conv.lines.length > 0) {
         e.preventDefault();
@@ -697,7 +942,8 @@
         line.who = id;
         const ch = charById(id);
         line.name = ch ? ch.title : "";
-        line.kind = id ? "say" : "act";
+        line.kind = id ? (SPEAK.has(line.kind) ? line.kind : "say") : "act";
+        if (!id) { delete line.with; delete line.beat; }
         changed(conv); render(); focusLine(line.id);
       }
     });
