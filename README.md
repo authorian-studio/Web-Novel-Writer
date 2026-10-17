@@ -1,6 +1,24 @@
-# Novelist Web — v0.15.2
+# Novelist Web — v0.16.0
 
-## Riwayat perubahan terbaru (v0.15.2) — paling baru di atas
+## Riwayat perubahan terbaru (v0.16.0) — paling baru di atas
+
+**Split view: buka 2 fitur berdampingan seperti jendela terpisah (maks. 2).** Mis. Kodeks di kiri, Tree Relations di
+kanan — keduanya hidup dan bisa dipakai bersamaan.
+- **Cara membuka:** di sidebar tab (tombol di samping logo), arahkan ke baris tab lalu klik ikon **kolom** ("Buka di
+  samping"); atau tombol kolom di baris ikon bawah sidebar → pilih fitur; atau **Ctrl/Shift+klik** tab di bar atas /
+  sidebar.
+- Tiap jendela punya kepala sendiri: nama fitur + dokumen yang dibuka, **Tukar posisi**, **Perbesar** (keluar dari
+  split; klik ganda kepala juga bisa) dan **Tutup jendela** (tabnya tetap terbuka di bar tab).
+- **Pembatas di tengah bisa diseret** untuk mengubah lebar (klik ganda = 50/50; panah kiri/kanan dari keyboard). Lebar
+  diingat di perangkat ini; split per project ikut dipulihkan saat project dibuka lagi.
+- Jendela yang terakhir disentuh diberi garis warna project — klik tab berikutnya mengisi jendela itu, dan pintasan
+  keyboard (Beranda, Tree Relations, Timeline, Map) hanya berlaku untuk jendela tersebut.
+- Tab di jendela kanan tampil sebagai pill bergaris putus-putus di bar atas; sidebar menandai **Kiri / Kanan**.
+- Kerangka & Quill memakai panel yang sama sehingga tidak bisa berdampingan. Layar ≤ 900 px: hanya jendela kiri tampil.
+- Kodeks menyesuaikan lebar jendela (navigasi jenis jadi ikon; daftar ATAU detail saat jendela sempit).
+
+## v0.15.2
+
 
 **Quill: gambar sampul belakang tidak lagi nyasar ke sampul depan.** Sisi tujuan gambar kini dikunci saat gambar
 dipilih / dilepas, bukan saat gambar selesai diproses:

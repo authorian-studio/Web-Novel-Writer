@@ -582,6 +582,11 @@
         </div>
       </aside>
       <div id="tabContent">
+        <!-- TAB PROJECT — SPLIT VIEW: maks. 2 tab berdampingan (kiri = tab aktif, kanan = tab "di samping"). Bingkai jendela,
+             kepala (judul, tukar, perbesar, tutup) & pembatas geser diisi app.js (renderSplitChrome); panel tab ditaruh di atasnya -->
+        <div class="split-win" data-pane="0" hidden><div class="split-head"></div></div>
+        <div class="split-win" data-pane="1" hidden><div class="split-head"></div></div>
+        <div id="splitDivider" class="split-divider" role="separator" aria-orientation="vertical" aria-label="Ubah lebar panel" aria-valuemin="25" aria-valuemax="75" tabindex="0" hidden></div>
         <!-- ============ HOME TAB (Beranda): kanvas React Flow selebar layar project — jejak semua dokumen + papan ide.
              Isinya dibangun home-canvas.js (+ home-canvas.css), dimuat saat tab ini pertama kali dibuka ============ -->
         <div id="tabHome" class="tab-panel home-panel">

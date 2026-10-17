@@ -806,11 +806,16 @@ function flushCurrentEdits() {
 // tengah menutup, seret untuk mengurutkan, "+" membuka jendela "Tambah tab". Sidebar tab (kiri) berisi tab terbuka +
 // riwayat (tab & dokumen yang dibuka: scene, item Organize, timeline, peta, cerita Quill).
 // Disimpan per project DI PERANGKAT INI (status tampilan, tidak memicu simpan ke Drive):
-//   novelist_tabs_<id>    = { open: ["home", "write", ...], active: "write" | null }   (null = semua tab ditutup)
+//   novelist_tabs_<id>    = { open: ["home", "write", ...], active: "write" | null, split: "organize" | null }
+//                           (active null = semua tab ditutup; split = tab yang dibuka di samping, panel kanan)
+//   novelist_tabsplit     = lebar panel kiri split view (%, 25–75)
 //   novelist_tabhist_<id> = [{ k, tab, doc, kind, title, t }]  (terbaru di depan, maks. 30)
 //   novelist_tabsidebar   = true/false  (sidebar menempel di desktop)
 // "quill" = panel Write dalam mode Quill (tab sendiri). switchTab(x) dari mana pun (Timeline "buka scene", alat Map di
 // Quill, Home, riwayat, ...) otomatis membuka tab x kalau sedang tertutup (disisipkan setelah tab aktif).
+// SPLIT VIEW: maks. 2 tab berdampingan seperti jendela terpisah — kiri = projTabs.active, kanan = projTabs.split.
+// Dibuka lewat tombol "Buka di samping" di sidebar tab, Ctrl/Shift+klik tab, atau kepala jendela. Dua tab yang
+// memakai panel yang sama (Kerangka & Quill) tidak bisa berdampingan. Layar <= 900 px: hanya panel kiri yang tampil.
 const TAB_DEFS = [
   { id: "home", panel: "home", name: "Beranda", icon: tiIcon("home"), desc: "Jejak semua dokumenmu & papan ide — zoom, susun, hubungkan" },
   { id: "write", panel: "write", name: "Kerangka", icon: tiIcon("list-details"), desc: "Rencanakan bab & adegan: sinopsis, POV, lokasi, tujuan, target kata" },
@@ -832,7 +837,10 @@ const TAB_HIST_MAX = 30;
 const TAB_DOC_ICONS = { scene: tiIcon("file-text"), characters: tiIcon("user"), locations: tiIcon("map-pin"), notes: tiIcon("note"), timeline: tiIcon("timeline"), map: tiIcon("map"), story: tiIcon("book-2"), board: tiIcon("layout-board"), jejaring: tiIcon("affiliate") };
 const tabNarrowMq = window.matchMedia("(max-width: 900px)");
 const tabReduceMq = window.matchMedia("(prefers-reduced-motion: reduce)");
-let projTabs = { open: [], active: null };   // tab project yang sedang dibuka
+let projTabs = { open: [], active: null, split: null };   // tab project yang sedang dibuka (+ tab di samping)
+let tabPane = [null, null];                  // tab yang sedang tampil di panel kiri & kanan (null = kosong)
+let tabSplitFocus = 0;                       // panel yang terakhir disentuh (0 kiri, 1 kanan): klik tab mengisi panel ini
+let tabSplitRatio = 50;                      // lebar panel kiri split view (%)
 let tabHist = [];                            // riwayat project ini
 let tabLastDoc = {};                         // dokumen terakhir per tab (timeline/map/quill) untuk label & riwayat
 let tabPendingDoc = null;                    // { tab, id }: timeline/peta dari riwayat, dibuka setelah modulnya tampil
@@ -844,7 +852,7 @@ let teMore = false;                          // layar kosong: chip "Lainnya" dib
 
 function tabStoreGet(key) { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (e) { return null; } }
 function tabStoreSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* storage diblokir: cukup di memori */ } }
-function saveProjectTabs() { if (currentProjectId) tabStoreSet("novelist_tabs_" + currentProjectId, { open: projTabs.open, active: projTabs.active }); }
+function saveProjectTabs() { if (currentProjectId) tabStoreSet("novelist_tabs_" + currentProjectId, { open: projTabs.open, active: projTabs.active, split: projTabs.split }); }
 function saveTabHist() { if (currentProjectId) tabStoreSet("novelist_tabhist_" + currentProjectId, tabHist); }
 
 // dipanggil openProject: pulihkan tab project ini (bawaan: Beranda, Tulis, Organize) lalu tampilkan tab aktifnya
@@ -855,7 +863,9 @@ function restoreProjectTabs(p) {
     open = TAB_DEFAULT.slice();
     if (writeMode(p) === "quill") open.splice(2, 0, "quill");   // project yang dulu ditulis di mode Quill: tab Quill ikut terbuka
   }
-  projTabs = { open, active: s && open.includes(s.active) ? s.active : (open[0] || null) };
+  projTabs = { open, active: s && open.includes(s.active) ? s.active : (open[0] || null), split: null };
+  if (s && projTabs.active && open.includes(s.split) && tabCanPair(projTabs.active, s.split)) projTabs.split = s.split;
+  tabSplitFocus = 0;
   const h = tabStoreGet("novelist_tabhist_" + p.id);
   tabHist = Array.isArray(h) ? h.filter((x) => x && TAB_BY_ID[x.tab] && typeof x.k === "string" && typeof x.t === "number").slice(0, TAB_HIST_MAX) : [];
   tabLastDoc = {}; tabPendingDoc = null; quillNav = null; quillScreen = null; teMore = false;
@@ -866,21 +876,27 @@ function restoreProjectTabs(p) {
   v.classList.add("tsb-no-anim");                               // ganti project: tanpa animasi buka sidebar/tab
   el("tabStrip").innerHTML = "";
   v.dataset.ptab = "";   // ganti project: panel tab aktif selalu dibangun ulang walau id tabnya sama (mis. Beranda -> Beranda)
+  tabPane = [null, null];
   tabSbDrawer = false;
   applyTabSidebar();
   if (projTabs.active) switchTab(projTabs.active);
-  else { saveProjectTabs(); showTabPanel(null); renderProjectTabs(); }
+  else { saveProjectTabs(); applyTabPanels(); renderProjectTabs(); }
   requestAnimationFrame(() => requestAnimationFrame(() => v.classList.remove("tsb-no-anim")));
 }
 
 function switchTab(tab) {
   if (!TAB_BY_ID[tab] || !currentProjectId) return;
   if (!projTabs.open.includes(tab)) insertProjectTab(tab, false);   // tab tertutup dipanggil fitur lain -> buka otomatis
-  const same = projTabs.active === tab && el("editorView").dataset.ptab === tab;
+  // split view: tab yang sudah di panel kanan (atau berbagi panel dengannya, mis. Quill -> Kerangka) tetap di kanan
+  const sp = tabSplitShown();
+  if (sp && (tab === sp || TAB_BY_ID[tab].panel === TAB_BY_ID[sp].panel)) { showSplitTab(tab); return; }
+  const same = projTabs.active === tab && tabPane[0] === tab;
   projTabs.active = tab;
+  if (projTabs.split === tab) projTabs.split = null;   // (layar sempit: tab kanan yang tersembunyi dipindah ke kiri)
+  tabSplitFocus = 0;
   saveProjectTabs();
-  if (same) { consumeTabPendingDoc(tab); stepQuillNav(); }   // tab yang sama: panel tidak dibangun ulang
-  else showTabPanel(tab);
+  if (same) { consumeTabPendingDoc(tab); stepQuillNav(); renderSplitChrome(); }   // tab yang sama: panel tidak dibangun ulang
+  else applyTabPanels();
   renderProjectTabs();
   noteTabVisit(tab);
 }
@@ -888,27 +904,207 @@ function insertProjectTab(tab, atEnd) {
   const i = projTabs.open.indexOf(projTabs.active);
   if (atEnd || i < 0) projTabs.open.push(tab); else projTabs.open.splice(i + 1, 0, tab);
 }
-// tampilkan panel milik tab (null = semua ditutup -> layar kosong). Isi lama switchTab().
-function showTabPanel(tab) {
-  const panel = tab ? TAB_BY_ID[tab].panel : null;
-  if (panel !== "home" && window.NovelHome) window.NovelHome.hide();   // Beranda: simpan teks yang diedit + lepas kanvas
-  if (panel === "home") { flushCurrentEdits(); renderProjectHome(); }
-  if (panel !== "jejaring" && window.NovelJejaring) window.NovelJejaring.hide();   // Jejaring: simpan nama yang diedit + lepas kanvas
-  if (panel === "jejaring") { flushCurrentEdits(); renderJejaringTab(); }
-  if (panel === "write") setWriteModeQuiet(tab === "quill" ? "quill" : "scene");
+// ---- split view ----
+// dua tab bisa berdampingan kalau beda tab & beda panel (Kerangka dan Quill sama-sama panel Tulis)
+function tabCanPair(a, b) { return !!(TAB_BY_ID[a] && TAB_BY_ID[b] && a !== b && TAB_BY_ID[a].panel !== TAB_BY_ID[b].panel); }
+// tab yang sedang tampil di panel kanan (null = tidak split / layar sempit)
+function tabSplitShown() {
+  const a = projTabs.active, b = projTabs.split;
+  return a && b && !tabNarrowMq.matches && projTabs.open.includes(b) && tabCanPair(a, b) ? b : null;
+}
+function tabIsShown(tab) { return !!tab && (tab === projTabs.active || tab === tabSplitShown()); }
+// isi panel kanan dengan tab ini (split harus sudah valid — lihat openTabInSplit untuk membuka dari luar)
+function showSplitTab(tab) {
+  if (!projTabs.open.includes(tab)) insertProjectTab(tab, false);
+  const same = tabPane[1] === tab;
+  projTabs.split = tab;
+  tabSplitFocus = 1;
+  saveProjectTabs();
+  if (same) { consumeTabPendingDoc(tab); stepQuillNav(); renderSplitChrome(); }
+  else applyTabPanels();
+  renderProjectTabs();
+  noteTabVisit(tab);
+}
+// "Buka di samping": tab ini tampil di panel kanan, tab aktif tetap di kiri. Tab kiri sendiri -> tukar posisi.
+function openTabInSplit(tab) {
+  if (!TAB_BY_ID[tab] || !currentProjectId) return;
+  if (tabNarrowMq.matches || !projTabs.active) { switchTab(tab); return; }   // layar sempit / semua tab tertutup: biasa
+  if (tab === projTabs.active) {
+    if (tabSplitShown()) swapSplitPanes();
+    else toast("Pilih tab lain untuk dibuka di samping " + TAB_BY_ID[tab].name, tiIcon("layout-columns"));
+    return;
+  }
+  if (!tabCanPair(projTabs.active, tab)) {
+    toast(TAB_BY_ID[projTabs.active].name + " & " + TAB_BY_ID[tab].name + " memakai panel yang sama — tidak bisa berdampingan", tiIcon("alert-triangle"));
+    return;
+  }
+  showSplitTab(tab);
+}
+// klik tab di bar atas / sidebar: mengisi panel yang terakhir disentuh (kiri atau kanan)
+function openTabFocused(tab) {
+  const sp = tabSplitShown();
+  if (sp && tabSplitFocus === 1 && tab !== projTabs.active && tabCanPair(projTabs.active, tab)) showSplitTab(tab);
+  else switchTab(tab);
+}
+function closeSplitPane() {
+  if (!projTabs.split) return;
+  projTabs.split = null;
+  tabSplitFocus = 0;
+  saveProjectTabs();
+  applyTabPanels();
+  renderProjectTabs();
+}
+function swapSplitPanes() {
+  const b = tabSplitShown();
+  if (!b) return;
+  projTabs.split = projTabs.active;
+  projTabs.active = b;
+  tabSplitFocus = 1 - tabSplitFocus;
+  saveProjectTabs();
+  applyTabPanels();   // dua tab tetap tampil: panel tidak dibangun ulang, hanya bertukar tempat
+  renderProjectTabs();
+}
+// perbesar satu panel = keluar dari split, panel itu jadi satu-satunya (tab lain tetap terbuka di bar tab)
+function maximizeSplitPane(i) {
+  if (!tabSplitShown()) return;
+  if (i === 1) { projTabs.active = projTabs.split; tabPane = [tabPane[1], null]; }
+  closeSplitPane();
+}
+function setSplitFocus(i) {
+  if (tabSplitFocus === i) return;
+  tabSplitFocus = i;
+  renderSplitChrome();
+}
+// bingkai jendela split: kepala (ikon, nama tab, dokumen, tombol tukar/perbesar/tutup), pembatas & penanda fokus
+let splitHeadHtml = ["", ""];
+function renderSplitChrome() {
+  const tc = el("tabContent"), b = projTabs.active ? tabSplitShown() : null, on = !!b;
+  tc.classList.toggle("is-split", on);
+  tc.style.setProperty("--split", tabSplitRatio + "%");
+  const dv = el("splitDivider");
+  dv.hidden = !on;
+  dv.setAttribute("aria-valuenow", String(Math.round(tabSplitRatio)));
+  [projTabs.active, b].forEach((tab, i) => {
+    const w = tc.querySelector(`.split-win[data-pane="${i}"]`);
+    w.hidden = !on;
+    w.classList.toggle("is-focus", on && tabSplitFocus === i);
+    let html = "";
+    if (on) {
+      const d = TAB_BY_ID[tab], doc = tabCurrentDoc(tab);
+      html = `<span class="split-head-ic">${tiPx(d.icon, 15)}</span>` +
+        `<span class="split-head-title"><b>${d.name}</b>${doc && doc.title ? `<span>${escapeHtml(doc.title)}</span>` : ""}</span>` +
+        `<span class="split-head-acts">` +
+        `<button type="button" class="split-head-btn" data-act="swap" data-tip="Tukar posisi" aria-label="Tukar posisi jendela">${tiPx(tiIcon("arrows-left-right"), 15)}</button>` +
+        `<button type="button" class="split-head-btn" data-act="max" data-tip="Perbesar (keluar dari split)" aria-label="Perbesar ${d.name}">${tiPx(tiIcon("arrows-maximize"), 15)}</button>` +
+        `<button type="button" class="split-head-btn" data-act="close" data-tip="Tutup jendela" aria-label="Tutup jendela ${d.name}">${tiPx(tiIcon("x"), 15)}</button></span>`;
+    }
+    if (splitHeadHtml[i] !== html) { w.firstElementChild.innerHTML = html; splitHeadHtml[i] = html; }
+  });
+  TAB_PANELS.forEach((t) => {
+    const n = el("tab" + capitalize(t));
+    n.classList.toggle("is-focus", on && n.classList.contains(tabSplitFocus ? "pane-b" : "pane-a"));
+  });
+  // Timeline (React Flow) hanya menerima tombol saat jendelanya yang difokus
+  if (on && !el("tabTimeline").classList.contains("hidden")) muteTimelineKeys(!el("tabTimeline").classList.contains("is-focus"));
+}
+function setSplitRatio(r, save) {
+  // tiap jendela min. 25% & min. ~400 px (kalau muat) supaya isinya tidak terlalu sempit
+  const w = el("tabContent").clientWidth, lo = w ? Math.min(50, Math.max(25, (400 / w) * 100)) : 25;
+  tabSplitRatio = Math.min(100 - lo, Math.max(lo, Math.round(r * 10) / 10));
+  el("tabContent").style.setProperty("--split", tabSplitRatio + "%");
+  el("splitDivider").setAttribute("aria-valuenow", String(Math.round(tabSplitRatio)));
+  if (save) tabStoreSet("novelist_tabsplit", tabSplitRatio);
+}
+function initSplitView() {
+  const tc = el("tabContent"), dv = el("splitDivider");
+  const r = Number(tabStoreGet("novelist_tabsplit"));
+  if (r >= 25 && r <= 75) tabSplitRatio = r;
+  // panel yang disentuh/difokus = panel tujuan klik tab berikutnya
+  const paneOf = (t) => {
+    if (!tc.classList.contains("is-split") || !t || !t.closest) return -1;
+    const w = t.closest(".split-win, .tab-panel");
+    if (!w) return -1;
+    if (w.classList.contains("split-win")) return +w.dataset.pane;
+    return w.classList.contains("pane-b") ? 1 : w.classList.contains("pane-a") ? 0 : -1;
+  };
+  tc.addEventListener("pointerdown", (e) => { const i = paneOf(e.target); if (i >= 0) setSplitFocus(i); }, true);
+  tc.addEventListener("focusin", (e) => { const i = paneOf(e.target); if (i >= 0) setSplitFocus(i); });
+  tc.querySelectorAll(".split-win").forEach((w) => {
+    w.firstElementChild.addEventListener("click", (e) => {
+      const btn = e.target.closest("button"), i = +w.dataset.pane;
+      if (!btn) return;
+      if (btn.dataset.act === "swap") swapSplitPanes();
+      else if (btn.dataset.act === "max") maximizeSplitPane(i);
+      else if (btn.dataset.act === "close") maximizeSplitPane(1 - i);   // tutup jendela ini = jendela satunya memenuhi area (tabnya tetap terbuka)
+    });
+    w.firstElementChild.addEventListener("dblclick", (e) => { if (!e.target.closest("button")) maximizeSplitPane(+w.dataset.pane); });
+  });
+  // pembatas: seret untuk mengubah lebar, klik ganda = 50/50, panah kiri/kanan dari keyboard
+  dv.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    dv.setPointerCapture(e.pointerId);
+    tc.classList.add("is-resizing");
+    const rect = tc.getBoundingClientRect();
+    const move = (ev) => setSplitRatio(((ev.clientX - rect.left) / rect.width) * 100, false);
+    const up = () => {
+      dv.removeEventListener("pointermove", move);
+      dv.removeEventListener("pointerup", up);
+      dv.removeEventListener("pointercancel", up);
+      tc.classList.remove("is-resizing");
+      setSplitRatio(tabSplitRatio, true);
+    };
+    dv.addEventListener("pointermove", move);
+    dv.addEventListener("pointerup", up);
+    dv.addEventListener("pointercancel", up);
+  });
+  dv.addEventListener("dblclick", () => setSplitRatio(50, true));
+  dv.addEventListener("keydown", (e) => {
+    const step = e.shiftKey ? 10 : 2;
+    if (e.key === "ArrowLeft") setSplitRatio(tabSplitRatio - step, true);
+    else if (e.key === "ArrowRight") setSplitRatio(tabSplitRatio + step, true);
+    else if (e.key === "Home") setSplitRatio(25, true);
+    else if (e.key === "End") setSplitRatio(75, true);
+    else if (e.key === "Enter") setSplitRatio(50, true);
+    else return;
+    e.preventDefault();
+  });
+}
+// tampilkan panel tab kiri (+ kanan saat split). Modul hanya dibangun untuk tab yang BARU tampil; tab yang tetap tampil
+// (mis. panel kiri saat panel kanan diganti) tidak disentuh. null di kiri = semua ditutup -> layar kosong.
+function applyTabPanels() {
+  const a = projTabs.active, b = a ? tabSplitShown() : null;
+  const pa = a ? TAB_BY_ID[a].panel : null, pb = b ? TAB_BY_ID[b].panel : null;
+  const panels = [pa, pb].filter(Boolean);
+  const prev = tabPane.slice();   // tab yang tampil sebelum panggilan ini (tabPane diperbarui di tengah fungsi)
+  const fresh = (p) => [a, b].some((t) => t && TAB_BY_ID[t].panel === p && !prev.includes(t));
+  if (!panels.includes("home") && window.NovelHome) window.NovelHome.hide();   // Beranda: simpan teks yang diedit + lepas kanvas
+  if (fresh("home")) { flushCurrentEdits(); renderProjectHome(); }
+  if (!panels.includes("jejaring") && window.NovelJejaring) window.NovelJejaring.hide();   // Jejaring: simpan nama yang diedit + lepas kanvas
+  if (fresh("jejaring")) { flushCurrentEdits(); renderJejaringTab(); }
+  const wt = [a, b].find((t) => t && TAB_BY_ID[t].panel === "write");
+  if (wt) setWriteModeQuiet(wt === "quill" ? "quill" : "scene");
   else if (window.NovelQuill) window.NovelQuill.hide();   // Quill: simpan + bersihkan sebelum tab lain tampil
-  TAB_PANELS.forEach((t) => el("tab" + capitalize(t)).classList.toggle("hidden", t !== panel));
-  el("tabEmpty").classList.toggle("hidden", !!panel);
-  el("editorView").dataset.tab = panel || "empty";
-  el("editorView").dataset.ptab = tab || "";
-  if (panel === "write") applyWriteMode();   // Quill: tampilkan mode Scene / Quill sesuai tabnya
+  TAB_PANELS.forEach((t) => {
+    const n = el("tab" + capitalize(t));
+    n.classList.toggle("hidden", !panels.includes(t));
+    n.classList.toggle("pane-a", !!pb && t === pa);
+    n.classList.toggle("pane-b", t === pb);
+  });
+  el("tabEmpty").classList.toggle("hidden", !!pa);
+  const v = el("editorView");
+  v.dataset.tab = pb ? "split" : pa || "empty";   // "split": Beranda tidak lagi memenuhi layar di belakang bar atas
+  v.dataset.ptab = a || "";
+  tabPane = [a, b];
+  if (fresh("write")) applyWriteMode();   // Quill: tampilkan mode Scene / Quill sesuai tabnya
   updateSceneDrawerVisibility();
-  muteTimelineKeys(panel !== "timeline");
-  if (panel !== "map" && window.NovelMap) window.NovelMap.hide();   // hentikan render loop 3D
-  if (panel === "timeline") openTimelineTab();
-  if (panel === "map") openMapTab();
-  if (panel === "organize" && window.NovelKodeks) window.NovelKodeks.refresh();   // Kodeks: "Disebut di" ikut naskah terbaru
-  if (!panel) renderTabEmpty();
+  muteTimelineKeys(!panels.includes("timeline"));
+  if (!panels.includes("map") && window.NovelMap) window.NovelMap.hide();   // hentikan render loop 3D
+  if (fresh("timeline")) openTimelineTab();
+  if (fresh("map")) openMapTab();
+  if (fresh("organize") && window.NovelKodeks) window.NovelKodeks.refresh();   // Kodeks: "Disebut di" ikut naskah terbaru
+  if (!pa) renderTabEmpty();
+  renderSplitChrome();
 }
 // mode Scene/Quill kini mengikuti tab (Tulis / Quill) — tidak menandai project berubah (bukan isi cerita)
 function setWriteModeQuiet(mode) {
@@ -922,12 +1118,18 @@ function closeProjectTab(tab) {
   const i = projTabs.open.indexOf(tab);
   if (i < 0) return;
   projTabs.open.splice(i, 1);
+  if (projTabs.split === tab) { projTabs.split = null; tabSplitFocus = 0; saveProjectTabs(); applyTabPanels(); renderProjectTabs(); return; }
   if (projTabs.active !== tab) { saveProjectTabs(); renderProjectTabs(); return; }
+  if (projTabs.split) {   // tab kiri ditutup saat split: tab kanan mengisi seluruh area
+    projTabs.active = projTabs.split; projTabs.split = null; tabSplitFocus = 0;
+    saveProjectTabs(); applyTabPanels(); renderProjectTabs();
+    return;
+  }
   const next = projTabs.open[i] || projTabs.open[i - 1] || null;   // tab aktif ditutup -> tetangga kanan, lalu kiri
   if (next) { switchTab(next); return; }
   projTabs.active = null;
   saveProjectTabs();
-  showTabPanel(null);
+  applyTabPanels();
   renderProjectTabs();
 }
 function moveProjectTab(tab, delta) {
@@ -969,9 +1171,10 @@ function renderTabStrip() {
     if (n !== want) strip.insertBefore(n, want);
     const on = id === projTabs.active, b = n.firstElementChild;
     n.classList.toggle("is-active", on);
+    n.classList.toggle("is-split", id === tabSplitShown());   // tab di panel kanan: pill berlabel juga, garis putus-putus
     b.setAttribute("aria-selected", on ? "true" : "false");
     b.tabIndex = on ? 0 : -1;
-    if (on) delete b.dataset.tip; else b.dataset.tip = TAB_BY_ID[id].name;
+    if (on || id === tabSplitShown()) delete b.dataset.tip; else b.dataset.tip = TAB_BY_ID[id].name;
     if (fresh && anim) enterTabNode(n);
     prev = n;
   });
@@ -1106,8 +1309,12 @@ function hideTabTip() { tabTipFor = null; if (tabTipEl) tabTipEl.classList.remov
 
 // ---- jendela "Tambah tab" ----
 let tpItems = [], tpIndex = 0, tpPrevFocus = null, tpHideTimer = null;
-function openTabPicker(query) {
+let tpMode = "tab";   // "tab" = tambah tab, "split" = pilih tab untuk panel kanan (split view)
+function openTabPicker(query, mode) {
   if (!currentProjectId) return;
+  tpMode = mode === "split" && projTabs.active && !tabNarrowMq.matches ? "split" : "tab";
+  el("tpTitle").textContent = tpMode === "split" ? "Buka di samping" : "Tambah tab";
+  el("tpSub").textContent = tpMode === "split" ? "Pilih fitur untuk jendela kanan — " + TAB_BY_ID[projTabs.active].name + " tetap di kiri (maks. 2 jendela)" : "Pilih fitur yang ingin dibuka di urutan tab";
   if (tabSbDrawer) toggleTabSidebar(false);
   hideTabTip();
   tpPrevFocus = document.activeElement;
@@ -1142,9 +1349,13 @@ function renderTabPicker(reset) {
   if (reset || tpIndex >= tpItems.length) tpIndex = 0;
   el("tpGrid").innerHTML = tpItems.map((d, i) => {
     const isOpen = projTabs.open.includes(d.id), on = i === tpIndex;
-    return `<div class="tp-card${on ? " is-active" : ""}${isOpen ? " is-open" : ""}" role="option" id="tp-opt-${d.id}" data-tab="${d.id}" aria-selected="${on}">` +
+    // mode split: tab kiri & tab yang berbagi panel dengannya tidak bisa dipilih
+    const off = tpMode === "split" && !tabCanPair(projTabs.active, d.id);
+    const badge = tpMode === "split" ? (d.id === projTabs.active ? "Di kiri" : off ? "Panel sama" : d.id === tabSplitShown() ? "Di kanan" : "")
+      : isOpen ? "Terbuka" : "";
+    return `<div class="tp-card${on ? " is-active" : ""}${isOpen ? " is-open" : ""}${off ? " is-disabled" : ""}" role="option" id="tp-opt-${d.id}" data-tab="${d.id}" aria-selected="${on}"${off ? ' aria-disabled="true"' : ""}>` +
       `<span class="tp-card-ic">${tiPx(d.icon, 20)}</span>` +
-      `<span class="tp-card-text"><span class="tp-card-name">${d.name}${isOpen ? '<span class="tp-badge">Terbuka</span>' : ""}</span><span class="tp-card-desc">${d.desc}</span></span></div>`;
+      `<span class="tp-card-text"><span class="tp-card-name">${d.name}${badge ? `<span class="tp-badge">${badge}</span>` : ""}</span><span class="tp-card-desc">${d.desc}</span></span></div>`;
   }).join("");
   el("tpEmpty").classList.toggle("hidden", tpItems.length > 0);
   if (tpItems.length) el("tpSearch").setAttribute("aria-activedescendant", "tp-opt-" + tpItems[tpIndex].id);
@@ -1167,6 +1378,13 @@ function tabPickerCols() {
 }
 function chooseTabPicker(id) {
   if (!TAB_BY_ID[id]) return;
+  if (tpMode === "split") {
+    if (!tabCanPair(projTabs.active, id)) return;
+    closeTabPicker(false);
+    if (!projTabs.open.includes(id)) insertProjectTab(id, true);
+    openTabInSplit(id);
+    return;
+  }
   closeTabPicker(false);
   if (!projTabs.open.includes(id)) insertProjectTab(id, true);   // dari "+": tab baru di ujung kanan
   switchTab(id);
@@ -1276,16 +1494,20 @@ function renderTabSidebar() {
   if (!p) return;
   const q = el("tsbSearch").value.trim().toLowerCase();
   const has = (s) => !q || String(s || "").toLowerCase().includes(q);
-  const x14 = tiPx(tiIcon("x"), 14);
+  const x14 = tiPx(tiIcon("x"), 14), col14 = tiPx(tiIcon("layout-columns"), 14);
+  const sp = tabSplitShown(), canSplit = !tabNarrowMq.matches && !!projTabs.active;
   // Terbuka
   const open = projTabs.open.map((id) => ({ id, d: TAB_BY_ID[id], doc: tabCurrentDoc(id) })).filter((r) => has(r.d.name) || (r.doc && has(r.doc.title)));
   el("tsbOpenCount").textContent = projTabs.open.length ? String(projTabs.open.length) : "";
   el("tsbOpenList").innerHTML = open.map((r) => {
-    const on = r.id === projTabs.active;
-    return `<div class="tsb-row${on ? " is-active" : ""}" role="listitem" data-tab="${r.id}">` +
-      `<button type="button" class="tsb-row-main" data-act="tab"${on ? ' aria-current="true"' : ""}><span class="tsb-row-ic">${tiPx(r.d.icon, 16)}</span>` +
-      `<span class="tsb-row-text"><span class="tsb-row-name">${r.d.name}</span>${r.doc ? `<span class="tsb-row-sub">${escapeHtml(r.doc.title || "(tanpa judul)")}</span>` : ""}</span></button>` +
-      `<button type="button" class="tsb-row-x" data-act="close" aria-label="Tutup tab ${r.d.name}">${x14}</button></div>`;
+    const on = r.id === projTabs.active, side = r.id === sp;
+    // tombol "Buka di samping" (split view): tab di kanan -> tombolnya menutup panel kanan
+    const split = !canSplit || (on && !sp) ? "" : `<button type="button" class="tsb-row-x tsb-row-split${side ? " is-on" : ""}" data-act="split" aria-pressed="${side}" ` +
+      `data-tip="${side ? "Tutup dari samping" : on ? "Tukar posisi" : "Buka di samping"}" aria-label="${side ? "Tutup " + r.d.name + " dari samping" : on ? "Tukar posisi panel" : "Buka " + r.d.name + " di samping"}">${on ? tiPx(tiIcon("arrows-left-right"), 14) : col14}</button>`;
+    return `<div class="tsb-row${on || side ? " is-active" : ""}${side ? " is-split" : ""}" role="listitem" data-tab="${r.id}">` +
+      `<button type="button" class="tsb-row-main" data-act="tab"${on || side ? ' aria-current="true"' : ""}><span class="tsb-row-ic">${tiPx(r.d.icon, 16)}</span>` +
+      `<span class="tsb-row-text"><span class="tsb-row-name">${r.d.name}${sp && (on || side) ? `<span class="tsb-pane-tag">${on ? "Kiri" : "Kanan"}</span>` : ""}</span>${r.doc ? `<span class="tsb-row-sub">${escapeHtml(r.doc.title || "(tanpa judul)")}</span>` : ""}</span></button>` +
+      split + `<button type="button" class="tsb-row-x" data-act="close" aria-label="Tutup tab ${r.d.name}">${x14}</button></div>`;
   }).join("") || (q ? '<p class="tsb-empty-line">Tidak ada yang cocok.</p>'
     : `<div class="tsb-empty"><span class="tsb-empty-ic">${tiPx(tiIcon("layout-grid-add"), 20)}</span><p>Semua tab ditutup.</p><button type="button" class="tsb-empty-btn" data-act="add">${tiPx(tiIcon("plus"), 14)}<span>Tambah tab</span></button></div>`);
   // Riwayat (dokumen yang sudah dihapus tidak ditampilkan)
@@ -1306,7 +1528,7 @@ function renderTabSidebar() {
   }).join("") || (q && tabHist.length ? '<p class="tsb-empty-line">Tidak ada yang cocok.</p>'
     : `<div class="tsb-empty"><span class="tsb-empty-ic">${tiPx(tiIcon("history"), 20)}</span><p>Belum ada riwayat</p><span class="tsb-empty-hint">Tab, scene, timeline, peta &amp; cerita yang kamu buka akan muncul di sini.</span></div>`);
   // baris ikon bawah
-  el("tsbQuick").querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("is-on", b.dataset.tab === projTabs.active));
+  el("tsbQuick").querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("is-on", tabIsShown(b.dataset.tab)));
 }
 function refreshTabHistTimes() {
   if (!tabSidebarVisible() || el("editorView").classList.contains("hidden")) return;
@@ -1321,7 +1543,7 @@ function noteTabVisit(tab) {
   tabVisitTimer = setTimeout(() => {
     const v = tabVisitPending;
     tabVisitPending = null;
-    if (!v || v.pid !== currentProjectId || projTabs.active !== v.tab) return;
+    if (!v || v.pid !== currentProjectId || !tabIsShown(v.tab)) return;
     pushTabHist(Object.assign({ tab: v.tab }, tabCurrentDoc(v.tab) || {}));
   }, 0);
 }
@@ -1329,7 +1551,7 @@ function noteTabVisit(tab) {
 function noteTabDoc(tab, doc) {
   if (!currentProjectId || !doc || !doc.doc) return;
   if (tab === "timeline" || tab === "map" || tab === "quill" || tab === "home" || tab === "jejaring") tabLastDoc[tab] = { doc: doc.doc, kind: doc.kind, title: doc.title };
-  if (projTabs.active !== tab) return;
+  if (!tabIsShown(tab)) return;
   if (tabVisitPending && tabVisitPending.tab === tab) tabVisitPending = null;
   pushTabHist(Object.assign({ tab }, doc));
 }
@@ -1341,6 +1563,7 @@ function pushTabHist(e) {
   if (tabHist.length > TAB_HIST_MAX) tabHist.length = TAB_HIST_MAX;
   saveTabHist();
   if (tabSidebarVisible()) renderTabSidebar();
+  renderSplitChrome();   // judul dokumen di kepala jendela split
 }
 function removeTabHist(k) { tabHist = tabHist.filter((h) => h.k !== k); saveTabHist(); renderTabSidebar(); }
 // buka lagi entri riwayat: tabnya (dibuka kalau tertutup) + dokumennya
@@ -1378,7 +1601,7 @@ function onQuillScreen(e) {
 }
 function stepQuillNav() {
   const nav = quillNav;
-  if (!nav || projTabs.active !== "quill" || !quillScreen || !quillScreen.view) return;
+  if (!nav || !tabIsShown("quill") || !quillScreen || !quillScreen.view) return;
   const v = quillScreen.view, host = el("quillRoot");
   // form cerita baru (jangan buang isiannya) / terlalu banyak langkah -> selesai
   if (v === "create" || nav.steps++ > 6) { quillNav = null; return; }
@@ -1409,7 +1632,8 @@ function initProjectTabs() {
     const n = e.target.closest(".ptab");
     if (!n || n.classList.contains("is-leaving")) return;
     if (e.target.closest(".ptab-x")) closeProjectTab(n.dataset.tab);
-    else switchTab(n.dataset.tab);
+    else if (e.ctrlKey || e.metaKey || e.shiftKey) openTabInSplit(n.dataset.tab);   // Ctrl/Shift+klik: buka di samping
+    else openTabFocused(n.dataset.tab);
   });
   strip.addEventListener("mousedown", (e) => { if (e.button === 1 && e.target.closest(".ptab")) e.preventDefault(); });   // tanpa autoscroll
   strip.addEventListener("auxclick", (e) => {
@@ -1456,7 +1680,13 @@ function initProjectTabs() {
   el("btnTabSidebar").onclick = () => toggleTabSidebar();
   el("tsbCollapse").onclick = () => toggleTabSidebar(false);
   el("tabSidebarScrim").onclick = () => toggleTabSidebar(false);
-  tabNarrowMq.addEventListener("change", () => { tabSbDrawer = false; if (currentProjectId) applyTabSidebar(); });
+  tabNarrowMq.addEventListener("change", () => {
+    tabSbDrawer = false;
+    if (!currentProjectId) return;
+    applyTabSidebar();
+    if (projTabs.split) { applyTabPanels(); renderProjectTabs(); }   // split view hanya di layar lebar
+  });
+  initSplitView();
 
   // tooltip
   const v = el("editorView");
@@ -1514,7 +1744,12 @@ function initProjectTabs() {
     const row = b.closest(".tsb-row");
     if (!row) return;
     if (b.dataset.act === "close") closeProjectTab(row.dataset.tab);
-    else { switchTab(row.dataset.tab); if (tabNarrowMq.matches) toggleTabSidebar(false); }
+    else if (b.dataset.act === "split") {
+      const t = row.dataset.tab;
+      if (t === tabSplitShown()) closeSplitPane(); else openTabInSplit(t);
+    }
+    else if (e.ctrlKey || e.metaKey || e.shiftKey) openTabInSplit(row.dataset.tab);
+    else { openTabFocused(row.dataset.tab); if (tabNarrowMq.matches) toggleTabSidebar(false); }
   });
   el("tsbOpenList").addEventListener("auxclick", (e) => { const row = e.target.closest(".tsb-row"); if (e.button === 1 && row) { e.preventDefault(); closeProjectTab(row.dataset.tab); } });
   makeTabSortable(el("tsbOpenList"), ".tsb-row", "y", (order) => { projTabs.open = order.filter((t) => TAB_BY_ID[t]); saveProjectTabs(); renderProjectTabs(); }, () => !el("tsbSearch").value.trim());
@@ -1528,12 +1763,14 @@ function initProjectTabs() {
   });
   el("tsbClearHist").onclick = () => { tabHist = []; saveTabHist(); renderTabSidebar(); };
   el("tsbQuick").innerHTML = TAB_QUICK.map((id) => `<button type="button" class="tsb-quick-btn" data-tab="${id}" data-tip="${TAB_BY_ID[id].name}" data-tip-pos="top" aria-label="Buka ${TAB_BY_ID[id].name}">${tiPx(TAB_BY_ID[id].icon, 17)}</button>`).join("") +
-    `<span class="tsb-quick-sep" aria-hidden="true"></span><button type="button" class="tsb-quick-btn" data-act="add" data-tip="Tambah tab" data-tip-pos="top" aria-label="Tambah tab" aria-haspopup="dialog">${tiPx(tiIcon("plus"), 17)}</button>`;
+    `<span class="tsb-quick-sep" aria-hidden="true"></span><button type="button" class="tsb-quick-btn tsb-quick-split" data-act="split" data-tip="Buka di samping… (atau Ctrl/Shift+klik tab)" data-tip-pos="top" aria-label="Buka tab di samping" aria-haspopup="dialog">${tiPx(tiIcon("layout-columns"), 17)}</button><button type="button" class="tsb-quick-btn" data-act="add" data-tip="Tambah tab" data-tip-pos="top" aria-label="Tambah tab" aria-haspopup="dialog">${tiPx(tiIcon("plus"), 17)}</button>`;
   el("tsbQuick").addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
     if (b.dataset.act === "add") { openTabPicker(); return; }
-    switchTab(b.dataset.tab);
+    if (b.dataset.act === "split") { openTabPicker("", "split"); return; }
+    if (e.ctrlKey || e.metaKey || e.shiftKey) { openTabInSplit(b.dataset.tab); return; }
+    openTabFocused(b.dataset.tab);
     if (tabNarrowMq.matches) toggleTabSidebar(false);
   });
   setInterval(refreshTabHistTimes, 30000);   // "5 menit lalu" tetap akurat

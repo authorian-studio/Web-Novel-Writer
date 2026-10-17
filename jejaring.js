@@ -2201,7 +2201,11 @@
     return !!(ctx && dom && dom.panel.isConnected && tab && !tab.classList.contains("hidden") && ev && !ev.classList.contains("hidden"));
   }
   function blocked() { return !!document.querySelector(".modal:not(.hidden), .tp-overlay:not(.hidden), .proj-sidebar.is-open, #editorView.tsb-drawer-open"); }
-  function keyTargetOk(t) { return t === document.body || t === document.documentElement || (dom && dom.panel.contains(t)); }
+  // split view (2 jendela): pintasan tanpa fokus di dalam panel hanya untuk jendela yang terakhir disentuh
+  function keyTargetOk(t) {
+    if (t === document.body || t === document.documentElement) { const tab = document.getElementById("tabJejaring"); return !(tab && /\bpane-[ab]\b/.test(tab.className) && !tab.classList.contains("is-focus")); }
+    return !!(dom && dom.panel.contains(t));
+  }
   function syncMods(e) {
     const m = { shift: !!e.shiftKey, meta: MAC && !!e.metaKey, multi: !!(e.shiftKey || e.ctrlKey || e.metaKey) };
     if (m.shift === mods.shift && m.meta === mods.meta && m.multi === mods.multi) return;

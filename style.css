@@ -2699,3 +2699,100 @@ body.light .acc-cur-drop { border-color: rgba(0,0,0,.18); background: rgba(0,0,0
 /* .login-bg (z-index 0, paling awal di DOM) tergambar di bawah kolom art & form tanpa z-index tambahan — z-index pada
    .login-panel akan membuat blend "screen" logo terisolasi (kotak hitam terlihat) */
 .login-art-menu-sep { height: 1px; margin: 4px 6px; background: rgba(255,255,255,.1); }
+
+/* ============ TAB PROJECT — SPLIT VIEW (maks. 2 jendela berdampingan; app.js renderSplitChrome / initSplitView) ============
+   #tabContent.is-split: dua bingkai .split-win (kaca, kepala berisi judul + tukar/perbesar/tutup) dengan pembatas geser di
+   tengah (--split = lebar jendela kiri). Panel tab (.pane-a kiri, .pane-b kanan) diletakkan tepat di badan bingkainya.
+   Jendela yang terakhir disentuh (.is-focus) diberi garis warna project: klik tab berikutnya mengisi jendela itu. */
+#tabContent { --split: 50%; --sw-gap: 10px; --sw-head: 40px; }
+.split-win, .split-divider { display: none; }
+#tabContent.is-split .split-win:not([hidden]) {
+  display: block; position: absolute; z-index: 0; top: 2px; bottom: 12px; border-radius: 16px;
+  background: var(--glass); border: 1px solid var(--glass-border); box-shadow: 0 16px 40px rgba(0,0,0,.24);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  transition: border-color .2s ease, box-shadow .2s ease; animation: splitWinIn .32s cubic-bezier(.2,.8,.2,1);
+}
+#tabContent.is-split .split-win[data-pane="0"] { left: 12px; right: calc(100% - var(--split) + var(--sw-gap) / 2); }
+#tabContent.is-split .split-win[data-pane="1"] { left: calc(var(--split) + var(--sw-gap) / 2); right: 12px; }
+#tabContent.is-split .split-win.is-focus {
+  border-color: color-mix(in srgb, var(--ptab-tint, var(--accent)) 50%, rgba(255,255,255,.12));
+  box-shadow: 0 16px 40px rgba(0,0,0,.28), 0 0 0 1px color-mix(in srgb, var(--ptab-tint, var(--accent)) 22%, transparent);
+}
+@keyframes splitWinIn { from { opacity: 0; transform: scale(.985); } }
+.split-head {
+  display: flex; align-items: center; gap: 9px; height: var(--sw-head); padding: 0 6px 0 12px; box-sizing: border-box;
+  border-bottom: 1px solid var(--glass-border); -webkit-user-select: none; user-select: none; cursor: default;
+}
+.split-head-ic { width: 24px; height: 24px; flex-shrink: 0; border-radius: 7px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.07); color: var(--text-dim); transition: background .2s ease, color .2s ease; }
+.split-win.is-focus .split-head-ic { color: var(--text); background: color-mix(in srgb, var(--ptab-tint, var(--accent)) 32%, rgba(255,255,255,.05)); }
+.split-head-title { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; white-space: nowrap; overflow: hidden; }
+.split-head-title b { font-size: calc(13px * var(--fs-scale, 1)); font-weight: 700; color: var(--text); }
+.split-head-title span { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: calc(12px * var(--fs-scale, 1)); color: var(--text-dim); }
+.split-head-title span::before { content: "·"; margin-right: 8px; opacity: .6; }
+.split-head-acts { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.split-head-btn { width: 28px; height: 28px; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s ease, color .15s ease; }
+.split-head-btn:hover { background: rgba(255,255,255,.09); color: var(--text); }
+.split-head-btn[data-act="close"]:hover { background: rgba(225,92,92,.18); color: var(--danger); }
+.split-head-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+body.light .split-head-ic { background: rgba(0,0,0,.05); }
+body.light .split-head-btn:hover { background: rgba(0,0,0,.06); }
+body.light #tabContent.is-split .split-win:not([hidden]) { box-shadow: 0 12px 32px rgba(0,0,0,.08); }
+
+/* panel tab di badan jendela (di bawah kepala). Padding bawaan panel diperkecil — bingkai jendela sudah memberi tepi */
+#tabContent.is-split > .tab-panel.pane-a, #tabContent.is-split > .tab-panel.pane-b {
+  z-index: 1; top: calc(3px + var(--sw-head)); bottom: 13px; border-radius: 0 0 15px 15px; overflow: hidden; padding: 6px 8px 8px; gap: 8px;
+}
+#tabContent.is-split > .tab-panel.pane-a { left: 13px; right: calc(100% - var(--split) + var(--sw-gap) / 2 + 1px); }
+#tabContent.is-split > .tab-panel.pane-b { left: calc(var(--split) + var(--sw-gap) / 2 + 1px); right: 13px; }
+#tabContent.is-split > .home-panel.pane-a, #tabContent.is-split > .home-panel.pane-b { padding: 0; }
+/* Beranda & Tree Relations di dalam jendela: tidak lagi memenuhi layar di belakang bar atas */
+#tabContent.is-split #tabHome .hc-head { top: 8px; left: 8px; right: 8px; }
+#tabContent.is-split #tabHome .hc-rail { top: 50px; right: 8px; }
+#tabContent.is-split #tabHome .hc-hint { top: 50px; }
+#tabContent.is-split #tabHome .hc-panel.is-drop::after { inset: 8px; }
+#tabContent.is-split #tabJejaring .jj-panel { inset: 0; border-radius: 0; border-color: transparent; box-shadow: none; }
+/* saat menyeret pembatas: kanvas/iframe di panel tidak menelan pointer, tanpa transisi */
+#tabContent.is-resizing { cursor: col-resize; -webkit-user-select: none; user-select: none; }
+#tabContent.is-resizing > .tab-panel, #tabContent.is-resizing .split-win { pointer-events: none; transition: none; }
+
+/* pembatas geser di antara dua jendela */
+#tabContent.is-split .split-divider:not([hidden]) {
+  display: block; position: absolute; z-index: 3; top: 2px; bottom: 12px; left: calc(var(--split) - 7px); width: 14px; cursor: col-resize; touch-action: none; outline: none;
+}
+.split-divider::before {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 4px; height: 44px; border-radius: 2px; transform: translate(-50%, -50%);
+  background: rgba(255,255,255,.18); transition: background .15s ease, height .2s cubic-bezier(.2,.8,.2,1);
+}
+.split-divider:hover::before, .split-divider:focus-visible::before, #tabContent.is-resizing .split-divider::before { height: 88px; background: color-mix(in srgb, var(--ptab-tint, var(--accent)) 70%, #fff); }
+.split-divider:focus-visible::before { box-shadow: 0 0 0 2px var(--accent); }
+body.light .split-divider::before { background: rgba(0,0,0,.2); }
+
+/* bar tab atas: tab di jendela kanan = pill berlabel juga, garis putus-putus */
+.ptab.is-split .ptab-lw { grid-template-columns: 1fr; }
+.ptab.is-split .ptab-btn {
+  color: var(--text); border-radius: 11px; border-style: dashed;
+  background: color-mix(in srgb, var(--ptab-tint, var(--accent)) 14%, rgba(16,16,20,.62));
+  border-color: color-mix(in srgb, var(--ptab-tint, var(--accent)) 55%, rgba(255,255,255,.14));
+}
+.ptab.is-split .ptab-x { top: 7px; right: 6px; width: 20px; height: 20px; border-radius: 6px; background: transparent; box-shadow: none; color: var(--text-dim); }
+.ptab.is-split .ptab-x:hover { background: rgba(255,255,255,.14); color: var(--text); }
+body.light .ptab.is-split .ptab-btn { background: color-mix(in srgb, var(--ptab-tint, var(--accent)) 8%, rgba(255,255,255,.9)); }
+
+/* sidebar tab: tombol "Buka di samping" per baris + label Kiri/Kanan */
+.tsb-row-split + .tsb-row-x { margin-left: -4px; }
+.tsb-row-split { margin-right: 2px; }
+.tsb-row-split.is-on { opacity: 1; color: var(--text); background: color-mix(in srgb, var(--ptab-tint, var(--accent)) 26%, transparent); }
+.tsb-row.is-split::before { background: transparent; border-left: 3px dashed var(--ptab-tint, var(--accent)); width: 0; }
+.tsb-row.is-split { background: color-mix(in srgb, var(--ptab-tint, var(--accent)) 10%, rgba(255,255,255,.03)); }
+.tsb-pane-tag {
+  display: inline-block; margin-left: 6px; padding: 1px 5px; border-radius: 5px; vertical-align: 1px;
+  font-size: calc(9.5px * var(--fs-scale, 1)); font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text); background: color-mix(in srgb, var(--ptab-tint, var(--accent)) 30%, transparent);
+}
+.tsb-quick-split { color: var(--text); }
+/* jendela "Buka di samping": fitur yang tidak bisa dipasangkan */
+.tp-card.is-disabled { opacity: .42; cursor: not-allowed; }
+.tp-card.is-disabled .tp-badge { color: var(--text-dim); background: rgba(255,255,255,.08); }
+@media (prefers-reduced-motion: reduce) { #tabContent.is-split .split-win:not([hidden]) { animation: none; } }
+/* status simpan di dalam jendela kanan (tidak menimpa bingkainya) */
+@media (min-width: 701px) { #editorView[data-tab="split"] .save-status { right: 26px; bottom: 20px; } }

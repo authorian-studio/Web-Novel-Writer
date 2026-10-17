@@ -813,6 +813,8 @@
     // Esc menutup popover layer saja (pilihan di peta tidak ikut dilepas)
     if (e.key === "Escape" && !$("mpLayersPop").classList.contains("hidden")) { e.stopPropagation(); closeLayers(); return; }
     if (!mapVisible()) return;
+    // split view (2 jendela): tombol hanya untuk peta bila jendelanya yang terakhir disentuh
+    if (/\bpane-[ab]\b/.test($("tabMap").className) && !$("tabMap").classList.contains("is-focus")) return;
     // modal app (pratinjau, backup, dll.) atau sidebar project menutupi peta: tombol tidak diteruskan ke editor peta
     // (mis. Delete tidak menghapus objek terpilih di belakang modal); Ctrl/Cmd+S app tetap jalan
     const side = $("projSidebar");

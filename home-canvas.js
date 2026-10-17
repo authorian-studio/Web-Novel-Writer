@@ -2297,7 +2297,11 @@
     return !!(ctx && root && dom && dom.panel.isConnected && tab && !tab.classList.contains("hidden") && ev && !ev.classList.contains("hidden"));
   }
   function blocked() { return !!document.querySelector(".modal:not(.hidden), .tp-overlay:not(.hidden), .proj-sidebar.is-open, #editorView.tsb-drawer-open"); }
-  function keyTargetOk(t) { return t === document.body || t === document.documentElement || (dom && dom.panel.contains(t)); }
+  // split view (2 jendela): pintasan tanpa fokus di dalam panel hanya untuk jendela yang terakhir disentuh
+  function keyTargetOk(t) {
+    if (t === document.body || t === document.documentElement) { const tab = document.getElementById("tabHome"); return !(tab && /\bpane-[ab]\b/.test(tab.className) && !tab.classList.contains("is-focus")); }
+    return !!(dom && dom.panel.contains(t));
+  }
   // sinkronkan Shift/Ctrl/⌘ dari event apa pun (keydown/keyup/pointer) -> render ulang hanya bila berubah
   function syncMods(e) {
     const m = { shift: !!e.shiftKey, meta: MAC && !!e.metaKey, multi: !!(e.shiftKey || e.ctrlKey || e.metaKey) };

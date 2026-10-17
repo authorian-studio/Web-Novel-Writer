@@ -327,3 +327,24 @@ body.light .kx { --kx-soft: rgba(0,0,0,.03); --kx-hover: rgba(0,0,0,.045); --kx-
 .kx-sw-reset:not(:disabled):hover { border-color: var(--kc); color: var(--text) !important; }
 .kx-sw-reset:disabled { opacity: .45; cursor: default; }
 .kx-row.is-on { background: color-mix(in srgb, var(--kc) 16%, transparent); }
+
+/* ---------- split view (Kodeks di salah satu dari 2 jendela): ikut lebar jendela, bukan lebar layar ---------- */
+#tabContent.is-split > #tabOrganize { container: kxpane / inline-size; }
+@container kxpane (max-width: 1000px) {
+  .kx-nav { width: 62px; }
+  .kx-brand div, .kx-kind-name, .kx-kind-n { display: none; }
+  .kx-brand { justify-content: center; padding: 16px 0 10px; }
+  .kx-kind { justify-content: center; padding: 0; }
+  .kx-view span, .kx-btn-soft span { display: none; }
+  .kx-view, .kx-btn-soft { padding: 0 9px; }
+  .kx-detail { padding: 0 18px 40px; }
+}
+/* jendela sempit: daftar ATAU detail (seperti HP), tombol × di detail kembali ke daftar */
+@container kxpane (max-width: 760px) {
+  .kx-search { width: 100%; order: 3; }
+  .kx-body .kx-coll { flex: 1 !important; border-right: none !important; }
+  .kx-body .kx-detail { display: none; }
+  .kx-body.has-sel .kx-coll { display: none; }
+  .kx-body.has-sel .kx-detail { display: block !important; flex: 1 !important; border: none !important; }
+  .kx-body[data-view="list"] .kx-d-close { display: inline-flex; }
+}
