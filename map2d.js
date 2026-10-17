@@ -1648,6 +1648,8 @@
       else if (BRUSH_TOOLS[tool]) c = "none";
       else if (tool === "select") c = hoverHit ? (sel && hoverHit.type === sel.type && hoverHit.id === sel.id ? "move" : "pointer") : "default";
       else c = "crosshair";
+      const V = { move: "move", pointer: "pointer", default: "default", crosshair: "cross" };   // set kursor Novelist (cursor.js)
+      if (V[c]) c = `var(--cur-${V[c]}, ${c})`;
       if (cv.style.cursor !== c) cv.style.cursor = c;
     }
     function localPos(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }

@@ -1455,7 +1455,7 @@ export function createMap3D(container, opts) {
     requestAnimationFrame(() => {
       hoverPending = false;
       if (disposed || !lastMove || PAINT[tool]) return;
-      canvas.style.cursor = pickPlace(lastMove.clientX, lastMove.clientY) ? "pointer" : "";
+      canvas.style.cursor = pickPlace(lastMove.clientX, lastMove.clientY) ? "var(--cur-pointer, pointer)" : "";
     });
   }
   function onLeave() { lastMove = null; if (!stroke) canvas.style.cursor = ""; }

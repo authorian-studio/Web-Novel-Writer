@@ -1,29 +1,26 @@
 /* cursor.js — KURSOR KUSTOM (Pengaturan Akun → Kursor). Dimuat di <head>, sebelum halaman tampil.
    Mode (disimpan di perangkat, localStorage "novelist_cursor"):
-     "novelist" (bawaan) = kursor khas Novelist: mata pena kecil krem bergaris gelap + titik emas; di atas tombol /
-                           tautan jadi pena emas. Teks (kolom ketik, editor) tetap kursor I-beam, seret/ubah ukuran
-                           tetap kursor sistem.
+     "novelist" (bawaan) = set kursor "W11 Cursor Free" (Jepri Creations; PNG 32 px di folder cursors/, dikonversi dari
+                           .cur/.ani Windows): versi putih (cursors/light) di tema gelap, versi hitam (cursors/dark) di
+                           tema terang — otomatis ikut body.light. Panah, tangan, I-beam, dilarang, sibuk, crosshair,
+                           geser & ubah ukuran semuanya ikut set ini (variabel --cur-* di style.css, html.cur-set).
      "system"            = kursor bawaan sistem operasi.
      "custom"            = gambar pilihan pengguna (diperkecil ke 24/32/48 px, PNG), titik tunjuk di ujung kiri atas
                            atau di tengah; dipakai untuk kursor biasa & di atas tombol.
    Hanya untuk perangkat dengan mouse/trackpad (any-pointer: fine) — layar sentuh tidak terpengaruh.
-   CSS-nya di style.css bagian "KURSOR KUSTOM" (html.cur-on + variabel --cur-default / --cur-pointer).
+   CSS-nya di style.css bagian "KURSOR KUSTOM" (html.cur-on + variabel --cur-*; semua "cursor: x" di file CSS ditulis
+   var(--cur-x, x) sehingga tanpa variabel tetap kursor sistem).
    API: window.NovelCursor = { get(), set({ mode, img, size, hot }), readImage(file, size) -> Promise<dataURL> } */
 (function () {
   "use strict";
   const KEY = "novelist_cursor";
-  const svgUrl = (svg) => "url(\"data:image/svg+xml," + encodeURIComponent(svg).replace(/'/g, "%27").replace(/"/g, "'") + "\")";
-  // mata pena: ujung di (2,2); badan krem, garis gelap + lingkar tipis terang (terlihat di tema gelap & terang), titik emas
-  const NIB = (fill, dot) => `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><path d="M2.2 2.2 L21 9.6 Q22.2 10.1 21 10.7 L13.3 13.3 L10.7 21 Q10.1 22.2 9.6 21 Z" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="3.4" stroke-linejoin="round"/><path d="M2.2 2.2 L21 9.6 Q22.2 10.1 21 10.7 L13.3 13.3 L10.7 21 Q10.1 22.2 9.6 21 Z" fill="${fill}" stroke="#141418" stroke-width="1.6" stroke-linejoin="round"/><circle cx="13.1" cy="13.1" r="1.9" fill="${dot}" stroke="#141418" stroke-width="1"/></svg>`;
-  const DEF = svgUrl(NIB("#f5efe3", "#d7a86e")) + " 2 2, auto";
-  const PTR = svgUrl(NIB("#d7a86e", "#f5efe3")) + " 2 2, pointer";
   function get() {
     try { const v = JSON.parse(localStorage.getItem(KEY) || "null"); if (v && typeof v === "object") return v; } catch (e) { /* abaikan */ }
     return { mode: "novelist" };
   }
   function apply(c) {
     const r = document.documentElement;
-    r.classList.remove("cur-on");
+    r.classList.remove("cur-on", "cur-set");
     r.style.removeProperty("--cur-default"); r.style.removeProperty("--cur-pointer");
     if (c.mode === "system") return;
     if (c.mode === "custom" && typeof c.img === "string" && /^data:image\/png;base64,/.test(c.img)) {
@@ -32,8 +29,7 @@
       r.style.setProperty("--cur-default", u + ", auto");
       r.style.setProperty("--cur-pointer", u + ", pointer");
     } else {
-      r.style.setProperty("--cur-default", DEF);
-      r.style.setProperty("--cur-pointer", PTR);
+      r.classList.add("cur-set");   // variabel --cur-* untuk set W11 ada di style.css (ikut tema)
     }
     r.classList.add("cur-on");
   }
@@ -64,6 +60,6 @@
   function resize(dataUrl, size) {
     return fetch(dataUrl).then((r) => r.blob()).then((b) => readImage(new File([b], "c.png", { type: b.type || "image/png" }), size));
   }
-  window.NovelCursor = { get, set, readImage, resize, preview: { novelist: DEF, pointer: PTR } };
+  window.NovelCursor = { get, set, readImage, resize, preview: { novelist: "cursors/light/arrow.png" } };
   apply(get());
 })();

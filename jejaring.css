@@ -56,7 +56,7 @@ body.light .jj-panel {
 .jj-flow { position: absolute; inset: 0; z-index: 1; }
 .jj-flow > .react-flow, .jj-pv > .react-flow { position: absolute; inset: 0; width: auto; height: auto; background: transparent; }
 .jj-bg circle { fill: var(--jj-dot); }
-.jj-rf .react-flow__pane { cursor: default; }
+.jj-rf .react-flow__pane { cursor: var(--cur-default, default); }
 .jj-rf .react-flow__pane.dragging { cursor: grabbing; }
 .jj-rf.is-hand .react-flow__pane, .jj-rf.is-hand .react-flow__node, .jj-rf.is-hand .jj-name, .jj-rf.is-hand .jj-photo-add { cursor: grab; }
 .jj-rf.is-hand .react-flow__pane.dragging { cursor: grabbing; }
@@ -68,7 +68,7 @@ body.light .jj-panel {
 .jj-rf .react-flow__nodesselection-rect { background: rgba(215,168,110,.04); border: 1px dashed rgba(215,168,110,.45); border-radius: 4px; }
 .jj-rf .react-flow__connection-path { stroke: var(--accent); }
 .jj-pv-rf .react-flow__pane { cursor: grab; }
-.jj-pv-rf .react-flow__node { cursor: default; }
+.jj-pv-rf .react-flow__node { cursor: var(--cur-default, default); }
 
 /* ---- kepala panel ---- */
 .jj-head { position: absolute; z-index: 16; top: 0; left: 0; right: 0; height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 8px 0 10px; pointer-events: none; }
@@ -78,12 +78,12 @@ body.light .jj-panel {
   height: 30px; border-radius: 9px; border: 1px solid var(--jj-glass-b); background: var(--jj-glass); color: var(--text);
   font-size: calc(13px * var(--fs-scale, 1)); font-weight: 700; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
 }
-.jj-doc-btn { display: inline-flex; align-items: center; gap: 7px; max-width: min(340px, 46vw); padding: 0 8px 0 9px; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+.jj-doc-btn { display: inline-flex; align-items: center; gap: 7px; max-width: min(340px, 46vw); padding: 0 8px 0 9px; cursor: var(--cur-pointer, pointer); transition: background .15s ease, border-color .15s ease; }
 .jj-doc-btn > .ti:last-child { color: var(--text-dim); transition: transform .2s ease; }
 .jj-doc-btn[aria-expanded="true"] > .ti:last-child { transform: rotate(180deg); }
 .jj-doc-btn:hover, .jj-doc-btn[aria-expanded="true"] { border-color: rgba(255,255,255,.2); }
 body.light .jj-doc-btn:hover, body.light .jj-doc-btn[aria-expanded="true"] { border-color: rgba(0,0,0,.18); }
-.jj-doc-btn.is-static { cursor: default; }
+.jj-doc-btn.is-static { cursor: var(--cur-default, default); }
 .jj-doc-btn.is-static > .ti:last-child { display: none; }
 .jj-doc-btn.is-static:hover { border-color: var(--jj-glass-b); }
 .jj-doc-ic { display: flex; color: var(--accent); }
@@ -92,7 +92,7 @@ body.light .jj-doc-btn:hover, body.light .jj-doc-btn[aria-expanded="true"] { bor
 .jj-doc-sub { pointer-events: none; font-size: calc(11.5px * var(--fs-scale, 1)); color: var(--text-dim); white-space: nowrap; text-shadow: 0 1px 6px rgba(0,0,0,.5); }
 body.light .jj-doc-sub { text-shadow: none; }
 .jj-head-right { gap: 3px; }
-.jj-ibtn { width: 30px; height: 30px; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.jj-ibtn { width: 30px; height: 30px; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: var(--cur-pointer, pointer); transition: background .15s ease, color .15s ease; }
 .jj-ibtn:hover, .jj-ibtn[aria-expanded="true"] { background: var(--jj-hover); color: var(--text); }
 .jj-ibtn-sm { width: 26px; height: 26px; flex-shrink: 0; border-radius: 7px; }
 .jj-ibtn-sm[aria-pressed="true"] { color: var(--accent); }
@@ -101,7 +101,7 @@ body.light .jj-doc-sub { text-shadow: none; }
 
 /* ---- tombol zoom (kanan bawah, seperti referensi) ---- */
 .jj-side { position: absolute; z-index: 6; right: 10px; bottom: 44px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px; border-radius: 12px; background: var(--jj-glass); border: 1px solid var(--jj-glass-b); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-.jj-sbtn { width: 30px; height: 30px; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.jj-sbtn { width: 30px; height: 30px; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: var(--cur-pointer, pointer); transition: background .15s ease, color .15s ease; }
 .jj-sbtn:hover { background: var(--jj-hover); color: var(--text); }
 .jj-panel.is-wiz .jj-side, .jj-panel.is-nodoc .jj-side, .jj-panel.is-wiz .jj-bottom, .jj-panel.is-nodoc .jj-bottom,
 .jj-panel.is-wiz .jj-hint, .jj-panel.is-wiz .jj-empty { display: none; }
@@ -110,11 +110,11 @@ body.light .jj-doc-sub { text-shadow: none; }
 .jj-bottom { position: absolute; z-index: 6; left: 10px; right: 10px; bottom: 12px; display: flex; flex-direction: column; align-items: center; gap: 7px; pointer-events: none; }
 .jj-sheets { pointer-events: auto; display: flex; align-items: center; gap: 3px; max-width: 100%; padding: 2px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
 .jj-sheets::-webkit-scrollbar { display: none; }
-.jj-sheet { flex-shrink: 0; height: 26px; max-width: 170px; padding: 0 12px; border: 1px solid transparent; border-radius: 13px; background: none; color: var(--text-dim); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.jj-sheet { flex-shrink: 0; height: 26px; max-width: 170px; padding: 0 12px; border: 1px solid transparent; border-radius: 13px; background: none; color: var(--text-dim); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: var(--cur-pointer, pointer); transition: background .15s ease, color .15s ease; }
 .jj-sheet:hover { background: var(--jj-hover); color: var(--text); }
 .jj-sheet.is-on { background: var(--jj-glass); border-color: var(--jj-glass-b); color: var(--text); box-shadow: 0 4px 14px rgba(0,0,0,.22); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 .jj-sheet.is-on[aria-expanded="true"] { border-color: var(--accent); }
-.jj-sheet-add { flex-shrink: 0; width: 26px; height: 26px; padding: 0; border: none; border-radius: 50%; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.jj-sheet-add { flex-shrink: 0; width: 26px; height: 26px; padding: 0; border: none; border-radius: 50%; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: var(--cur-pointer, pointer); transition: background .15s ease, color .15s ease; }
 .jj-sheet-add:hover { background: var(--jj-hover); color: var(--text); }
 .jj-sheet-input { flex-shrink: 0; width: 130px; height: 26px; padding: 0 10px; border: 1px solid var(--accent); border-radius: 13px; outline: none; background: var(--jj-pop); color: var(--text); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 650; }
 .jj-tools-wrap { display: flex; justify-content: center; max-width: 100%; pointer-events: none; }
@@ -125,7 +125,7 @@ body.light .jj-doc-sub { text-shadow: none; }
   overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
 }
 .jj-tools::-webkit-scrollbar { display: none; }
-.jj-tool { position: relative; flex-shrink: 0; width: 40px; height: 38px; padding: 0; border: none; border-radius: 11px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.jj-tool { position: relative; flex-shrink: 0; width: 40px; height: 38px; padding: 0; border: none; border-radius: 11px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: var(--cur-pointer, pointer); transition: background .15s ease, color .15s ease; }
 .jj-tool:hover, .jj-tool[aria-expanded="true"] { background: var(--jj-hover); color: var(--text); }
 .jj-tool[aria-pressed="true"] { background: var(--jj-on); color: var(--text); box-shadow: inset 0 0 0 1px var(--jj-glass-b); }
 .jj-tool.is-on { color: var(--accent); }
@@ -143,14 +143,14 @@ body.light .jj-doc-sub { text-shadow: none; }
 .jj-panel.is-drop::after { content: ""; position: absolute; z-index: 8; inset: 8px; border: 2px dashed var(--accent); border-radius: 12px; background: var(--jj-tint); pointer-events: none; }
 
 /* ---- tombol ---- */
-.jj-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px; padding: 0 20px; border: none; border-radius: 11px; background: var(--accent); color: #1c140a; font-size: calc(13.5px * var(--fs-scale, 1)); font-weight: 700; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.22); transition: filter .15s ease, transform .15s ease; }
+.jj-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px; padding: 0 20px; border: none; border-radius: 11px; background: var(--accent); color: #1c140a; font-size: calc(13.5px * var(--fs-scale, 1)); font-weight: 700; cursor: var(--cur-pointer, pointer); box-shadow: 0 6px 18px rgba(0,0,0,.22); transition: filter .15s ease, transform .15s ease; }
 .jj-btn-primary:hover { filter: brightness(1.08); }
 .jj-btn-primary:active { transform: translateY(1px); }
 body.light .jj-btn-primary { color: #fff; }
-.jj-btn-sm { flex-shrink: 0; height: 30px; padding: 0 12px; border: none; border-radius: 8px; background: var(--accent); color: #1c140a; font-size: calc(12.5px * var(--fs-scale, 1)); font-weight: 700; cursor: pointer; }
+.jj-btn-sm { flex-shrink: 0; height: 30px; padding: 0 12px; border: none; border-radius: 8px; background: var(--accent); color: #1c140a; font-size: calc(12.5px * var(--fs-scale, 1)); font-weight: 700; cursor: var(--cur-pointer, pointer); }
 body.light .jj-btn-sm { color: #fff; }
 .jj-btn-primary.jj-btn-sm { height: 32px; padding: 0 14px; border-radius: 9px; }
-.jj-link-btn { margin-left: auto; padding: 2px 6px; border: none; border-radius: 6px; background: none; color: var(--accent); font-size: calc(11.5px * var(--fs-scale, 1)); font-weight: 650; letter-spacing: 0; text-transform: none; cursor: pointer; }
+.jj-link-btn { margin-left: auto; padding: 2px 6px; border: none; border-radius: 6px; background: none; color: var(--accent); font-size: calc(11.5px * var(--fs-scale, 1)); font-weight: 650; letter-spacing: 0; text-transform: none; cursor: var(--cur-pointer, pointer); }
 .jj-link-btn:hover { background: var(--jj-hover); }
 
 /* ---- menu / popover ---- */
@@ -164,9 +164,9 @@ body.light .jj-btn-sm { color: #fff; }
 .jj-pop.is-wicon, .jj-pop.is-wcolor, .jj-pop.is-emoji { min-width: 0; padding: 10px; }
 .jj-pop.is-labels, .jj-pop.is-tagsel { width: 292px; }
 .jj-pop.is-help { width: 360px; }
-.jj-mi { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 32px; padding: 5px 9px 5px 8px; border: none; border-radius: 8px; background: none; color: var(--text); font-size: calc(13px * var(--fs-scale, 1)); text-align: left; cursor: pointer; }
+.jj-mi { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 32px; padding: 5px 9px 5px 8px; border: none; border-radius: 8px; background: none; color: var(--text); font-size: calc(13px * var(--fs-scale, 1)); text-align: left; cursor: var(--cur-pointer, pointer); }
 .jj-mi:hover, .jj-mi:focus-visible { background: var(--jj-hover); outline: none; }
-.jj-mi[disabled] { opacity: .4; cursor: default; background: none; }
+.jj-mi[disabled] { opacity: .4; cursor: var(--cur-default, default); background: none; }
 .jj-mi.is-danger, .jj-mi.is-danger .jj-mi-ic { color: var(--danger); }
 .jj-mi-ic { width: 18px; flex-shrink: 0; display: flex; justify-content: center; color: var(--text-dim); }
 .jj-mi-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3; }
@@ -181,14 +181,14 @@ body.light .jj-btn-sm { color: #fff; }
 .jj-pick-head { margin: 0 2px 8px; font-size: calc(10.5px * var(--fs-scale, 1)); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
 .jj-pick-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 228px; }
 .jj-icon-grid { display: grid; grid-template-columns: repeat(6, 36px); gap: 4px; }
-.jj-pick { width: 36px; height: 36px; padding: 0; border: 1px solid transparent; border-radius: 9px; background: var(--jj-hover); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+.jj-pick { width: 36px; height: 36px; padding: 0; border: 1px solid transparent; border-radius: 9px; background: var(--jj-hover); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: var(--cur-pointer, pointer); transition: background .15s ease, border-color .15s ease; }
 .jj-pick:hover { background: var(--jj-on); }
 .jj-pick.is-on { border-color: var(--accent); background: rgba(215,168,110,.16); background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .jj-emoji-grid { display: grid; grid-template-columns: repeat(5, 38px); gap: 4px; margin-bottom: 4px; }
-.jj-emoji { width: 38px; height: 38px; padding: 0; border: 1px solid transparent; border-radius: 9px; background: var(--jj-hover); font-size: calc(19px * var(--fs-scale, 1)); line-height: 1; cursor: pointer; transition: background .15s ease, transform .12s ease; }
+.jj-emoji { width: 38px; height: 38px; padding: 0; border: 1px solid transparent; border-radius: 9px; background: var(--jj-hover); font-size: calc(19px * var(--fs-scale, 1)); line-height: 1; cursor: var(--cur-pointer, pointer); transition: background .15s ease, transform .12s ease; }
 .jj-emoji:hover { background: var(--jj-on); transform: scale(1.06); }
 .jj-emoji.is-on { border-color: var(--accent); }
-.jj-sw { flex-shrink: 0; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 2px solid transparent; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); cursor: pointer; transition: transform .12s ease; }
+.jj-sw { flex-shrink: 0; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 2px solid transparent; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); cursor: var(--cur-pointer, pointer); transition: transform .12s ease; }
 .jj-sw:hover { transform: scale(1.12); }
 .jj-sw.is-on, .jj-sw[aria-pressed="true"] { border-color: var(--text); }
 .jj-sw.is-note { border-radius: 6px; }
@@ -202,13 +202,13 @@ body.light .jj-btn-sm { color: #fff; }
 /* popover relasi ("RELASI": kisi jenis + Buat kustom + Tautkan + Lewati) */
 .jj-pop-head { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; font-size: calc(13px * var(--fs-scale, 1)); font-weight: 700; }
 .jj-pop-head.is-cap { min-height: 0; padding: 6px 8px 6px; font-size: calc(10.5px * var(--fs-scale, 1)); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
-.jj-pop-back { width: 26px; height: 26px; flex-shrink: 0; padding: 0; border: none; border-radius: 7px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.jj-pop-back { width: 26px; height: 26px; flex-shrink: 0; padding: 0; border: none; border-radius: 7px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: var(--cur-pointer, pointer); }
 .jj-pop-back:hover { background: var(--jj-hover); color: var(--text); }
 .jj-pop-sub { margin: -2px 8px 8px; font-size: calc(12px * var(--fs-scale, 1)); line-height: 1.4; color: var(--text-dim); }
 .jj-pop-sub b { color: var(--text); }
 .jj-pop-note { margin: 2px 8px 4px; font-size: calc(11.5px * var(--fs-scale, 1)); line-height: 1.4; color: var(--text-dim); }
 .jj-relgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding-bottom: 4px; }
-.jj-rel { display: flex; align-items: center; gap: 8px; min-width: 0; height: 32px; padding: 0 8px; border: none; border-radius: 8px; background: none; color: var(--text); font-size: calc(13px * var(--fs-scale, 1)); text-align: left; cursor: pointer; transition: background .12s ease; }
+.jj-rel { display: flex; align-items: center; gap: 8px; min-width: 0; height: 32px; padding: 0 8px; border: none; border-radius: 8px; background: none; color: var(--text); font-size: calc(13px * var(--fs-scale, 1)); text-align: left; cursor: var(--cur-pointer, pointer); transition: background .12s ease; }
 .jj-rel .ti { flex-shrink: 0; color: var(--c, var(--text-dim)); }
 .jj-rel span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .jj-rel:hover, .jj-rel:focus-visible { background: var(--jj-hover); outline: none; }
@@ -216,7 +216,7 @@ body.light .jj-btn-sm { color: #fff; }
 .jj-relchip { display: flex; align-items: center; gap: 6px; margin: 0 6px 8px; padding: 4px 4px 4px 8px; border-radius: 8px; background: rgba(215,168,110,.14); background: color-mix(in srgb, var(--accent) 16%, transparent); font-size: calc(12.5px * var(--fs-scale, 1)); font-weight: 650; }
 .jj-relchip .ti { flex-shrink: 0; color: var(--accent); }
 .jj-relchip span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.jj-relchip button { width: 22px; height: 22px; flex-shrink: 0; padding: 0; border: none; border-radius: 6px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.jj-relchip button { width: 22px; height: 22px; flex-shrink: 0; padding: 0; border: none; border-radius: 6px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: var(--cur-pointer, pointer); }
 .jj-relchip button:hover { background: var(--jj-hover); color: var(--text); }
 .jj-custom, .jj-newtag { display: flex; align-items: center; gap: 6px; padding: 2px 4px 4px; }
 .jj-custom-in, .jj-newtag input { flex: 1; min-width: 0; height: 30px; padding: 0 9px; border: 1px solid var(--jj-glass-b); border-radius: 8px; outline: none; background: var(--jj-hover); color: var(--text); font-size: calc(13px * var(--fs-scale, 1)); }
@@ -236,7 +236,7 @@ body.light .jj-btn-sm { color: #fff; }
 
 /* ---- bilah aksi kartu terpilih (NodeToolbar): Buat kartu · Tautkan kartu · foto · lencana · label · hapus ---- */
 .jj-selbar { display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 12px; background: var(--jj-pop); border: 1px solid var(--jj-glass-b); box-shadow: var(--jj-shadow); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-.jj-sb-btn { height: 28px; min-width: 28px; padding: 0 6px; border: none; border-radius: 7px; background: none; color: var(--text-dim); display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; font-size: calc(12px * var(--fs-scale, 1)); font-weight: 650; white-space: nowrap; transition: background .15s ease, color .15s ease; }
+.jj-sb-btn { height: 28px; min-width: 28px; padding: 0 6px; border: none; border-radius: 7px; background: none; color: var(--text-dim); display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: var(--cur-pointer, pointer); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 650; white-space: nowrap; transition: background .15s ease, color .15s ease; }
 .jj-sb-btn:hover, .jj-sb-btn[aria-expanded="true"] { background: var(--jj-hover); color: var(--text); }
 .jj-sb-btn[aria-pressed="true"] { background: var(--jj-on); color: var(--text); }
 .jj-sb-btn.is-wide { padding: 0 9px; color: var(--text); }
@@ -255,7 +255,7 @@ body.light .jj-card.has-photo .jj-photo { border-color: rgba(0,0,0,.12); }
 .jj-card.is-linked.is-empty .jj-photo { border-style: solid; }
 .jj-photo img { display: block; width: 100%; height: 100%; border-radius: 10px; object-fit: cover; pointer-events: none; -webkit-user-drag: none; }
 .jj-photo-add { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0 0 8px; border: none; border-radius: 10px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: inherit; }
-.jj-card.is-sel .jj-photo-add { cursor: pointer; }
+.jj-card.is-sel .jj-photo-add { cursor: var(--cur-pointer, pointer); }
 .jj-card.is-sel .jj-photo-add:hover { color: var(--text); background: var(--jj-hover); }
 .jj-card.is-sel .jj-photo { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 12px 30px rgba(0,0,0,.32); }
 .jj-card.is-dim, .jj-rf .react-flow__node.is-dim { opacity: .28; }
@@ -263,7 +263,7 @@ body.light .jj-card.has-photo .jj-photo { border-color: rgba(0,0,0,.12); }
 .jj-name { position: absolute; z-index: 2; left: 50%; top: 107px; transform: translateX(-50%); display: block; max-width: 118px; height: 22px; padding: 0 10px; border: 1px solid var(--jj-glass-b); border-radius: 11px; background: var(--jj-pill); color: var(--text); font-size: calc(11px * var(--fs-scale, 1)); font-weight: 650; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: inherit; box-shadow: 0 3px 10px rgba(0,0,0,.25); }
 body.light .jj-name { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
 .jj-name.is-ph { color: var(--text-dim); font-style: italic; font-weight: 500; }
-.jj-card.is-sel .jj-name { cursor: text; border-color: rgba(215,168,110,.5); }
+.jj-card.is-sel .jj-name { cursor: var(--cur-text, text); border-color: rgba(215,168,110,.5); }
 .jj-name-edit { position: absolute; z-index: 3; left: 50%; top: 106px; transform: translateX(-50%); width: 132px; height: 24px; padding: 0 8px; border: 1px solid var(--accent); border-radius: 12px; outline: none; background: var(--jj-pop); color: var(--text); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 650; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,.3); }
 .jj-tags { position: absolute; left: 5px; right: 5px; top: 5px; display: flex; flex-wrap: wrap; gap: 3px; pointer-events: none; }
 .jj-tag { max-width: 100%; padding: 1px 6px; border-radius: 6px; background: var(--c); color: #16130e; font-size: calc(9.5px * var(--fs-scale, 1)); font-weight: 750; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 2px 6px rgba(0,0,0,.25); }
@@ -284,7 +284,7 @@ body.light .jj-name { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
   width: 20px; height: 20px; min-width: 0; min-height: 0; padding: 0; z-index: 4; border-radius: 50%;
   border: 1px solid var(--jj-glass-b); background: var(--jj-pop); color: var(--text-dim);
   display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px rgba(0,0,0,.3);
-  opacity: 0; visibility: hidden; pointer-events: none; cursor: pointer; transition: opacity .12s ease, background .12s ease, color .12s ease;
+  opacity: 0; visibility: hidden; pointer-events: none; cursor: var(--cur-pointer, pointer); transition: opacity .12s ease, background .12s ease, color .12s ease;
 }
 .jj-rf .react-flow__handle.jj-plus .ti { pointer-events: none; }
 .jj-rf .react-flow__handle.jj-plus.is-on { opacity: 1; visibility: visible; pointer-events: all; }
@@ -298,13 +298,13 @@ body.light .jj-name { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
 .jj-rf .react-flow__edge-rel .react-flow__edge-path { stroke: var(--jj-edge); stroke-width: 1.5; }
 .jj-rf .react-flow__edge-rel:hover .react-flow__edge-path { stroke-width: 2.2; }
 .jj-rf .react-flow__edge-rel.selected .react-flow__edge-path { stroke: var(--accent) !important; stroke-width: 2.2; }
-.jj-elabel { position: absolute; display: inline-flex; align-items: center; gap: 4px; height: 20px; max-width: 150px; padding: 0 7px 0 5px; border: 1px solid var(--jj-glass-b); border-radius: 6px; background: var(--jj-pill); color: var(--text); font-family: inherit; font-size: calc(10.5px * var(--fs-scale, 1)); font-weight: 650; white-space: nowrap; pointer-events: all; cursor: pointer; box-shadow: 0 3px 9px rgba(0,0,0,.22); }
+.jj-elabel { position: absolute; display: inline-flex; align-items: center; gap: 4px; height: 20px; max-width: 150px; padding: 0 7px 0 5px; border: 1px solid var(--jj-glass-b); border-radius: 6px; background: var(--jj-pill); color: var(--text); font-family: inherit; font-size: calc(10.5px * var(--fs-scale, 1)); font-weight: 650; white-space: nowrap; pointer-events: all; cursor: var(--cur-pointer, pointer); box-shadow: 0 3px 9px rgba(0,0,0,.22); }
 .jj-elabel span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .jj-elabel .ti { flex-shrink: 0; color: var(--c, var(--text-dim)); }
 .jj-elabel.has-c { border-color: rgba(255,255,255,.2); border-color: color-mix(in srgb, var(--c) 50%, transparent); }
 .jj-elabel:hover { border-color: var(--text-dim); }
 .jj-elabel.is-sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 3px 9px rgba(0,0,0,.22); }
-.jj-elabel.is-pv { height: 18px; padding: 0 6px 0 4px; font-size: 9.5px; pointer-events: none; cursor: default; }
+.jj-elabel.is-pv { height: 18px; padding: 0 6px 0 4px; font-size: 9.5px; pointer-events: none; cursor: var(--cur-default, default); }
 .jj-rf.is-hand .jj-elabel { cursor: grab; }
 
 /* ---- catatan tempel & teks ---- */
@@ -337,7 +337,7 @@ body.light .jj-note { box-shadow: 0 8px 22px rgba(0,0,0,.12), inset 0 1px 0 rgba
 body.light .jj-minimap .react-flow__minimap-mask { fill: rgba(0,0,0,.08); }
 
 /* ---- alat taruh ---- */
-.jj-place { position: absolute; inset: 0; z-index: 5; cursor: crosshair; touch-action: none; }
+.jj-place { position: absolute; inset: 0; z-index: 5; cursor: var(--cur-cross, crosshair); touch-action: none; }
 .jj-ghost { position: absolute; border: 1.5px dashed var(--accent); border-radius: 4px; background: rgba(246,217,122,.2); pointer-events: none; }
 
 /* ================= WIZARD "Jejaring baru" (di dalam panel, di bawah kepala) ================= */
@@ -354,18 +354,18 @@ body.light .jj-wiz-dlg { box-shadow: 0 26px 70px rgba(0,0,0,.14); }
 .jj-wiz-left { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 .jj-wiz-head { display: flex; align-items: flex-start; gap: 12px; padding: 4px 2px 16px; }
 .jj-wiz-ic { width: 36px; height: 36px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--text); }
-.jj-wiz-back { width: 36px; height: 36px; flex-shrink: 0; padding: 0; border: none; border-radius: 10px; background: none; color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.jj-wiz-back { width: 36px; height: 36px; flex-shrink: 0; padding: 0; border: none; border-radius: 10px; background: none; color: var(--text); display: flex; align-items: center; justify-content: center; cursor: var(--cur-pointer, pointer); }
 .jj-wiz-back:hover { background: var(--jj-hover); }
 .jj-wiz-titles { flex: 1; min-width: 0; }
 .jj-wiz-titles h2 { margin: 0; font-size: calc(18px * var(--fs-scale, 1)); font-weight: 700; line-height: 1.3; }
 .jj-wiz-titles p { margin: 2px 0 0; font-size: calc(13.5px * var(--fs-scale, 1)); color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; }
-.jj-wiz-x { width: 30px; height: 30px; flex-shrink: 0; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.jj-wiz-x { width: 30px; height: 30px; flex-shrink: 0; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: var(--cur-pointer, pointer); }
 .jj-wiz-x:hover { background: var(--jj-hover); color: var(--text); }
 .jj-wiz-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0 -6px; padding: 2px 6px; scrollbar-width: thin; }
 .jj-wiz-foot { display: flex; justify-content: flex-end; padding-top: 14px; }
 /* langkah 1: templat */
 .jj-tpls { display: flex; flex-direction: column; gap: 4px; }
-.jj-tpl { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 10px; border: 1px solid transparent; border-radius: 12px; background: none; color: var(--text); text-align: left; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+.jj-tpl { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 10px; border: 1px solid transparent; border-radius: 12px; background: none; color: var(--text); text-align: left; cursor: var(--cur-pointer, pointer); transition: background .15s ease, border-color .15s ease; }
 .jj-tpl:hover { background: var(--jj-hover); }
 .jj-tpl[aria-checked="true"] { background: var(--jj-on); border-color: var(--jj-glass-b); }
 .jj-tpl-ic { width: 38px; height: 38px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 10px; color: var(--c, var(--text)); background: var(--jj-hover); border: 1px solid var(--jj-glass-b); }
@@ -377,18 +377,18 @@ body.light .jj-wiz-dlg { box-shadow: 0 26px 70px rgba(0,0,0,.14); }
 .jj-types { display: flex; flex-direction: column; gap: 7px; }
 .jj-types-empty { margin: 4px 2px 8px; font-size: calc(13px * var(--fs-scale, 1)); line-height: 1.5; color: var(--text-dim); }
 .jj-trow { display: flex; align-items: center; gap: 4px; }
-.jj-trow-ic { width: 38px; height: 38px; flex-shrink: 0; margin-right: 2px; padding: 0; border: 1px solid var(--jj-glass-b); border-radius: 10px; background: var(--jj-hover); color: var(--c, var(--text)); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease; }
+.jj-trow-ic { width: 38px; height: 38px; flex-shrink: 0; margin-right: 2px; padding: 0; border: 1px solid var(--jj-glass-b); border-radius: 10px; background: var(--jj-hover); color: var(--c, var(--text)); display: flex; align-items: center; justify-content: center; cursor: var(--cur-pointer, pointer); transition: background .15s ease; }
 .jj-trow-ic:hover, .jj-trow-ic[aria-expanded="true"] { background: var(--jj-on); }
 .jj-trow-name { flex: 1; min-width: 0; height: 38px; padding: 0 12px; border: 1px solid var(--jj-glass-b); border-radius: 10px; outline: none; background: var(--jj-hover); color: var(--text); font-size: calc(14px * var(--fs-scale, 1)); font-weight: 550; }
 .jj-trow-name:focus { border-color: var(--accent); }
-.jj-trow-btn { width: 30px; height: 30px; flex-shrink: 0; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.jj-trow-btn { width: 30px; height: 30px; flex-shrink: 0; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: var(--cur-pointer, pointer); transition: background .15s ease, color .15s ease; }
 .jj-trow-btn:hover, .jj-trow-btn[aria-expanded="true"] { background: var(--jj-hover); color: var(--text); }
 .jj-trow-btn[data-w="dash"] { color: var(--text); }
 .jj-dash-svg line { stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .jj-trow-col i { display: block; width: 14px; height: 14px; border-radius: 50%; border: 1.5px dashed var(--text-dim); }
 .jj-trow-col.has-c i { border: none; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.2); }
 .jj-trow-x:hover { color: var(--danger); background: rgba(225,92,92,.12); }
-.jj-wiz-add { display: inline-flex; align-items: center; gap: 8px; height: 34px; margin-top: 6px; padding: 0 10px 0 8px; border: none; border-radius: 9px; background: none; color: var(--text); font-size: calc(13.5px * var(--fs-scale, 1)); font-weight: 650; cursor: pointer; }
+.jj-wiz-add { display: inline-flex; align-items: center; gap: 8px; height: 34px; margin-top: 6px; padding: 0 10px 0 8px; border: none; border-radius: 9px; background: none; color: var(--text); font-size: calc(13.5px * var(--fs-scale, 1)); font-weight: 650; cursor: var(--cur-pointer, pointer); }
 .jj-wiz-add:hover { background: var(--jj-hover); }
 /* pratinjau */
 .jj-wiz-right { position: relative; min-height: 0; min-width: 0; overflow: hidden; border-radius: 14px; background: var(--jj-pv-bg); border: 1px solid var(--jj-glass-b); }
@@ -440,10 +440,10 @@ body.perf-boost .jj-pop, body.perf-boost .jj-wiz-dlg, body.perf-boost .jj-tip-ca
 
 /* Tree Relations: "Hubungkan ke kartu lain" (satu kartu -> banyak kartu) */
 .jj-card-list { max-height: 260px; }
-.jj-card-list .jj-mi[disabled] { opacity: .5; cursor: default; }
+.jj-card-list .jj-mi[disabled] { opacity: .5; cursor: var(--cur-default, default); }
 .jj-pop-foot { display: flex; padding: 8px 6px 4px; margin-top: 4px; border-top: 1px solid var(--jj-line, rgba(255,255,255,.08)); }
 .jj-pop-foot .jj-btn-sm { flex: 1; }
-.jj-pop-foot .jj-btn-sm:disabled { opacity: .45; cursor: default; }
+.jj-pop-foot .jj-btn-sm:disabled { opacity: .45; cursor: var(--cur-default, default); }
 /* label relasi di garis pendek (kartu berdekatan): cukup ikon, nama di tooltip */
 .jj-elabel.is-compact { width: 22px; padding: 0; justify-content: center; border-radius: 999px; }
 .jj-elabel.is-pv.is-compact { width: 16px; height: 16px; }

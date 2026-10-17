@@ -1,0 +1,4 @@
+Kursor: "W11 Cursor Free" (Dark & Light) oleh JepriCreations — dari paket Windows (.cur/.ani) yang diberikan pemilik
+proyek, dikonversi ke PNG 32 px dengan titik tunjuk (hotspot) asli. Animasi .ani (wait, appstarting) diambil satu frame
+karena browser tidak mendukung kursor animasi.
+cursors/light = versi putih (dipakai di tema gelap), cursors/dark = versi hitam (dipakai di tema terang).

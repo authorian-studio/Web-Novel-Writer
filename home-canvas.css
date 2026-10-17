@@ -44,7 +44,7 @@ body.light .hc-panel {
 .hc-flow { position: absolute; inset: 0; z-index: 1; }
 .hc-flow > .react-flow { position: absolute; inset: 0; width: auto; height: auto; background: transparent; }
 .hc-rf .react-flow__background circle { fill: var(--hc-dot); }
-.hc-rf .react-flow__pane { cursor: default; }
+.hc-rf .react-flow__pane { cursor: var(--cur-default, default); }
 .hc-rf .react-flow__pane.dragging { cursor: grabbing; }
 .hc-rf.is-hand .react-flow__pane, .hc-rf.is-hand .react-flow__node, .hc-rf.is-hand .hc-scene, .hc-rf.is-hand .hc-trail,
 .hc-rf.is-hand .hc-frame-title, .hc-rf.is-hand .hc-frame-edge { cursor: grab; }
@@ -66,7 +66,7 @@ body.light .hc-panel {
   height: 32px; border-radius: 10px; border: 1px solid var(--hc-glass-b); background: var(--hc-glass); color: var(--text);
   font-size: calc(13px * var(--fs-scale, 1)); font-weight: 700; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
 }
-.hc-board-btn { display: inline-flex; align-items: center; gap: 6px; max-width: min(340px, 46vw); padding: 0 8px 0 11px; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+.hc-board-btn { display: inline-flex; align-items: center; gap: 6px; max-width: min(340px, 46vw); padding: 0 8px 0 11px; cursor: var(--cur-pointer, pointer); transition: background .15s ease, border-color .15s ease; }
 .hc-board-btn .ti { color: var(--text-dim); transition: transform .2s ease; }
 .hc-board-btn[aria-expanded="true"] .ti { transform: rotate(180deg); }
 .hc-board-btn:hover, .hc-board-btn[aria-expanded="true"] { border-color: rgba(255,255,255,.2); }
@@ -76,9 +76,9 @@ body.light .hc-board-btn:hover, body.light .hc-board-btn[aria-expanded="true"] {
 .hc-board-sub { pointer-events: none; font-size: calc(11.5px * var(--fs-scale, 1)); color: var(--text-dim); white-space: nowrap; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
 body.light .hc-board-sub { text-shadow: 0 0 6px rgba(255,255,255,.9); }
 .hc-head-right { gap: 2px; padding: 2px; border-radius: 11px; background: var(--hc-glass); border: 1px solid var(--hc-glass-b); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-.hc-pill { height: 26px; margin-right: 2px; padding: 0 10px 0 8px; display: inline-flex; align-items: center; gap: 6px; border-radius: 9px; border: none; background: none; color: var(--text-dim); font-size: calc(11.5px * var(--fs-scale, 1)); font-weight: 600; cursor: pointer; transition: background .15s ease, color .15s ease; }
-.hc-zoom { min-width: 48px; height: 28px; padding: 0 6px; border: none; border-radius: 8px; background: none; color: var(--text-dim); font-size: calc(11.5px * var(--fs-scale, 1)); font-weight: 650; font-variant-numeric: tabular-nums; cursor: pointer; }
-.hc-ibtn { width: 28px; height: 28px; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.hc-pill { height: 26px; margin-right: 2px; padding: 0 10px 0 8px; display: inline-flex; align-items: center; gap: 6px; border-radius: 9px; border: none; background: none; color: var(--text-dim); font-size: calc(11.5px * var(--fs-scale, 1)); font-weight: 600; cursor: var(--cur-pointer, pointer); transition: background .15s ease, color .15s ease; }
+.hc-zoom { min-width: 48px; height: 28px; padding: 0 6px; border: none; border-radius: 8px; background: none; color: var(--text-dim); font-size: calc(11.5px * var(--fs-scale, 1)); font-weight: 650; font-variant-numeric: tabular-nums; cursor: var(--cur-pointer, pointer); }
+.hc-ibtn { width: 28px; height: 28px; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: var(--cur-pointer, pointer); transition: background .15s ease, color .15s ease; }
 .hc-pill:hover, .hc-zoom:hover, .hc-ibtn:hover, .hc-ibtn[aria-expanded="true"], .hc-pill[aria-expanded="true"] { background: var(--hc-hover); color: var(--text); }
 .hc-bare-btn .ti + .ti, .hc-bare-btn[aria-pressed="true"] .ti:first-child { display: none; }
 .hc-bare-btn[aria-pressed="true"] .ti + .ti { display: block; }
@@ -91,7 +91,7 @@ body.light .hc-board-sub { text-shadow: 0 0 6px rgba(255,255,255,.9); }
 /* ---- tepi kanan: tombol tampilan + filter jejak ---- */
 .hc-rail { position: absolute; z-index: 6; right: 12px; top: 58px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .hc-side { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px; border-radius: 12px; background: var(--hc-glass); border: 1px solid var(--hc-glass-b); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-.hc-sbtn { position: relative; width: 30px; height: 30px; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.hc-sbtn { position: relative; width: 30px; height: 30px; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: var(--cur-pointer, pointer); transition: background .15s ease, color .15s ease; }
 .hc-sbtn:hover, .hc-sbtn[aria-expanded="true"] { background: var(--hc-hover); color: var(--text); }
 .hc-sbtn[aria-pressed="true"] { background: var(--hc-on); color: var(--text); }
 .hc-side-sep { width: 16px; height: 1px; margin: 2px 0; background: var(--hc-glass-b); }
@@ -107,7 +107,7 @@ body.light .hc-board-sub { text-shadow: 0 0 6px rgba(255,255,255,.9); }
   overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
 }
 .hc-tools::-webkit-scrollbar { display: none; }
-.hc-tool { position: relative; flex-shrink: 0; height: 40px; min-width: 36px; padding: 0 6px; border: none; border-radius: 11px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.hc-tool { position: relative; flex-shrink: 0; height: 40px; min-width: 36px; padding: 0 6px; border: none; border-radius: 11px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: var(--cur-pointer, pointer); transition: background .15s ease, color .15s ease; }
 .hc-tool:hover { background: var(--hc-hover); color: var(--text); }
 .hc-tool[aria-pressed="true"], .hc-tool[aria-expanded="true"] { background: var(--hc-on); color: var(--text); box-shadow: inset 0 0 0 1px var(--hc-glass-b); }
 .hc-t-sm { width: 34px; min-width: 34px; padding: 0; }
@@ -157,9 +157,9 @@ body.light .hc-empty { text-shadow: none; }
 @keyframes hcPop { from { opacity: 0; transform: translateY(-3px) scale(.98); } to { opacity: 1; transform: none; } }
 .hc-pop.is-shape, .hc-pop.is-note { min-width: 0; padding: 10px; }
 .hc-pop.is-help { width: 360px; }
-.hc-mi { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 32px; padding: 5px 9px 5px 8px; border: none; border-radius: 8px; background: none; color: var(--text); font-size: calc(13px * var(--fs-scale, 1)); text-align: left; cursor: pointer; }
+.hc-mi { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 32px; padding: 5px 9px 5px 8px; border: none; border-radius: 8px; background: none; color: var(--text); font-size: calc(13px * var(--fs-scale, 1)); text-align: left; cursor: var(--cur-pointer, pointer); }
 .hc-mi:hover, .hc-mi:focus-visible { background: var(--hc-hover); outline: none; }
-.hc-mi[disabled] { opacity: .4; cursor: default; background: none; }
+.hc-mi[disabled] { opacity: .4; cursor: var(--cur-default, default); background: none; }
 .hc-mi.is-danger, .hc-mi.is-danger .hc-mi-ic { color: var(--danger); }
 .hc-mi-ic { width: 18px; flex-shrink: 0; display: flex; justify-content: center; color: var(--text-dim); }
 .hc-mi-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3; }
@@ -173,11 +173,11 @@ body.light .hc-empty { text-shadow: none; }
 .hc-pick-head { margin: 0 2px 6px; font-size: calc(10.5px * var(--fs-scale, 1)); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
 .hc-pick-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: 10px; }
 .hc-pick-row:last-child { margin-bottom: 0; }
-.hc-pick { width: 38px; height: 38px; padding: 0; border: 1px solid transparent; border-radius: 10px; background: var(--hc-hover); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+.hc-pick { width: 38px; height: 38px; padding: 0; border: 1px solid transparent; border-radius: 10px; background: var(--hc-hover); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: var(--cur-pointer, pointer); transition: background .15s ease, border-color .15s ease; }
 .hc-pick:hover { background: var(--hc-on); }
 .hc-pick[aria-pressed="true"] { border-color: var(--accent); background: rgba(215,168,110,.16); background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .hc-pick-note { margin: 0 2px; font-size: calc(11.5px * var(--fs-scale, 1)); color: var(--text-dim); }
-.hc-sw { flex-shrink: 0; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 2px solid transparent; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); cursor: pointer; transition: transform .12s ease; }
+.hc-sw { flex-shrink: 0; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 2px solid transparent; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); cursor: var(--cur-pointer, pointer); transition: transform .12s ease; }
 .hc-sw:hover { transform: scale(1.12); }
 .hc-sw[aria-pressed="true"] { border-color: var(--text); }
 .hc-sw.is-note { border-radius: 6px; }
@@ -200,7 +200,7 @@ body.light .hc-fk-dot { background: var(--kcl); box-shadow: none; }
 .hc-pop.is-docs { max-width: calc(100% - 16px); min-width: 0; padding: 10px 10px 8px; }
 .hc-tiles { display: flex; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 1px; }
 .hc-tiles::-webkit-scrollbar { display: none; }
-.hc-tile { position: relative; flex-shrink: 0; width: 82px; padding: 4px 4px 6px; display: flex; flex-direction: column; align-items: center; gap: 6px; border: 1px solid transparent; border-radius: 12px; background: none; color: var(--text); cursor: pointer; transition: background .15s ease, border-color .15s ease, transform .18s cubic-bezier(.2,.8,.2,1); }
+.hc-tile { position: relative; flex-shrink: 0; width: 82px; padding: 4px 4px 6px; display: flex; flex-direction: column; align-items: center; gap: 6px; border: 1px solid transparent; border-radius: 12px; background: none; color: var(--text); cursor: var(--cur-pointer, pointer); transition: background .15s ease, border-color .15s ease, transform .18s cubic-bezier(.2,.8,.2,1); }
 .hc-tile:hover, .hc-tile:focus-visible { background: var(--hc-hover); border-color: var(--hc-glass-b); outline: none; transform: translateY(-2px); }
 .hc-tile-art { width: 72px; height: 50px; display: flex; overflow: hidden; border-radius: 9px; background: rgba(255,255,255,.04); box-shadow: 0 4px 12px rgba(0,0,0,.28), inset 0 0 0 1px rgba(255,255,255,.06); }
 body.light .hc-tile-art { background: rgba(0,0,0,.04); box-shadow: 0 3px 10px rgba(0,0,0,.1), inset 0 0 0 1px rgba(0,0,0,.06); }
@@ -211,12 +211,12 @@ body.light .hc-tile-art { background: rgba(0,0,0,.04); box-shadow: 0 3px 10px rg
 /* daftar dokumen satu jenis */
 .hc-pop.is-doclist { width: 330px; }
 .hc-dl-head { display: flex; align-items: center; gap: 8px; padding: 2px 4px 6px 2px; font-size: calc(13px * var(--fs-scale, 1)); }
-.hc-dl-back { width: 28px; height: 28px; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.hc-dl-back { width: 28px; height: 28px; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: var(--cur-pointer, pointer); }
 .hc-dl-back:hover { background: var(--hc-hover); color: var(--text); }
 .hc-dl-ic { display: flex; color: var(--kc); }
 body.light .hc-dl-ic { color: var(--kcl); }
 .hc-dl-seg { display: flex; flex-wrap: wrap; gap: 2px; margin: 0 2px 6px; padding: 2px; border-radius: 9px; background: var(--hc-hover); }
-.hc-dl-segb { flex: 1 0 auto; height: 28px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: none; border-radius: 7px; background: none; color: var(--text-dim); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 600; cursor: pointer; }
+.hc-dl-segb { flex: 1 0 auto; height: 28px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: none; border-radius: 7px; background: none; color: var(--text-dim); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 600; cursor: var(--cur-pointer, pointer); }
 .hc-dl-segb:hover { color: var(--text); }
 .hc-dl-segb[aria-checked="true"] { background: var(--hc-pop); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.25); }
 .hc-dl-search { display: flex; align-items: center; gap: 7px; height: 34px; margin: 0 2px 6px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--hc-glass-b); background: var(--hc-hover); color: var(--text-dim); }
@@ -232,7 +232,7 @@ body.light .hc-dl-item .hc-mi-ic { color: var(--kcl); }
 
 /* ---- bilah aksi objek terpilih (NodeToolbar) ---- */
 .hc-selbar { display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 12px; background: var(--hc-pop); border: 1px solid var(--hc-glass-b); box-shadow: var(--hc-shadow); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-.hc-sb-btn { height: 28px; min-width: 28px; padding: 0 6px; border: none; border-radius: 7px; background: none; color: var(--text-dim); display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; font-size: calc(12px * var(--fs-scale, 1)); font-weight: 700; transition: background .15s ease, color .15s ease; }
+.hc-sb-btn { height: 28px; min-width: 28px; padding: 0 6px; border: none; border-radius: 7px; background: none; color: var(--text-dim); display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: var(--cur-pointer, pointer); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 700; transition: background .15s ease, color .15s ease; }
 .hc-sb-btn:hover { background: var(--hc-hover); color: var(--text); }
 .hc-sb-btn[aria-pressed="true"] { background: var(--hc-on); color: var(--text); }
 .hc-sb-wide { padding: 0 10px; color: var(--text); background: rgba(215,168,110,.2); background: color-mix(in srgb, var(--accent) 22%, transparent); }
@@ -242,7 +242,7 @@ body.light .hc-dl-item .hc-mi-ic { color: var(--kcl); }
 .hc-selbar .hc-sw { width: 18px; height: 18px; margin: 0 1px; }
 
 /* ---- node: scene di papan lain (titik + judul) ---- */
-.hc-scene { width: 160px; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 7.5px 4px 4px; color: var(--text); cursor: pointer; }
+.hc-scene { width: 160px; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 7.5px 4px 4px; color: var(--text); cursor: var(--cur-pointer, pointer); }
 .hc-scene-dot { width: 11px; height: 11px; flex-shrink: 0; border-radius: 50%; background: #e8e8ec; box-shadow: 0 0 0 4px rgba(255,255,255,.06), 0 0 14px rgba(255,255,255,.35); transition: transform .2s ease, box-shadow .2s ease; }
 .hc-scene-dot.is-draft { background: var(--accent); box-shadow: 0 0 0 4px rgba(215,168,110,.1), 0 0 14px rgba(215,168,110,.45); }
 .hc-scene-dot.is-done { background: var(--success); box-shadow: 0 0 0 4px rgba(76,175,130,.1), 0 0 14px rgba(76,175,130,.45); }
@@ -256,7 +256,7 @@ body.light .hc-scene-dot.is-draft { background: var(--accent); box-shadow: 0 0 0
 body.light .hc-scene-dot.is-done { background: var(--success); box-shadow: 0 0 0 4px rgba(76,175,130,.14); }
 
 /* ---- node: titik jejak dokumen (warna per jenis; scene = warna statusnya). Ikon jenis muncul saat disorot ---- */
-.hc-trail { --c: var(--kc, #e8e8ec); width: 160px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 2px 4px 4px; color: var(--text); cursor: pointer; }
+.hc-trail { --c: var(--kc, #e8e8ec); width: 160px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 2px 4px 4px; color: var(--text); cursor: var(--cur-pointer, pointer); }
 body.light .hc-trail { --c: var(--kcl, #5d5a52); }
 .hc-trail.is-draft, body.light .hc-trail.is-draft { --c: var(--accent); }
 .hc-trail.is-done, body.light .hc-trail.is-done { --c: var(--success); }
@@ -302,7 +302,7 @@ body.light .hc-tip-kind { background: color-mix(in srgb, var(--kcl) 12%, transpa
 .hc-tip-go { margin-top: 3px; font-size: calc(10.5px * var(--fs-scale, 1)); font-weight: 600; color: var(--accent); }
 
 /* ---- node: kartu dokumen (alat Dokumen) ---- */
-.hc-doc { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; border-radius: 14px; background: var(--hc-card); border: 1px solid var(--hc-card-b); box-shadow: 0 12px 30px rgba(0,0,0,.32); color: var(--text); cursor: default; transition: border-color .15s ease, box-shadow .15s ease; }
+.hc-doc { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; border-radius: 14px; background: var(--hc-card); border: 1px solid var(--hc-card-b); box-shadow: 0 12px 30px rgba(0,0,0,.32); color: var(--text); cursor: var(--cur-default, default); transition: border-color .15s ease, box-shadow .15s ease; }
 body.light .hc-doc { box-shadow: 0 10px 26px rgba(0,0,0,.1); }
 .hc-doc::before { content: ""; position: absolute; left: 0; top: 0; right: 0; height: 2px; background: var(--kc); opacity: .75; }
 body.light .hc-doc::before { background: var(--kcl); }
@@ -383,10 +383,10 @@ body.light .hc-textn { text-shadow: none; }
 /* ---- node: frame (judul di atas, isi tembus klik) ---- */
 .hc-frame { width: 100%; height: 100%; border: 1.5px solid var(--hc-frame-b); border-radius: 14px; background: var(--hc-frame-bg); }
 .hc-frame.has-c { border-color: color-mix(in srgb, var(--c) 60%, transparent); background: color-mix(in srgb, var(--c) 7%, transparent); }
-.hc-frame-title { position: absolute; left: 2px; top: -28px; height: 24px; max-width: calc(100% / var(--k, 1)); transform: scale(var(--k, 1)); transform-origin: 0 100%; display: flex; align-items: center; padding: 0 6px; border-radius: 6px; color: var(--text-dim); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: all; cursor: move; transition: background .15s ease, color .15s ease; }
+.hc-frame-title { position: absolute; left: 2px; top: -28px; height: 24px; max-width: calc(100% / var(--k, 1)); transform: scale(var(--k, 1)); transform-origin: 0 100%; display: flex; align-items: center; padding: 0 6px; border-radius: 6px; color: var(--text-dim); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: all; cursor: var(--cur-move, move); transition: background .15s ease, color .15s ease; }
 .hc-frame-title:hover { color: var(--text); background: var(--hc-hover); }
 .hc-rf .react-flow__node.selected .hc-frame-title { color: var(--accent); }
-.hc-frame-edge { position: absolute; pointer-events: all; cursor: move; }
+.hc-frame-edge { position: absolute; pointer-events: all; cursor: var(--cur-move, move); }
 .hc-frame-edge.is-t { left: 0; right: 0; top: calc(-5px * var(--k, 1)); height: calc(10px * var(--k, 1)); }
 .hc-frame-edge.is-b { left: 0; right: 0; bottom: calc(-5px * var(--k, 1)); height: calc(10px * var(--k, 1)); }
 .hc-frame-edge.is-l { top: 0; bottom: 0; left: calc(-5px * var(--k, 1)); width: calc(10px * var(--k, 1)); }
@@ -403,7 +403,7 @@ body.light .hc-textn { text-shadow: none; }
 /* ---- pegangan penghubung: menutupi seluruh objek, hanya aktif di alat Penghubung ---- */
 .hc-rf .react-flow__handle.hc-handle { top: 0; left: 0; right: 0; bottom: 0; width: auto; height: auto; min-width: 0; min-height: 0; transform: none; border: none; border-radius: 10px; background: transparent; z-index: 0; }
 .hc-rf .react-flow__handle.hc-handle-frame { top: -28px; bottom: auto; right: auto; width: min(calc(100% / var(--k, 1)), 240px); height: 24px; border-radius: 6px; transform: scale(var(--k, 1)); transform-origin: 0 100%; }
-.hc-rf.is-connect .hc-handle { z-index: 4; cursor: crosshair; }
+.hc-rf.is-connect .hc-handle { z-index: 4; cursor: var(--cur-cross, crosshair); }
 .hc-rf.is-connect .react-flow__node:hover .hc-handle, .hc-rf .hc-handle.connectingfrom, .hc-rf .hc-handle.connectingto { box-shadow: 0 0 0 2px var(--accent); }
 .hc-rf .hc-handle.connectingto.valid { box-shadow: 0 0 0 3px var(--accent), 0 0 18px rgba(215,168,110,.45); }
 
@@ -415,7 +415,7 @@ body.light .hc-textn { text-shadow: none; }
 .hc-rf .react-flow__edge-link:hover .hc-arrow { fill: var(--text); }
 .hc-rf .react-flow__edge-link.selected .react-flow__edge-path { stroke: var(--accent); stroke-width: 2.2; }
 .hc-rf .react-flow__edge-link.selected .hc-arrow { fill: var(--accent); }
-.hc-elabel { position: absolute; max-width: 240px; padding: 3px 9px; border-radius: 8px; background: var(--hc-pop); border: 1px solid var(--hc-glass-b); box-shadow: 0 4px 12px rgba(0,0,0,.2); color: var(--text); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: all; cursor: default; }
+.hc-elabel { position: absolute; max-width: 240px; padding: 3px 9px; border-radius: 8px; background: var(--hc-pop); border: 1px solid var(--hc-glass-b); box-shadow: 0 4px 12px rgba(0,0,0,.2); color: var(--text); font-size: calc(12px * var(--fs-scale, 1)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: all; cursor: var(--cur-default, default); }
 .hc-elabel.is-sel { border-color: var(--accent); }
 .hc-elabel.is-edit { padding: 0; overflow: visible; border: none; background: none; box-shadow: none; }
 .hc-elabel-edit { width: 190px; height: 28px; padding: 0 9px; border: 1px solid var(--accent); border-radius: 8px; outline: none; background: var(--hc-pop); color: var(--text); font: inherit; }
@@ -430,7 +430,7 @@ body.light .hc-minimap .react-flow__minimap-mask { fill: rgba(0,0,0,.08); }
 .hc-minimap .hc-mm-text { fill: var(--text-dim); }
 
 /* ---- alat taruh: kotak bayangan saat menyeret ---- */
-.hc-place { position: absolute; inset: 0; z-index: 5; cursor: crosshair; touch-action: none; }
+.hc-place { position: absolute; inset: 0; z-index: 5; cursor: var(--cur-cross, crosshair); touch-action: none; }
 .hc-ghost { position: absolute; border: 1.5px dashed var(--accent); border-radius: 8px; background: var(--hc-tint); pointer-events: none; }
 .hc-ghost.is-note { border-radius: 4px; background: rgba(246,217,122,.22); }
 .hc-ghost.is-circle { border-radius: 50%; }

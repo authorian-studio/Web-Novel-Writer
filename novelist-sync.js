@@ -512,7 +512,7 @@
     const text = state === "local" && !S.localOk ? "Belum tersinkron" : st.text;
     ind.innerHTML = `${tiPx(tiIcon(st.icon), 14)}<span>${escapeHtml(text)}</span>`;
     ind.style.color = st.color;
-    ind.style.cursor = "pointer";
+    ind.style.cursor = "var(--cur-pointer, pointer)";
     ind.classList.toggle("ns-spin", state === "syncing");
     ind.title = state === "synced" ? "Klik untuk sinkron sekarang" : state === "login" ? "Klik untuk login ulang — tulisanmu tetap aman di perangkat ini" : text;
   }

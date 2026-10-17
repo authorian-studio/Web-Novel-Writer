@@ -1,6 +1,16 @@
-# Novelist Web — v0.20.0
+# Novelist Web — v0.21.0
 
-## Riwayat perubahan terbaru (v0.20.0) — paling baru di atas
+## Riwayat perubahan terbaru (v0.21.0) — paling baru di atas
+
+**Kursor baru: set "W11 Cursor" (JepriCreations)** menggantikan kursor pena Novelist sebagai bawaan
+(Pengaturan Akun → Kursor → Novelist).
+- Versi **putih** otomatis di tema gelap, versi **hitam** di tema terang.
+- Bukan hanya panah & tangan: I-beam (teks), dilarang, sibuk, crosshair, geser dan ubah ukuran juga ikut set ini.
+  Semua `cursor: x` di file CSS kini `var(--cur-x, x)` — mode Sistem tetap kursor bawaan OS, mode Kustom tetap jalan.
+- File `.cur` Windows dikonversi ke PNG 32 px (folder `cursors/`, kredit di `cursors/CREDITS.txt`) supaya jalan di
+  semua browser; kursor animasi (.ani) memakai satu frame.
+
+## v0.20.0
 
 **Modal Add / Edit project didesain ulang** mengikuti tema modern (kaca buram, aksen emas).
 - **Pratinjau sampul live** di kiri: buku 3D miring yang langsung menampilkan judul, deskripsi dan warna (atau foto
