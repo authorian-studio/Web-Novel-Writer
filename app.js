@@ -825,11 +825,12 @@ const TAB_DEFS = [
   { id: "timeline", panel: "timeline", name: "Timeline", icon: tiIcon("timeline"), desc: "Garis waktu peristiwa, terhubung ke scene" },
   { id: "map", panel: "map", name: "Map", icon: tiIcon("map"), desc: "Lukis peta dunia & lihat sebagai diorama 3D" },
   { id: "plot", panel: "plot", name: "Plot", icon: tiIcon("git-branch"), desc: "Kurva ketegangan, benang subplot & benih cerita" },
+  { id: "conversation", panel: "conversation", name: "Conversation", icon: tiIcon("messages"), desc: "Susun dialog antar tokoh Kodeks, lalu sisipkan ke Write atau Quill" },
   { id: "schedule", panel: "schedule", name: "Schedule", icon: tiIcon("calendar-time"), desc: "Jadwal & target menulis (segera hadir)" },
   { id: "tools", panel: "tools", name: "Tools", icon: tiIcon("tool"), desc: "Alat bantu menulis (segera hadir)" },
 ];
 const TAB_BY_ID = Object.fromEntries(TAB_DEFS.map((d) => [d.id, d]));
-const TAB_PANELS = ["home", "write", "organize", "jejaring", "timeline", "map", "plot", "schedule", "tools"];
+const TAB_PANELS = ["home", "write", "organize", "jejaring", "timeline", "map", "plot", "conversation", "schedule", "tools"];
 const TAB_DEFAULT = ["home", "write", "organize"];
 const TAB_QUICK = ["home", "write", "quill", "timeline", "map"];          // baris ikon bawah sidebar
 const TAB_EMPTY_MAIN = ["home", "write", "quill", "organize", "timeline"]; // chip utama saat semua tab ditutup
@@ -1104,6 +1105,8 @@ function applyTabPanels() {
   if (fresh("map")) openMapTab();
   if (fresh("plot")) openPlotTab();
   if (!panels.includes("plot") && window.NovelPlot) window.NovelPlot.hide();
+  if (fresh("conversation")) openConversationTab();
+  if (!panels.includes("conversation") && window.NovelConversation) window.NovelConversation.hide();
   if (fresh("organize") && window.NovelKodeks) window.NovelKodeks.refresh();   // Kodeks: "Disebut di" ikut naskah terbaru
   if (!pa) renderTabEmpty();
   renderSplitChrome();
@@ -2049,6 +2052,94 @@ async function openPlotTab() {
     openOutline: () => switchTab("write"),
     characters: () => ((getProject(currentProjectId).data.organize || {}).characters || []),
   });
+}
+
+// ---- CONVERSATION: conversation.js + conversation.css (dialog antar tokoh Kodeks bergaya obrolan) baru dimuat saat tab
+// ini pertama kali dibuka. Data di p.data.conversations; hasilnya disisipkan sebagai paragraf ke adegan (Kerangka) atau
+// chapter Quill lewat convInsert — di akhir isi, atau di kursor bila tujuan sedang terbuka di editor (split view).
+let convLibPromise = null;
+function ensureConversationLib() {
+  if (!convLibPromise) {
+    convLibPromise = loadStyleOnce("conversation.css").then(() => loadScriptOnce("conversation.js"));
+    convLibPromise.catch(() => { convLibPromise = null; });   // boleh dicoba lagi
+  }
+  return convLibPromise;
+}
+async function openConversationTab() {
+  const box = el("convRoot");
+  if (!window.NovelConversation) box.innerHTML = `<div class="home-loading">${tiPx(tiIcon("loader-2"), 18)}<span>Memuat Conversation…</span></div>`;
+  try { await ensureConversationLib(); }
+  catch (e) { box.innerHTML = '<div class="home-loading">Conversation gagal dimuat. Periksa koneksi lalu buka tab ini lagi.</div>'; return; }
+  if (el("tabConversation").classList.contains("hidden") || !currentProjectId) return;   // pengguna sudah pindah tab
+  if (box.querySelector(".home-loading")) box.innerHTML = "";
+  window.NovelConversation.show({
+    getProject: () => getProject(currentProjectId),
+    onChange: markDirtyAndSchedule,
+    characters: () => ((getProject(currentProjectId).data.organize || {}).characters || []),
+    openKodeks: () => { flushCurrentEdits(); switchTab("organize"); },
+    currentSceneId: () => currentSceneId,
+    currentChapter: convOpenChapter,
+    stories: () => convStories().map((s) => ({ id: s.id, title: s.title, chapters: s.chapters.filter(Boolean).map((c) => ({ id: c.id, title: c.title })) })),
+    canCursor: convCanCursor,
+    insert: convInsert,
+    openTarget: (t) => { flushCurrentEdits(); if (t.kind === "scene") openSceneInWrite(t.id); else openProjectDoc("chapter", t.id); },
+  });
+}
+function convStories() {
+  const p = getProject(currentProjectId);
+  return ((p && p.data.quill && p.data.quill.stories) || []).filter((s) => s && Array.isArray(s.chapters));
+}
+// chapter yang sedang terbuka di editor Quill (hanya bila Quill tampil, mis. di split view)
+function convOpenChapter() {
+  const q = window.NovelQuill;
+  if (!q || !q.isOpen() || !tabIsShown("quill")) return null;
+  const c = q.getContext();
+  return c && c.story && c.chapter ? { storyId: c.story.id, chapterId: c.chapter.id, ctx: c } : null;
+}
+function convCanCursor(t) {
+  if (t.kind === "scene") { const ed = el("sceneEditor"); return !!ed && ed.dataset.sceneId === t.id && tabIsShown("write"); }
+  const oc = convOpenChapter();
+  return !!oc && oc.chapterId === t.id;
+}
+// sisip di kursor: insertHTML menggabungkan paragraf pertama/terakhir dengan teks di sekitar kursor, jadi diapit penanda
+// paragraf sementara yang lalu dibuang (paragraf tempat kursor terbelah seperti menekan Enter)
+const CONV_MARK = "\u2063cv\u2063";
+const convWrapMarks = (html) => `<p>${CONV_MARK}</p>${html}<p>${CONV_MARK}</p>`;
+const convCleanMarks = (h) => {
+  const m = `(?:<span\\b[^>]*>)?${CONV_MARK}(?:<\\/span>)?`;   // Chrome kadang membungkus penanda dengan <span style>
+  return String(h || "").replace(new RegExp(`<p\\b[^>]*>${m}(?:\\s|&nbsp;|<br\\s*\\/?>)*<\\/p>`, "g"), "").replace(new RegExp(`${m}(?:&nbsp;|\\s)*`, "g"), "");
+};
+const convTrimEnd = (h) => String(h || "").replace(/(\s*<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>)+\s*$/i, "");
+function convInsert(t, html, atCursor) {
+  flushCurrentEdits();
+  if (t.kind === "scene") {
+    const s = findScene(t.id);
+    if (!s || s.type === "folder") return false;
+    const ed = el("sceneEditor"), onPage = !!ed && ed.dataset.sceneId === s.id;
+    if (onPage && atCursor && tabIsShown("write")) {
+      twExec("insertHTML", convWrapMarks(html));
+      ed.innerHTML = convCleanMarks(ed.innerHTML);
+      twOnEditorInput();   // simpan isi + statistik
+      return true;
+    }
+    s.content = convTrimEnd(s.content) + html;
+    if (onPage) { ed.innerHTML = s.content; twUpdateEmpty(); twUpdateStats(); }
+    else if (tabIsShown("write")) renderSceneList();   // jumlah kata di daftar adegan
+    markDirtyAndSchedule();
+    return true;
+  }
+  const st = convStories().find((x) => x.id === t.storyId), ch = st && st.chapters.find((c) => c && c.id === t.id);
+  if (!ch) return false;
+  const oc = convOpenChapter();
+  if (oc && oc.chapterId === ch.id) {   // chapter sedang dibuka di Quill: lewat editornya supaya tidak tertimpa saat disimpan
+    if (atCursor) { oc.ctx.insertHtmlAtCursor(convWrapMarks(html)); oc.ctx.replaceChapterHtml(convCleanMarks(oc.ctx.getChapterHtml())); }
+    else oc.ctx.replaceChapterHtml(convTrimEnd(oc.ctx.getChapterHtml()) + html);
+    return true;
+  }
+  ch.html = convTrimEnd(ch.html) + html;
+  ch.updatedAt = st.updatedAt = new Date().toISOString();
+  markDirtyAndSchedule();
+  return true;
 }
 
 // ---- HOME TAB: canvas berisi titik-titik scene ----

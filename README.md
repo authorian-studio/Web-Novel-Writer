@@ -1,6 +1,29 @@
-# Novelist Web — v0.17.0
+# Novelist Web — v0.18.0
 
-## Riwayat perubahan terbaru (v0.17.0) — paling baru di atas
+## Riwayat perubahan terbaru (v0.18.0) — paling baru di atas
+
+**Tab baru: Conversation.** Susun dialog antar tokoh dari Kodeks seperti obrolan, lalu sisipkan hasilnya sebagai prosa ke
+adegan di Write (Kerangka) atau ke chapter Quill. Buka dari "Tambah tab" (ikon gelembung obrolan).
+- **Percakapan** punya judul (klik judul → daftar percakapan / buat baru; menu ⋯ = ganti judul, duplikat, salin sebagai
+  teks, hapus) dan baris **"Apa yang terjadi?"** untuk catatan situasinya (tidak ikut disisipkan).
+- **Tokoh** dipilih dari karakter Kodeks (foto/inisial + warna). Tokoh pertama = POV: gelembungnya di kanan, lainnya di
+  kiri. Klik avatar untuk mengganti pembicara; cari tokoh dengan mengetik.
+- **Menulis cepat:** Enter = baris berikutnya dengan pembicara bergantian (A-B-A-B), Shift+Enter = baris baru di dialog
+  yang sama, Ctrl+1–9 = ganti pembicara ke tokoh ke-n, Ctrl+0 = narasi, Backspace di baris kosong = hapus, Alt+↑/↓ atau
+  seret pegangan = pindah baris, ↑/↓ di ujung kolom = pindah ke baris tetangga.
+- **Narasi / aksi** (baris miring di tengah) untuk gerak tokoh di antara dialog.
+- **Tag dialog** per baris: otomatis (kata / tanya — mengikuti tanda tanya), tanpa tag, pilihan (bisik, teriak, gumam, …)
+  atau kata kerja sendiri.
+- **Sisipkan:** pilih tujuan Write (adegan) atau Quill (cerita → chapter), posisi **di akhir** atau **di posisi kursor
+  terakhir** (bila tujuan sedang terbuka, mis. di split view — paragraf tempat kursor terbelah seperti menekan Enter),
+  gaya **Novel dengan tag** (“Aku pergi,” kata Raka.), **Novel tanpa tag**, atau **Naskah** (RAKA: Aku pergi.), tanda kutip
+  (“ ”, " ", ‘ ’, 「 」, « », — ) dan bahasa tag (Indonesia "kata Raka" / English "Raka said"), dengan pratinjau. Pilihan
+  format diingat di perangkat; riwayat "Sudah disisipkan ke" bisa diklik untuk membuka tujuannya.
+- Data disimpan di project (`data.conversations`) dan ikut tersinkron ke Drive. Bekerja di split view, tema terang/gelap,
+  layar sempit, dan English.
+
+## v0.17.0
+
 
 **Tab Plot kini hidup: Plot Lab.** Bukan papan kartu lagi, tapi alat untuk *membaca bentuk* cerita. Semuanya membaca
 urutan adegan & bab di Kerangka, jadi tidak ada data ganda. Navigasi kiri berisi empat tampilan + pilihan pola struktur
