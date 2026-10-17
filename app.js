@@ -824,7 +824,7 @@ const TAB_DEFS = [
   { id: "jejaring", panel: "jejaring", name: "Tree Relations", icon: tiIcon("affiliate"), desc: "Pohon relasi tokoh: keluarga, kantor, militer, istana" },
   { id: "timeline", panel: "timeline", name: "Timeline", icon: tiIcon("timeline"), desc: "Garis waktu peristiwa, terhubung ke scene" },
   { id: "map", panel: "map", name: "Map", icon: tiIcon("map"), desc: "Lukis peta dunia & lihat sebagai diorama 3D" },
-  { id: "plot", panel: "plot", name: "Plot", icon: tiIcon("git-branch"), desc: "Susun alur & konflik cerita (segera hadir)" },
+  { id: "plot", panel: "plot", name: "Plot", icon: tiIcon("git-branch"), desc: "Kurva ketegangan, benang subplot & benih cerita" },
   { id: "schedule", panel: "schedule", name: "Schedule", icon: tiIcon("calendar-time"), desc: "Jadwal & target menulis (segera hadir)" },
   { id: "tools", panel: "tools", name: "Tools", icon: tiIcon("tool"), desc: "Alat bantu menulis (segera hadir)" },
 ];
@@ -1102,6 +1102,8 @@ function applyTabPanels() {
   if (!panels.includes("map") && window.NovelMap) window.NovelMap.hide();   // hentikan render loop 3D
   if (fresh("timeline")) openTimelineTab();
   if (fresh("map")) openMapTab();
+  if (fresh("plot")) openPlotTab();
+  if (!panels.includes("plot") && window.NovelPlot) window.NovelPlot.hide();
   if (fresh("organize") && window.NovelKodeks) window.NovelKodeks.refresh();   // Kodeks: "Disebut di" ikut naskah terbaru
   if (!pa) renderTabEmpty();
   renderSplitChrome();
@@ -2021,6 +2023,32 @@ async function openMapTab() {
     },
   });
   consumeTabPendingDoc("map");   // dibuka dari riwayat
+}
+
+// ---- PLOT: plot.js + plot.css (Plot Lab: kurva ketegangan, benang subplot, benih & panen, diagnosa) baru dimuat saat
+// tab ini pertama kali dibuka. Data di p.data.plot; urutan adegan dibaca langsung dari Kerangka (p.data.scenes).
+let plotLibPromise = null;
+function ensurePlotLib() {
+  if (!plotLibPromise) {
+    plotLibPromise = loadStyleOnce("plot.css").then(() => loadScriptOnce("plot.js"));
+    plotLibPromise.catch(() => { plotLibPromise = null; });   // boleh dicoba lagi
+  }
+  return plotLibPromise;
+}
+async function openPlotTab() {
+  const box = el("plotRoot");
+  if (!window.NovelPlot) box.innerHTML = `<div class="home-loading">${tiPx(tiIcon("loader-2"), 18)}<span>Memuat Plot…</span></div>`;
+  try { await ensurePlotLib(); }
+  catch (e) { box.innerHTML = '<div class="home-loading">Plot gagal dimuat. Periksa koneksi lalu buka tab ini lagi.</div>'; return; }
+  if (el("tabPlot").classList.contains("hidden") || !currentProjectId) return;   // pengguna sudah pindah tab
+  if (box.querySelector(".home-loading")) box.innerHTML = "";
+  window.NovelPlot.show({
+    getProject: () => getProject(currentProjectId),
+    onChange: markDirtyAndSchedule,
+    openScene: (id) => { flushCurrentEdits(); openSceneInWrite(id); },
+    openOutline: () => switchTab("write"),
+    characters: () => ((getProject(currentProjectId).data.organize || {}).characters || []),
+  });
 }
 
 // ---- HOME TAB: canvas berisi titik-titik scene ----

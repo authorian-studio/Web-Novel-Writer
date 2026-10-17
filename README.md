@@ -1,6 +1,34 @@
-# Novelist Web — v0.16.0
+# Novelist Web — v0.17.0
 
-## Riwayat perubahan terbaru (v0.16.0) — paling baru di atas
+## Riwayat perubahan terbaru (v0.17.0) — paling baru di atas
+
+**Tab Plot kini hidup: Plot Lab.** Bukan papan kartu lagi, tapi alat untuk *membaca bentuk* cerita. Semuanya membaca
+urutan adegan & bab di Kerangka, jadi tidak ada data ganda. Navigasi kiri berisi empat tampilan + pilihan pola struktur
+(masing-masing dengan sparkline bentuknya).
+- **Kurva ketegangan.** Tiap adegan adalah titik yang bisa **diseret naik-turun** (0–10; dari keyboard: ↑/↓, angka 0–9,
+  ←/→ pindah adegan, Delete hapus nilai). Kurvamu digambar di atas **bentuk ideal** pola yang dipilih (garis putus-putus)
+  dengan pita bab di latar. **Isi dari pola** memberi titik awal. Panel kanan menampilkan adegan terpilih: nilai &
+  suasananya (Tenang → Puncak), saran nilai dari pola di posisi itu, sinopsis, Tujuan/Konflik/Hasil dari Kerangka, beat,
+  benang & benih yang menyentuhnya.
+- **Pola struktur + beat:** Tiga Babak, Save the Cat (14 beat), Perjalanan Pahlawan (12 tahap), Kishōtenketsu, Piramida
+  Freytag, Kurva Fichtean — tiap beat punya penjelasan singkat. Pasang beat ke adegan; nomor beat tampil di kurva, dan
+  bila jauh dari posisi idealnya muncul garis geser + label (mis. "+28%"). Pemasangan beat disimpan per pola.
+- **Benang cerita.** Tabel anyaman: baris = plot utama / subplot / arc tokoh, kolom = adegan (dikelompokkan per bab). Klik
+  sel: muncul → titik balik → selesai (Shift/Alt+klik = kosongkan). Garis berwarna menghubungkan kemunculan; **jeda yang
+  terlalu panjang diberi garis merah**. Baris **Kepadatan** menunjukkan berapa benang bergerak di tiap adegan. Tombol
+  cepat: Plot utama, Subplot romansa, Misteri, Persahabatan, dan "Arc <nama tokoh>" dari Kodeks.
+- **Benih & panen** (setup → payoff / pistol Chekhov). Catat petunjuk/janji, adegan tanam & adegan tuai. Peta busur di
+  atas memperlihatkan semuanya: hijau = terbayar, oranye putus-putus = belum dituai, merah = dituai sebelum ditanam.
+  Saring "Belum tuntas".
+- **Diagnosa plot** otomatis (angka di navigasi = jumlah peringatan): ketegangan datar ≥ 4 adegan, puncak yang jauh dari
+  pola, kurva yang tidak bergelombang, beat yang meleset / urutannya terbalik / belum dipasang, benang yang menghilang
+  terlalu lama atau berhenti tanpa selesai, adegan yang tidak memajukan benang apa pun, benih yang belum dituai, dan
+  adegan tanpa konflik di Kerangka. Ada skor kesehatan + meter, dan tiap temuan bisa diklik untuk melompat ke tempatnya.
+- Data disimpan di project (`data.plot`) dan ikut tersinkron ke Drive. Bekerja di split view (navigasi jadi ikon saat
+  jendela sempit), tema terang/gelap, dan English.
+- Terjemahan English: dua tooltip lama yang berakhir "… scene" tidak lagi berubah jadi "… scenes".
+
+## v0.16.0
 
 **Split view: buka 2 fitur berdampingan seperti jendela terpisah (maks. 2).** Mis. Kodeks di kiri, Tree Relations di
 kanan — keduanya hidup dan bisa dipakai bersamaan.
